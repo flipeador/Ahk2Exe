@@ -59,6 +59,9 @@ CB_GetCount(CB)
 
 /*
     Recupera el texto del elemento especificado.
+    Parámetros:
+        Item: El índice basado en cero del elemento cuyo texto se va a recuperar.
+              Si se especifica -1, recupera el texto mostrado por el control de edición (Edit). Si es un control DDL, recupera el texto del elemento seleccionado.
     Return:
         Si tuvo éxito devuelve el texto del elemento, caso contrario devuelve una cadena vacía.
     ErrorLevel:
@@ -67,7 +70,11 @@ CB_GetCount(CB)
 CB_GetText(CB, Item := -1)
 {
     If (Item == -1)
-        Return ControlGetText(, "ahk_id" . CB_GetInfo(CB).Edit)
+    {
+        If (CB.Type == "ComboBox")
+            Return ControlGetText(, "ahk_id" . CB_GetInfo(CB).Edit)
+        Item := CB_GetSelection(CB)
+    }
 
     ; CB_GETLBTEXTLEN message
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775864(v=vs.85).aspx
@@ -136,11 +143,19 @@ CB_GetSelection(CB)
 
 /*
     Establece la selección en el elemento especificado.
+    Parámetros:
+        Item:
+            El índice basado en cero del elemento a seleccionar.
+        Mode:
+            Si se especifica, debe ser uno de los valores del parámetro «Mode» de la función CB_FindString. El parámetro «Item» de esta función debe ser una cadena a buscar y seleccionar.
     Return:
         Si tuvo éxito devuelve el índice basado en cero del elemento seleccionado, caso contrario devuelve -1.
 */
-CB_SetSelection(CB, Item)
+CB_SetSelection(CB, Item, Mode := -1)
 {
+    If (Mode != -1)
+        Item := CB_FindString(CB, Item,, Mode)
+
     ; CB_SETCURSEL message
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775899(v=vs.85).aspx
     Return DllCall("User32.dll\SendMessageW", "Ptr", CB.Hwnd, "UInt", 0x014E, "Ptr", Item, "Ptr", 0, "Ptr")

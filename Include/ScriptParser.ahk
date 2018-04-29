@@ -1,14 +1,28 @@
-﻿PreprocessScript(Script, Parent := "", FileList := "")
+﻿PreprocessScript(Script, Tree := "", FileList := "", Directives := "")
 {
-    LastError := 0
-    If (Parent == "")
+    If (Tree == "")
     {
-        Log := "Inicializando pre-procesado del script`n"
+        Util_AddLog("INFO", "Se ha iniciado el procesado del script", Script)
+
         FileList := []    ; almacena una lista con todos los archivos incluidos (para evitar varias inclusiones de un mismo archivo)
+        ; almacena los archivos a añadir luego de la compilación al archivo EXE resultante y otras configuraciones
+        Directives := {         MainIcon: CB_GetText(Gui.Control["ddlico"])
+                      ,       ConsoleApp: FALSE
+                      ,     ResourceLang: SUBLANG_ENGLISH_US
+                      ,         PostExec: ""
+                      ,      CompanyName: ""
+                      ,  FileDescription: ""
+                      ,      FileVersion: A_AhkVersion
+                      ,   ProductVersion: A_AhkVersion
+                      ,   LegalCopyright: ""
+                      , OriginalFilename: SubStr(Script, InStr(Script, "\",, -1)+1)
+                      ,     InternalName: ""
+                      ,      ProductName: ""
+                      ,         Comments: ""
+                      ,        Resources: [] }
     }
     FileList.Push(Script)    ; incluimos este script a la lista de archivos incluidos
-    Log .= "Include [" . Script . "]`n"
-
+    Util_AddLog("INCLUDE", "Se ha incluido un archivo", Script,, StrReplace(Tree, "`n", "|"))
 
 
     ; ======================================================================================================================================================
@@ -16,8 +30,8 @@
     ; ======================================================================================================================================================
     If (DirExist(Script) || !FileExist(Script))
     {
-        Util_Error("El archivo de código fuente AHK no existe.", Script . (Parent == "" ? "" : "`nParent: " . Parent))
-        Log .= "Archivo script no encontrado [" . Script . "]`n"
+        Util_AddLog("ERROR", "No se ha encontrado el script", Script,, StrReplace(Tree, "`n", "|"))
+        Util_Error("El archivo de código fuente AHK no existe.", Script)
         Return FALSE    ; terminamos pre-procesado debido a un error
     }
     Local WorkingDir := new TempWorkingDir(GetDirParent(Script))    ; establece temporalmente el directorio de trabajo actual al del script ha procesar
@@ -33,6 +47,8 @@
         , IncludeAgain := FALSE    ; determina si se debe ignorar archivos ya incluidos
         ,    InComment := FALSE    ; determina si se está en un comentario en bloque
         ,  ContSection := FALSE    ; determina si se está en una continuación de una sección
+        ,      IgnoreQ := 0        ; 
+        ,  IgnoreBegin := FALSE    ; determina si el código siguiente debe ser ignorado
 
     VarSetCapacity(NewCode, FileGetSize(Script))    ; establecemos la capacidad de la variable que amlacenará el nuevo código, para mejorar el rendimiento
     VarSetCapacity(LineTxt, 65534 * 2)    ; capacidad de la variable que almacenará el texto de la línea actual
@@ -40,19 +56,118 @@
     Loop Read, Script    ; abrimos el archivo para lectura y leemos línea por línea
     {
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        ; Buscamos el final de secciones de continuación
+        ; Directivas específicas del compilador
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (ContSection)
+        If (IgnoreBegin)    ; ¿ignorar línea?
         {
-            If (SubStr(LTrim(A_LoopReadLine), 1, 2) == ")`"")    ; ¿termina la sección?
-                ContSection := FALSE
-            NewCode .= A_LoopReadLine . "`n"
+            IgnoreBegin := !(A_LoopReadLine ~= "i)^\s*;@Ahk2Exe-IgnoreEnd")    ; continua hasta que se encuentre ";@Ahk2Exe-IgnoreEnd"
+            Continue
+        }
+        If (A_LoopReadLine ~= "i)^\s*;@Ahk2Exe-")    ; ¿la línea empieza con ";@Ahk2Exe-"? (ignora espacios antes de ";")
+        {
+            LineTxt := SubStr(Trim(A_LoopReadLine), 11)    ; removemos espacios al principio y final de la línea, luego eliminamos ";@Ahk2Exe-" al principio
+            foo := (bar := InStr(LineTxt, A_Space)) ? SubStr(LineTxt, 1, bar - 1) : LineTxt    ; recuperamos el nombre del comando
+            bar := bar ? LTrim(SubStr(LineTxt, bar)) : ""    ; recupera el valor
+
+
+            If (Tree == "")    ; ¿estamos en el script principal?
+            {
+                ; ##############################################################################################################################################
+                ; Directivas que controlan los metadatos ejecutables que se añadirán al archivo EXE resultante
+                ; ##############################################################################################################################################
+                If (foo = "SetMainIcon")    ; anula el ícono EXE personalizado utilizado para la compilación.
+                {
+                    If (bar == "")    ; ¿no se especificó nada luego del comando?
+                        Util_Error("Uso inválido de la directiva @Ahk2Exe-SetMainIcon.`nDebe especificar un icono.`nLínea #" . A_Index . ".", Script)
+                    Else If (DirExist(bar := Util_GetFullPathName(bar)) || !FileExist(bar))
+                        Util_Error("Error en la directiva @Ahk2Exe-SetMainIcon.`nEl archivo icono especificado no existe.`n" . bar . "`nLínea #" . A_Index . ".", Script)
+                    Else
+                        Directives.MainIcon := bar
+                }
+
+                Else If (foo = "ConsoleApp")    ; cambia el subsistema ejecutable al modo consola
+                    Directives.ConsoleApp := TRUE
+
+                Else If (foo = "UseResourceLang")    ; cambia el lenguaje de recursos utilizado por @Ahk2Exe-AddResource
+                {
+                    If (bar == "")
+                        Util_Error("Uso inválido de la directiva @Ahk2Exe-UseResourceLang.`nDebe especificar un código de idioma.`nLínea #" . A_Index . ".", Script)
+                    Else If (!(bar is "Integer"))
+                        Util_Error("Error en la directiva @Ahk2Exe-UseResourceLang.`nEl valor de idioma especificado es inválido.`n" . bar . "`nLínea #" . A_Index . ".", Script)
+                    Else
+                        Directives.ResourceLang := bar
+                }
+
+                Else If (foo = "PostExec")    ; especifica un comando que se ejecutará después de una compilación exitosa
+                {
+                    If (bar == "")
+                        Util_Error("Uso inválido de la directiva @Ahk2Exe-PostExec.`nDebe especificar un comando ha ejecutar después de la compilación.`nLínea #" . A_Index . ".", Script)
+                    Else
+                        Directives.PostExec := bar
+                }
+
+                Else If (foo = "AddResource")
+                {
+                    If (bar == "")
+                        Util_Error("Uso inválido de la directiva @Ahk2Exe-AddResource.`nDebe especificar un recurso ha añadir al archivo EXE resultante.`nLínea #" . A_Index . ".", Script)
+                    Else
+                        ObjPush(Directives.Resources, ParseResourceStr(bar, A_Index, Script))
+                }
+
+                Else    ; información de la versión
+                {
+                    If (foo = "SetCompanyName")
+                        Directives.CompanyName := bar
+                    If (foo = "SetFileDescription" || foo = "SetDescription")
+                        Directives.FileDescription := bar
+                    If (foo = "SetFileVersion" || foo = "SetVersion")
+                        Directives.FileVersion := bar
+                    If (foo = "SetProductVersion" || foo = "SetVersion")
+                        Directives.ProductVersion := bar
+                    If (foo = "SetLegalCopyright" || foo = "SetCopyright")
+                        Directives.LegalCopyright := bar
+                    If (foo = "SetOriginalFilename" || foo = "OrigFilename")
+                        Directives.OriginalFilename := bar
+                    If (foo = "SetInternalName" || foo = "SetName")
+                        Directives.InternalName := bar
+                    If (foo = "SetProductName" || foo = "SetName")
+                        Directives.ProductName := bar
+                    If (foo = "SetComments")
+                        Directives.Comments := bar
+                }
+            }
+
+
+            ; ##############################################################################################################################################
+            ; Directivas que controlan el comportamiento del script
+            ; ##############################################################################################################################################
+            If (foo = "IgnoreBegin")    ; ¿ignorar todas las líneas entre IgnoreBegin y IgnoreEnd?
+                IgnoreBegin := TRUE
+
+
+            If (ERROR)
+                Return FALSE
             Continue
         }
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        ; Removemos espacios al inicio y final de la línea, ignoramos líneas en blanco y comentarios al inicio de la línea, almacenamos la línea actual
+        ; Buscamos el final de secciones de continuación
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        If (ContSection)
+        {
+            If (!(A_LoopReadLine ~= "^\s*\)(`"|')"))    ; ¿no termina la sección?    )" | )'
+            {
+                NewCode .= A_LoopReadLine . "`n"
+                Continue
+            }
+            ContSection := FALSE
+            IgnoreQ := TRUE
+        }
+
+
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        ; Removemos espacios al inicio y final de la línea, ignoramos líneas en blanco y comentarios al inicio de la línea
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         If ((LineTxt := Trim(A_LoopReadLine)) == "" || SubStr(LineTxt, 1, 1) == ";")
             Continue    ; continuamos con la próxima línea
@@ -92,8 +207,8 @@
         {
             If (foo == "`"" || foo == "'")    ; ¿estamos dentro de una cadena?
             {
-                If (A_LoopField == foo && Mod(bar, 2) == 0)    ; ¿aquí termina la cadena? ¿se trata de una comilla de cierre o una literal?
-                    foo := ""    ; terminamos la cadena
+                If (IgnoreQ || A_LoopField == foo && Mod(bar, 2) == 0)    ; ¿aquí termina la cadena? ¿se trata de una comilla de cierre o una literal?
+                    IgnoreQ := FALSE, foo := ""    ; terminamos la cadena
                 ; si bar es múltiplo de 2, entonces "`" hace referencia a otro "`"; esto ayuda a diferenciar correctamente var:="cadena`"" de var:="cadena``"
                 bar := A_LoopField == "``" ? bar + 1 : 0    ; ¿es el caracter "`" o no?
                 Continue    ; continuamos con el próximo caracter
@@ -114,23 +229,16 @@
             foo := A_LoopField    ; almacena el caracter actual (útil para detectar el comienzo de una cadena, objeto o cualquier otra cosa del estilo)
         }
 
-        If (foo == "`"" || foo == "'")    ; ¿hay alguna cadena sin cerrar?
-        {
-            ; comentado debido a continuaciones de secciones ( var := "`n(`n)" )
-            ;Util_Error("Error de sintaxis.`nNo se ha encontrado la comilla de cierre.`nLínea #" . LineNum . "; Carácter " . foo . ".", Script)
-            ;Return FALSE
-        }
-
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Procesamos los #Includes
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (SubStr(LineTxt, 1, 14) = "#IncludeAgain ")
+        If (SubStr(LineTxt, 1, 14) = "#IncludeAgain ")    ; ¿en esta línea hay un #IncludeAgain?
             LineTxt := StrReplace(LineTxt, "#IncludeAgain ", "#Include "), IncludeAgain := TRUE
         If (SubStr(LineTxt, 1, 9) = "#Include ")    ; ¿en esta línea hay un #Include?
         {
             LineTxt := Trim(SubStr(LineTxt, 9))    ; eliminamos la palabra "#Include" del inicio y luego espacios en blanco
-            DerefVar(LineTxt, A_WorkingDir)    ; desreferenciamos las variables incluidas entre signos de porcentaje
+            DerefVar(LineTxt)    ; desreferenciamos las variables incluidas entre signos de porcentaje
 
             If (SubStr(LineTxt, 1, 2) == "*i")    ; ¿el archivo a incluir es opcional?
             {
@@ -158,32 +266,31 @@
                 If (FileExist(bar . LineTxt))    ; ¿existe el archivo a incluir en la carpeta "Lib" del script principal?
                 {
                     If (!IsAlreadyIncluded(FileList, bar . LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
-                        NewCode .= PreprocessScript(bar . LineTxt, Script, FileList) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
-                    If (LastError == 1)    ; ¿ha ocurrido un error en el procesado del script incluido?
+                        NewCode .= PreprocessScript(bar . LineTxt, Tree . "`n" . Script, FileList, Directives) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
+                    If (ERROR)
                         Return FALSE
                 }
                 Else If (AhkLib[1] != "" && FileExist(AhkLib[1] . "\" . LineTxt))    ; ¿existe el archivo a incluir en la carpeta "Lib" en el directorio de instalación de AHK?
                 {
                     If (!IsAlreadyIncluded(FileList, AhkLib[1] . "\" . LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
-                        NewCode .= PreprocessScript(AhkLib[1] . "\" . LineTxt, Script, FileList) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
-                    If (LastError == 1)    ; ¿ha ocurrido un error en el procesado del script incluido?
+                        NewCode .= PreprocessScript(AhkLib[1] . "\" . LineTxt, Tree . "`n" . Script, FileList, Directives) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
+                    If (ERROR)
                         Return FALSE
                 }
                 Else If (AhkLib[2] != "")
                 {
                     If (!IsAlreadyIncluded(FileList, AhkLib[2] . "\" . LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
-                        NewCode .= PreprocessScript(AhkLib[2] . "\" . LineTxt, Script, FileList) . "`n"   ; procesa el script incluido y añadimos el resultado al nuevo código
-                    If (LastError == 1)    ; ¿ha ocurrido un error en el procesado del script incluido?
+                        NewCode .= PreprocessScript(AhkLib[2] . "\" . LineTxt, Tree . "`n" . Script, FileList, Directives) . "`n"   ; procesa el script incluido y añadimos el resultado al nuevo código
+                    If (ERROR)
                         Return FALSE
                 }
                 Else If (!foo)    ; ¿no se debe permitir omitir archivos inexistentes?
                 {
-                    Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include <" . LineTxt . ">`nLínea #" . LineNum . ".", Script)
-                    Log .= "Archivo a incluir no encontrado [<" . LineTxt . ">]`n"
-                    Return FALSE
+                    Util_AddLog("ERROR", "No se a encontrado el archivo a incluir", Script, A_Index, "<" . LineTxt . ">")
+                    Return Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include <" . LineTxt . ">`nLínea #" . LineNum . ".", Script)
                 }
                 Else
-                    Log .= "Archivo a incluir omitido [<" . LineTxt . ">]`n"
+                    Util_AddLog("INCLUDE", "Archivo a incluir omitido", Script, A_Index, "<" . LineTxt . ">")
             }
 
 
@@ -197,18 +304,17 @@
                 {
                     If (!foo)
                     {
-                        Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . LineNum . ".", Script)
-                        Log .= "Archivo a incluir no encontrado [" . LineTxt . "]`n"
-                        Return FALSE
+                        Util_AddLog("ERROR", "No se ha encontrado el archivo a incluir", Script, A_Index, LineTxt)
+                        Return Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . LineNum . ".", Script)
                     }
                     Else
-                        Log .= "Archivo a incluir omitido [" . LineTxt . "]`n"
+                        Util_AddLog("INCLUDE", "Archivo a incluir omitido", Script, A_Index, LineTxt)
                 }
                 Else
                 {
                     If (!IsAlreadyIncluded(FileList, LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
-                        NewCode .= PreprocessScript(LineTxt, Script, FileList) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
-                    If (LastError == 1)    ; ¿ha ocurrido un error en el procesado del script incluido?
+                        NewCode .= PreprocessScript(LineTxt, Tree . "`n" . Script, FileList, Directives) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
+                    If (ERROR)
                         Return FALSE
                 }
             }
@@ -222,15 +328,28 @@
                 LineTxt := Util_GetFullPathName(LineTxt)    ; recuperamos la ruta completa del supuesto directorio
                 If (!DirExist(LineTxt))    ; ¿el directorio a incluir no existe?
                 {
-                    Util_Error("Error en directorio #Include. El directorio a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . LineNum . ".", Script)
-                    Log .= "Directorio a incluir no encontrado [" . LineTxt . "]`n"
-                    Return FALSE
+                    Util_AddLog("INCLUDE", "Directorio a incluir no encontrado", Script, A_Index, "<" . LineTxt . ">")
+                    Return Util_Error("Error en directorio #Include. El directorio a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . LineNum . ".", Script)
+
                 }
                 A_WorkingDir := LineTxt    ; cambiamos el directorio de trabajo actual
             }
 
 
             Continue
+        }
+
+
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        ; Buscamos por el comando FileInstall
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        If (LineTxt ~= "i)^FileInstall")    ; ¿la línea comienza con "FileInstall"?
+        {
+            ; evitamos trabajar con la variable original (LineTxt) ya que debe ser añadida al script compilado
+            foo := ParseFuncParams(SubStr(LineTxt, 8))[1]    ; eliminamos "FileInstall" al principio de la línea y recuperamos el primer parámetro correctamente formateado
+            If (ERROR)
+                Return FALSE
+            ObjPush(Directives.Resources, "*10 " . foo)    ; incluimos el archivo para ser añadido en RT_RCDATA
         }
 
 
@@ -245,10 +364,14 @@
     ; ======================================================================================================================================================
     ; Terminar y devolver el código procesado
     ; ======================================================================================================================================================
-    If (NewCode == "")
-        Log .= "Archivo script no contiene datos [" . Script . "]`n"
+    If (NewCode == "")    ; ¿este script no contiene datos?
+        Util_AddLog("ADVERTENCIA", "El script no contiene datos", Script)
+    If (Tree == "")    ; ¿estamos procesando el script principal que se va a compilar?
+        Return {       Code: "; <COMPILER: v" . A_AhkVersion . ">`n" . Trim(NewCode, "`t `r`n")
+               , Directives: Directives
+               ,     Script: Script }
 
-    Return (Parent == "" ? "; <COMPILER: v" . A_AhkVersion . ">`n" : "") . Trim(NewCode, "`t `r`n")
+    Return Trim(NewCode, "`t `r`n")
 }
 
 
@@ -257,7 +380,7 @@
 
 IsAlreadyIncluded(FileList, AhkFile, IncludeAgain)
 {
-    If (!IncludeAgain)    ; ¿no permitir múltiples inclusiones del mismo archivos?
+    If (!IncludeAgain)    ; ¿no permitir múltiples inclusiones del mismo archivo?
         Loop (ObjLength(FileList))
             If (FileList[A_Index] = AhkFile)
                 Return TRUE
@@ -268,14 +391,15 @@ IsAlreadyIncluded(FileList, AhkFile, IncludeAgain)
 
 
 
-DerefVar(ByRef String, WorkingDir)
+DerefVar(ByRef String)
 {
-    String := StrReplace(String,     "%A_ScriptDir%",      WorkingDir)
+    String := StrReplace(String,     "%A_ScriptDir%",    A_WorkingDir)
     String := StrReplace(String,       "%A_AppData%",       A_AppData)
     String := StrReplace(String, "%A_AppDataCommon%", A_AppDataCommon)
     String := StrReplace(String,      "%A_LineFile%",      A_LineFile)
     String := StrReplace(String,       "%A_Desktop%",       A_Desktop)
     String := StrReplace(String,   "%A_MyDocuments%",   A_MyDocuments)
+    String := StrReplace(String,  "%A_ProgramFiles%",  A_ProgramFiles)
 }
 
 
@@ -301,7 +425,6 @@ class TempWorkingDir
 
 ParseVersionInfo(Script)
 {
-    Global VerInfo
     If (DirExist(Script) || !FileExist(Script))
         Return FALSE
 
@@ -319,4 +442,64 @@ ParseVersionInfo(Script)
     }
 
     Return VerInfo2
+}
+
+
+
+
+
+ParseFuncParams(Params)
+{
+    Local Arr := []
+
+    ERROR := 1
+
+    Return Arr
+}
+
+
+
+
+
+ParseResourceStr(str, LineNum, Script)    ;@Ahk2Exe-AddResource *[int type] [str filename], [int/str resname]
+{
+    Static ResTypesExt := { bmp: 2, dib: 2
+                          , cur: 12
+                          , ico: 13
+                          , htm: 23, html: 23, mht: 23
+                          , manifest: 24 }
+
+    Local Obj := { ResType: 0
+                 ,    File: ""
+                 , ResName: ""
+                 ,    Name: "" }
+
+    If (str ~= "^\*\d{1,2}\s")
+        Obj.ResType := RTrim(SubStr(str, 2, 2)), str := RegExReplace(str, "^\*\d{1,2}\s*")
+
+    Obj.File := StrReplace(str, "``,", "`n")
+    Local pos := InStr(Obj.File, ",",, -1)
+    If (pos)
+    {
+        Obj.ResName := Trim(SubStr(Obj.File, pos+1))
+        Obj.ResName := Obj.ResName is "Integer" ? Integer(Obj.ResName) : Format("{:U}", String(Obj.ResName))
+        Obj.File := Trim(SubStr(Obj.File, 1, pos-1))
+        If (Obj.ResName == "")
+            pos := 0, Util_AddLog("ADVERTENCIA", "Se especificó la coma pero sin el nombre del recurso", Script, LineNum, "@Ahk2Exe-AddResource")
+   }
+
+    Local FileName := "", Ext := ""
+    SplitPath(Obj.File, FileName,, Ext)
+    If (!pos)
+        Obj.ResName := Obj.ResType == 0 && Ext = "manifest" ? 1 : Format("{:U}", FileName)
+
+    If (DirExist(Obj.File := StrReplace(Obj.File, "`n", ",")) || !FileExist(Obj.File))
+        Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nEl archivo especificado es inválido.`n" . Obj.File . "`nLínea #" . LineNum . ".", Script)
+
+    If (Obj.ResType == 0)
+        Obj.ResType := ObjHasKey(ResTypesExt, Ext) ? ResTypesExt[Ext] : RT_RCDATA
+
+    Obj.Name := Type(Obj.ResName) == "Integer" ? Obj.ResName : ObjGetAddress(Obj, "ResName")
+
+    Return Obj
 }

@@ -1,21 +1,21 @@
 ﻿/* 
     Crea un mapa de bits con degradado lineal para un control Picture.
     Parámetros:
-    Pic:
-        El objeto control Picture.
-    Colors:
-        Un Array con los colores RGB a utilizar. Debe especificar por lo menos dos colores.
-    Positions:
-        Un Array que contiene las posiciones relativas de los valores de color como valores de coma flotante. 0.0 es el inicio y 1.0 es el finál.
-        Por defecto los colores se dividen automáticamente teniendo en cuenta la cantidad de colores especificados.
-    Direction:
-        Dirección de los colores. 0 hirizontal. 1 vertical. 2 diagonal (sup-iz inf-der). 3 diagonal (sup-der inf-iz).
-    GammaCorrection:
-        TRUE para activar la corrección de gama. FALSE para desactivar, este es el valor por defecto.
-    BrushWidth:
-        El ancho del pincel, en píxeles. Por defecto se establece en el ancho del control. Este valor debe estar comprendido entre 1 y el ancho del control inclusive.
-    BrushHeight:
-        El alto del pincel, en píxeles. Por defecto se establece en el alto del control. Este valor debe estar comprendido entre 1 y el alto del control inclusive.
+        Pic:
+            El objeto control Picture.
+        Colors:
+            Un Array con los colores RGB a utilizar. Debe especificar por lo menos dos colores.
+        Positions:
+            Un Array que contiene las posiciones relativas de los valores de color como valores de coma flotante. 0.0 es el inicio y 1.0 es el finál.
+            Por defecto los colores se dividen automáticamente teniendo en cuenta la cantidad de colores especificados.
+        Direction:
+            Dirección de los colores. 0 hirizontal. 1 vertical. 2 diagonal (sup-iz inf-der). 3 diagonal (sup-der inf-iz).
+        GammaCorrection:
+            TRUE para activar la corrección de gama. FALSE para desactivar, este es el valor por defecto.
+        BrushWidth:
+            El ancho del pincel, en píxeles. Por defecto se establece en el ancho del control. Este valor debe estar comprendido entre 1 y el ancho del control inclusive.
+        BrushHeight:
+            El alto del pincel, en píxeles. Por defecto se establece en el alto del control. Este valor debe estar comprendido entre 1 y el alto del control inclusive.
     Return:
         La función no devuelve ningún valor, en caso de error envía una Excepción con detalles del problema.
     Ejemplo:
