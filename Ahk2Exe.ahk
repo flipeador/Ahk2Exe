@@ -5,7 +5,7 @@
 ;@Ahk2Exe-SetCopyright       Copyright (c) 2004
 ;@Ahk2Exe-SetCompanyName     AutoHotkey
 ;@Ahk2Exe-SetOrigFilename    Ahk2Exe.ahk
-;;@Ahk2Exe-SetMainIcon        Ahk2Exe.ico
+;@Ahk2Exe-SetMainIcon        Ahk2Exe.ico
 
 
 
@@ -42,6 +42,7 @@ SetRegView 64
 
 #Include Include\Compiler.ahk
 #Include Include\ScriptParser.ahk
+#Include Include\Resources.ahk
 
 
 
@@ -61,12 +62,10 @@ If (WinExist(Title))
     WinShow(Title), WinActivate(Title), ExitApp()
 
 
-Util_GdiplusStartup()
-
-
 ; variables super-globales obligatorias
 global     Cfg := Util_LoadCfg()
 global VerInfo := Util_LoadVerInfo()    ; StringFileInfo BLOCK statement - https://msdn.microsoft.com/en-us/library/windows/desktop/aa381049(v=vs.85).aspx
+global    Gdip := new Gdiplus
 global AhkPath := RegRead("HKLM\SOFTWARE\AutoHotkey", "InstallDir")
     global AhkDir := DirExist(GetDirParent(AhkPath)) ? GetDirParent(AhkPath) : GetDirParent(A_ScriptDir)
     global AhkLib := [ DirExist(AhkDir . "\Lib") ? AhkDir . "\Lib" : ""
@@ -83,8 +82,8 @@ global       RT_CURSOR := 1    ; Resource-Definition Statements - https://msdn.m
      , RT_ACCELERATORS := 9
      ,       RT_RCDATA := 10
      , RT_MESSAGETABLE := 11
-     , RT_GROUP_CURSOR := 12
-     ,   RT_GROUP_ICON := 13
+     , RT_GROUP_CURSOR := 12  ; RT_CURSOR + 11 - MAKEINTRESOURCE((ULONG_PTR)(RT_CURSOR) + DIFFERENCE)
+     ,   RT_GROUP_ICON := 14  ;   RT_ICON + 11 - MAKEINTRESOURCE((ULONG_PTR)(  RT_ICON) + DIFFERENCE)
      ,      RT_VERSION := 16
      ,         RT_HTML := 23
      ,     RT_MANIFEST := 24
@@ -167,7 +166,7 @@ Gui.AddText("x30 y175 w120 h20 +0x200", "Fuente (archivo script)")
 Gui.AddComboBox("x180 y175 w435 h22 vddlsrc R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastSrcList, "`r`n", "|"), "|"))
     CB_SetItemHeight(Gui.Control["ddlsrc"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
     CB_SetItemHeight(Gui.Control["ddlsrc"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
-    Gui.Control["ddlsrc"].OnEvent("Change", "Util_LoadVersionInfo")
+    Gui.Control["ddlsrc"].OnEvent("Change", "Util_UpdateSrc")
     CB_SetSelection(Gui.Control["ddlsrc"], CB_FindString(Gui.Control["ddlsrc"], Cfg.LastSrcFile))
 Gui.AddButton("x620 y175 w40 h22 vbsrc", "•••")
     Gui.Control["bsrc"].OnEvent("Click", "Gui_SrcButton")
@@ -204,10 +203,10 @@ Button := Gui.AddButton("x592 y357 w68 h22", "Descargar")
 Gui.Control["tab"].UseTab(2)
 Gui.AddListView("x20 y150 w650 h250 vlvri -E0x200", "Nombre|Valor")
     DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvri"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
-    Util_LoadVersionInfo()
+    Util_UpdateSrc()
 
 Gui.Control["tab"].UseTab(3)
-Gui.AddListView("x20 y150 w650 h250 vlvlog -E0x200", "ID|Mensaje|Archivo|Línea|Detalles|Código de error")
+Gui.AddListView("x20 y150 w650 h250 vlvlog -E0x200", "ID|Mensaje|Archivo|Línea|Detalles|Código de error|Información adicional|Tiempo")
     DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvlog"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
 
 Gui.Control["tab"].UseTab()
@@ -251,9 +250,7 @@ Gui_Size(Gui, MinMax, W, H)
 
 Gui_DropFiles(Gui, Ctrl, FileArray, X, Y)
 {
-    Util_GuiDisable("Leyendo archivos..")
-
-    Local LastSrc := "", LastIco := ""
+    Local LastSrc := "", LastIco := "", foo := new GuiDisable("Leyendo archivos..")
     Loop (ObjLength(FileArray))
     {
         If (DirExist(FileArray[A_Index]))
@@ -264,8 +261,7 @@ Gui_DropFiles(Gui, Ctrl, FileArray, X, Y)
     }
     CB_SetSelection(Gui.Control["ddlsrc"], LastSrc, 0)
     CB_SetSelection(Gui.Control["ddlico"], LastIco, 0)
-    Util_LoadVersionInfo()
-    Util_GuiEnable()
+    Util_UpdateSrc()
 
     Load(File)
     {
@@ -278,7 +274,7 @@ Gui_DropFiles(Gui, Ctrl, FileArray, X, Y)
 
 Gui_SrcButton()
 {
-    Util_GuiDisable("Mostrando diálogo para seleccionar archivo fuente AHK..")
+    Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo fuente AHK..")
     Local File := CB_GetSelection(Gui.Control["ddlsrc"]) == -1 ? Cfg.LastSrcFile : CB_GetText(Gui.Control["ddlsrc"])
         , File := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar archivo fuente"], File, {"Todos los archivos": "*.*", Iconos: "#*.ahk"},, 0x1200)
     If (File)
@@ -286,14 +282,13 @@ Gui_SrcButton()
         Loop (ObjLength(File))
             CB_Insert(Gui.Control["ddlsrc"], File[A_Index],, 0)
         CB_SetSelection(Gui.Control["ddlsrc"], File[1], 0)
-        Util_LoadVersionInfo()
+        Util_UpdateSrc()
     }
-    Util_GuiEnable()
 }
 
 Gui_IcoButton()
 {
-    Util_GuiDisable("Mostrando diálogo para seleccionar archivo icono..")
+    Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo icono..")
     Local File := CB_GetSelection(Gui.Control["ddlico"]) == -1 ? Cfg.LastIconFile : CB_GetText(Gui.Control["ddlico"])
         , File := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar icono"], File, {Iconos: "#*.ico"},, 0x1200)
     If (File)
@@ -303,12 +298,11 @@ Gui_IcoButton()
                 CB_Insert(Gui.Control["ddlico"], File[A_Index],, 0)
         CB_SetSelection(Gui.Control["ddlico"], File[1], 0)
     }
-    Util_GuiEnable()
 }
 
 Gui_DestButton()
 {
-    Util_GuiDisable("Mostrando diálogo para seleccionar archivo de destino..")
+    Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo de destino..")
     Local File := Gui.Control["edest"].Text == "" ? (CB_GetSelection(Gui.Control["ddlsrc"]) == -1 ? GetDirParent(Cfg.LastExeFile) . "\" : CB_GetText(Gui.Control["ddlsrc"])) : Gui.Control["edest"].Text
         , File := SaveFile([Gui.Hwnd,"Ahk2Exe - Guardar como"], SubStr(File, -4) = ".ahk" ? SubStr(File, 1, -4) . ".exe" : File, {Ejecutables: "#*.exe"})
     If (File)
@@ -320,16 +314,14 @@ Gui_DestButton()
         Else
             Util_Error("El archivo destino debe ser un archivo ejecutable EXE.", File)
     }
-    Util_GuiEnable()
 }
 
 Gui_CompileButton()
 {
-    Util_GuiDisable("Compilando..")
-
     ERROR := FALSE
     Util_ClearLog()
-    Local Script := CB_GetText(Gui.Control["ddlsrc"])
+    Local foo := new GuiDisable("Compilando..")
+        , Script := CB_GetText(Gui.Control["ddlsrc"])
         ,   Data := PreprocessScript(Script)
 
     If (Data)
@@ -345,8 +337,6 @@ Gui_CompileButton()
     }
     Else
         Util_AddLog("ERROR", "Ha ocurrido un error durante el procesado del script", Script)
-
-    Util_GuiEnable()
 }
 
 
@@ -481,45 +471,8 @@ Util_LoadVerInfo()
            ,      ProductName: ["ProductName"]
            ,   ProductVersion: ["ProductVersion"]
            ,          Version: ["FileVersion","ProductVersion"]
+           ,         Comments: ["Comments"]
            ,             Name: ["ProductName","InternalName"]    }
-}
-
-Util_GdiplusStartup()
-{
-    Local Gdiplus := {}
-    If (!(Gdiplus.hModule := DllCall("Kernel32.dll\LoadLibraryW", "Str", "gdiplus.dll", "Ptr")))
-        Util_Error("LoadLibrary Gdiplus Error #" . A_LastError,, TRUE)
-
-    Local GdiplusStartupInput := "", pToken := 0
-    NumPut(VarSetCapacity(GdiplusStartupInput, 16, 0) * 0 + 1, &GdiplusStartupInput, "UInt")    ; GdiplusStartupInput.GdiplusVersion = 1
-    Local Ret := DllCall("Gdiplus.dll\GdiplusStartup", "UPtrP", pToken, "UPtr", &GdiplusStartupInput, "UPtr", 0, "UInt")
-    If (!pToken)
-        Util_Error("Gdiplus Error #" . Ret . ".",, TRUE)
-    Gdiplus.pToken := pToken
-
-    Return Gdiplus
-}
-
-Util_GdiplusShutdown(Gdiplus)
-{
-    DllCall("Gdiplus.dll\GdiplusShutdown", "UPtr", Gdiplus.pToken)
-    DllCall("Kernel32.dll\FreeLibrary", "Ptr", Gdiplus.hModule)
-}
-
-Util_GuiDisable(Text)
-{
-    WinSetEnabled(FALSE, "ahk_id" . Gui.Hwnd)
-    Gui.Control["sb"].SetText(Text)
-}
-
-Util_GuiEnable()
-{
-    WinSetEnabled(TRUE, "ahk_id" . Gui.Hwnd)
-    Gui.Control["sb"].SetText("Listo")
-    Gui.Show()
-    WinSetAlwaysOnTop(TRUE, "ahk_id" . Gui.Hwnd)
-    WinSetAlwaysOnTop(FALSE, "ahk_id" . Gui.Hwnd)
-    WinMoveTop("ahk_id" . Gui.Hwnd)
 }
 
 Util_LoadBinFiles(Default)
@@ -551,18 +504,27 @@ Util_CheckCompressionFile(Name)
     Return FileExist(Name) ? "v" . FileGetVersion(Name) . A_Space : ""
 }
 
-Util_LoadVersionInfo()
+Util_UpdateSrc()
 {
-    try Gui.Control["sb"].SetText("Cargando información de la versión..")
-    try Gui.Control["bcompile"].Enabled := FALSE
-    Local  VerInfo2 := ParseVersionInfo(CB_GetText(Gui.Control["ddlsrc"]))
+    SetTimer("Update", -250)
+    Update()
+    {
+        Local Script := CB_GetText(Gui.Control["ddlsrc"])
+            ,    foo := new Status("Analizando archivo fuente.. " . Script)
+            ,   Data := QuickParse(Script)
+        Gui.Control["ddlsrc"].Enabled := FALSE
+        If (Data)
+        {
+            If (Data.MainIcon != "")
+                CB_Insert(Gui.Control["ddlico"], Data.MainIcon,, 0), CB_SetSelection(Gui.Control["ddlico"], Data.MainIcon, 0)
 
-    Gui.Control["lvri"].Delete()
-    Loop Parse, "Comments|CompanyName|FileDescription|FileVersion|InternalName|LegalCopyright|OriginalFilename|ProductName|ProductVersion", "|"
-        Gui.Control["lvri"].Add(, A_LoopField, IsObject(VerInfo2) && ObjHasKey(VerInfo2, A_LoopField) ? VerInfo2[A_LoopField] : "")
-    Gui.Control["lvri"].ModifyCol(1, "AutoHdr")
-    try Gui.Control["bcompile"].Enabled := TRUE
-    try Gui.Control["sb"].SetText("Listo")
+            Gui.Control["lvri"].Delete()
+            Loop Parse, "Comments|CompanyName|FileDescription|FileVersion|InternalName|LegalCopyright|OriginalFilename|ProductName|ProductVersion", "|"
+                Gui.Control["lvri"].Add(, A_LoopField, IsObject(Data.VerInfo) && ObjHasKey(Data.VerInfo, A_LoopField) ? Data.VerInfo[A_LoopField] : "")
+            Gui.Control["lvri"].ModifyCol(1, "AutoHdr")
+        }
+        Gui.Control["ddlsrc"].Enabled := TRUE
+    }
 }
 
 Util_GetFullPathName(Path)
@@ -575,9 +537,9 @@ Util_GetFullPathName(Path)
     Return Buffer
 }
 
-Util_AddLog(What, Message, Script, Line := "-", Extra := "", ErrorCode := "-")
+Util_AddLog(What, Message, Script := "-", Line := "-", Extra := "-", ErrorCode := "-", Other := "-")
 {
-    Gui.Control["lvlog"].Add(, What, Message, Script, Line, Extra == "" ? A_Now : Extra, ErrorCode)
+    Gui.Control["lvlog"].Add(, What, Message, Script, Line, Extra, ErrorCode, Other, FormatTime(, "dd/MM/yyyy hh:mm:ss"))
     Loop 5
         Gui.Control["lvlog"].ModifyCol(A_Index, "AutoHdr")
 }
@@ -585,4 +547,64 @@ Util_AddLog(What, Message, Script, Line := "-", Extra := "", ErrorCode := "-")
 Util_ClearLog()
 {
     Gui.Control["lvlog"].Delete()
+}
+
+
+
+
+
+; =====================================================================================================================================================
+; CLASES
+; =====================================================================================================================================================
+Class Status
+{
+    __New(str)
+    {
+        Try Gui.Control["sb"].SetText(str)
+    }
+
+    __Delete()
+    {
+        try Gui.Control["sb"].SetText("Listo")
+    }
+}
+
+Class GuiDisable
+{
+    __New(str)
+    {
+        WinSetEnabled(FALSE, "ahk_id" . Gui.Hwnd)
+        this.Status := new Status(str)
+    }
+
+    __Delete()
+    {
+        WinSetEnabled(TRUE, "ahk_id" . Gui.Hwnd)
+        Gui.Show()
+        WinSetAlwaysOnTop(TRUE, "ahk_id" . Gui.Hwnd)
+        WinSetAlwaysOnTop(FALSE, "ahk_id" . Gui.Hwnd)
+        WinMoveTop("ahk_id" . Gui.Hwnd)
+    }
+}
+
+Class Gdiplus
+{
+    __New()
+    {
+        If (!(this.hModule := DllCall("Kernel32.dll\LoadLibraryW", "Str", "gdiplus.dll", "Ptr")))
+            Util_Error("LoadLibrary Gdiplus Error #" . A_LastError,, TRUE)
+
+        Local GdiplusStartupInput := "", pToken := 0
+        NumPut(VarSetCapacity(GdiplusStartupInput, 16, 0) * 0 + 1, &GdiplusStartupInput, "UInt")    ; GdiplusStartupInput.GdiplusVersion = 1
+        Local Ret := DllCall("Gdiplus.dll\GdiplusStartup", "UPtrP", pToken, "UPtr", &GdiplusStartupInput, "UPtr", 0, "UInt")
+        If (!pToken)
+            Util_Error("Gdiplus Error #" . Ret . ".",, TRUE)
+        this.pToken := pToken
+    }
+
+    __Delete()
+    {
+        DllCall("Gdiplus.dll\GdiplusShutdown", "UPtr", this.pToken)
+        DllCall("Kernel32.dll\FreeLibrary", "Ptr", this.hModule)
+    }
 }
