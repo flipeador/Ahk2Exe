@@ -177,13 +177,6 @@
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        ; Buscamos el inicio de secciones de continuación
-        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (SubStr(LineTxt, 1, 1) == "(" && !InStr(LineTxt, ")"))    ; ¿la línea empieza por "(" y no contiene ningún ")" en ella?
-            ContSection := TRUE
-
-
-        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Omitimos comentarios en bloque
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         If (InComment)    ; ¿estamos en un comentario en bloque multilínea?
@@ -197,6 +190,13 @@
             InComment := SubStr(LineTxt, -2) != "*/"    ; ¿el comentario en bloque termina en la misma línea o no? (/* comentario */)
             Continue
         }
+
+
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        ; Buscamos el inicio de secciones de continuación
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        If (SubStr(LineTxt, 1, 1) == "(" && !InStr(LineTxt, ")"))    ; ¿la línea empieza por "(" y no contiene ningún ")" en ella?
+            ContSection := TRUE
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -423,11 +423,34 @@ class TempWorkingDir
 
 
 
-ParseVersionInfo(Script)
+QuickParse(Script)    ; analiza rápidamente el Script a compilar para recuperar ciertos datos
 {
     If (DirExist(Script) || !FileExist(Script))
         Return FALSE
+    WorkingDir := new TempWorkingDir(GetDirParent(Script))
 
+    Local Data := {VerInfo: ParseVersionInfo(Script), MainIcon: ""}
+        ,  foo := "" ;, bar := ""
+        ,  Ext := ""
+
+    Loop Read, Script
+    {
+        If (A_LoopReadLine ~= "i)^\s*;@Ahk2Exe-SetMainIcon")
+        {
+            If (!DirExist(foo := Trim(SubStr(LTrim(A_LoopReadLine), 22))) && FileExist(foo))
+            {
+                foo := Util_GetFullPathName(foo), SplitPath(foo,,, Ext)
+                If (Ext = "ico")
+                    ObjRawSet(Data, "MainIcon", foo)
+            }
+        }
+    }
+
+    Return Data
+}
+
+ParseVersionInfo(Script)
+{
     Local  LineTxt := "", Name := "", Value := ""
         , VerInfo2 := {}, Pos := 0
 
@@ -465,7 +488,7 @@ ParseResourceStr(str, LineNum, Script)    ;@Ahk2Exe-AddResource *[int type] [str
 {
     Static ResTypesExt := { bmp: 2, dib: 2
                           , cur: 12
-                          , ico: 13
+                          , ico: 14, ico: 3
                           , htm: 23, html: 23, mht: 23
                           , manifest: 24 }
 
@@ -494,11 +517,16 @@ ParseResourceStr(str, LineNum, Script)    ;@Ahk2Exe-AddResource *[int type] [str
         Obj.ResName := Obj.ResType == 0 && Ext = "manifest" ? 1 : Format("{:U}", FileName)
 
     If (DirExist(Obj.File := StrReplace(Obj.File, "`n", ",")) || !FileExist(Obj.File))
+    {
+        Util_AddLog("ERROR", "El archivo especificado es inválido", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
         Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nEl archivo especificado es inválido.`n" . Obj.File . "`nLínea #" . LineNum . ".", Script)
+    }
 
     If (Obj.ResType == 0)
         Obj.ResType := ObjHasKey(ResTypesExt, Ext) ? ResTypesExt[Ext] : RT_RCDATA
 
+    If (Type(Obj.ResName) == "Integer" && Obj.ResName >= 0x10000)
+        Obj.ResName := String(Obj.ResName), Util_AddLog("INFO", "Se convirtío el nombre del recurso a una cadena", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
     Obj.Name := Type(Obj.ResName) == "Integer" ? Obj.ResName : ObjGetAddress(Obj, "ResName")
 
     Return Obj
