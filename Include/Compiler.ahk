@@ -83,7 +83,7 @@
     VarSetCapacity(Buffer, 0)
 
     ; incluir el archivo icono principal
-    Local GROUP_ICON := "", ICONS := "", IconGroupID := 0, IconID := 0
+    Local GROUP_ICON := "", ICONS := "", IconGroupID := 0, IconID := 1
     If (hIconFile)
     {
         ; eliminamos todos grupos de iconos
@@ -95,7 +95,7 @@
             DeleteResource(hUpdate, Resource.Type, Resource.Name, Resource.LangID)
         }
         ; procesamos y añadimos el icono
-        ProcessIcon(hIconFile, ++IconID, GROUP_ICON, ICONS)
+        ProcessIcon(hIconFile, IconID, GROUP_ICON, ICONS)
         AddResource(hUpdate, RT_GROUP_ICON, ++IconGroupID, ObjGetAddress(GROUP_ICON, "Buffer"), GROUP_ICON.Size)
         Loop (ObjLength(ICONS))
             AddResource(hUpdate, RT_ICON, IconID++, ObjGetAddress(ICONS[A_Index], "Buffer"), ICONS[A_Index].Size)
@@ -111,7 +111,7 @@
         If (foo.ResType == RT_RCDATA)
         {
             VarSetCapacity(Buffer, Size := FileGetSize(foo.File)), FileOpen(foo.File, "r").RawRead(&Buffer, Size)
-            DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Ptr", RT_RCDATA, "UPtr", foo.Name, "UShort", Data.ResourceLang, "UPtr", &Buffer, "UInt", Size)
+            AddResource(hUpdate, RT_RCDATA, foo.Name, &Buffer, Size, Data.ResourceLang)
         }
 
         Else If (foo.ResType == RT_GROUP_ICON || foo.ResType == RT_ICON)
@@ -122,7 +122,7 @@
                 AddResource(hUpdate, RT_GROUP_ICON, ++IconGroupID, ObjGetAddress(GROUP_ICON, "Buffer"), GROUP_ICON.Size)
                 Loop (ObjLength(ICONS))
                     AddResource(hUpdate, RT_ICON, IconID++, ObjGetAddress(ICONS[A_Index], "Buffer"), ICONS[A_Index].Size)
-                GROUP_ICON := "", ICONS := ""
+                hIconFile.Close(), GROUP_ICON := "", ICONS := ""
             }
             Else
                 Util_AddLog("ADVERTENCIA", "No se ha podido abrir el icono especificado para lectura", Data.Script,, "@Ahk2Exe-AddResource",, obj.File)
