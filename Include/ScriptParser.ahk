@@ -7,7 +7,7 @@
         FileList := []    ; almacena una lista con todos los archivos incluidos (para evitar varias inclusiones de un mismo archivo)
         ; almacena los archivos a añadir luego de la compilación al archivo EXE resultante y otras configuraciones
         Directives := {         MainIcon: CB_GetText(Gui.Control["ddlico"])
-                      ,       ConsoleApp: FALSE
+                      ,        Subsystem: IMAGE_SUBSYSTEM_WINDOWS_GUI
                       ,     ResourceLang: SUBLANG_ENGLISH_US
                       ,         PostExec: ""
                       ,      CompanyName: ""
@@ -86,7 +86,7 @@
                 }
 
                 Else If (foo = "ConsoleApp")    ; cambia el subsistema ejecutable al modo consola
-                    Directives.ConsoleApp := TRUE
+                    Directives.Subsystem := IMAGE_SUBSYSTEM_WINDOWS_CUI
 
                 Else If (foo = "UseResourceLang")    ; cambia el lenguaje de recursos utilizado por @Ahk2Exe-AddResource
                 {
@@ -484,50 +484,60 @@ ParseFuncParams(Params)
 
 
 
-ParseResourceStr(str, LineNum, Script)    ;@Ahk2Exe-AddResource *[int type] [str filename], [int/str resname]
+ParseResourceStr(String, LineNum, Script)    ;@Ahk2Exe-AddResource *[int/str type/"type"] [str filename], [int/str resname]
 {
-    Static ResTypesExt := { bmp: 2, dib: 2
-                          , cur: 12
-                          , ico: 14, ico: 3
-                          , htm: 23, html: 23, mht: 23
-                          , manifest: 24 }
+    Static CommonResTypes := { bmp: 2, dib: 2              ; RT_BITMAP
+                             , cur: 1                      ; RT_CURSOR
+                             , ico: 3                      ; RT_ICON
+                             , htm: 23, html: 23, mht: 23  ; RT_HTML
+                             , manifest: 24                ; RT_MANIFEST
+                             ; otros
+                             , png: ".PNG" }
 
-    Local Obj := { ResType: 0
-                 ,    File: ""
-                 , ResName: ""
-                 ,    Name: "" }
+    Local      Obj := { ResType: "", File: "", ResName: "" }
+        ,      foo := "" ;, bar := ""
+        , FileName := "", Ext := ""
 
-    If (str ~= "^\*\d{1,2}\s")
-        Obj.ResType := RTrim(SubStr(str, 2, 2)), str := RegExReplace(str, "^\*\d{1,2}\s*")
-
-    Obj.File := StrReplace(str, "``,", "`n")
-    Local pos := InStr(Obj.File, ",",, -1)
-    If (pos)
+    If (String ~= "^\*")
     {
-        Obj.ResName := Trim(SubStr(Obj.File, pos+1))
-        Obj.ResName := Obj.ResName is "Integer" ? Integer(Obj.ResName) : Format("{:U}", String(Obj.ResName))
-        Obj.File := Trim(SubStr(Obj.File, 1, pos-1))
-        If (Obj.ResName == "")
-            pos := 0, Util_AddLog("ADVERTENCIA", "Se especificó la coma pero sin el nombre del recurso", Script, LineNum, "@Ahk2Exe-AddResource")
-   }
-
-    Local FileName := "", Ext := ""
-    SplitPath(Obj.File, FileName,, Ext)
-    If (!pos)
-        Obj.ResName := Obj.ResType == 0 && Ext = "manifest" ? 1 : Format("{:U}", FileName)
-
-    If (DirExist(Obj.File := StrReplace(Obj.File, "`n", ",")) || !FileExist(Obj.File))
-    {
-        Util_AddLog("ERROR", "El archivo especificado es inválido", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
-        Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nEl archivo especificado es inválido.`n" . Obj.File . "`nLínea #" . LineNum . ".", Script)
+        If (SubStr(String, 2, 1) == "`"")
+        {
+            If (!(foo := InStr(String, "`"",, 3)) || (Obj.ResType := SubStr(String, 3, foo - 3)) == "")
+            {
+                Util_AddLog("ERROR", "La sintaxis es inválida", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
+                Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nLa sintaxis es inválida.`nLínea #" . LineNum . ".", Script)
+            }
+            String := LTrim(SubStr(String, foo + 1))
+        }
+        Else
+        {
+            If (!(foo := InStr(String, A_Space,, 2)) || (Obj.ResType := SubStr(String, 2, foo - 2)) == "")
+            {
+                Util_AddLog("ERROR", "La sintaxis es inválida", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
+                Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nLa sintaxis es inválida.`nLínea #" . LineNum . ".", Script)
+            }
+            String := LTrim(SubStr(String, foo + 1))
+        }
     }
 
-    If (Obj.ResType == 0)
-        Obj.ResType := ObjHasKey(ResTypesExt, Ext) ? ResTypesExt[Ext] : RT_RCDATA
+    If (foo := InStr(String, ","))
+    {
+        Obj.ResName := LTrim(SubStr(String, foo + 1))
+        String := RTrim(SubStr(String, 1, foo - 1))
+    }
 
-    If (Type(Obj.ResName) == "Integer" && Obj.ResName >= 0x10000)
-        Obj.ResName := String(Obj.ResName), Util_AddLog("INFO", "Se convirtío el nombre del recurso a una cadena", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
-    Obj.Name := Type(Obj.ResName) == "Integer" ? Obj.ResName : ObjGetAddress(Obj, "ResName")
+    SplitPath(String, FileName,, Ext)
+    If (Obj.ResName == "")
+        Obj.ResName := FileName
+
+    If (Obj.ResType == "")
+        Obj.ResType := ObjHasKey(CommonResTypes, Ext) ? CommonResTypes[Ext] : RT_RCDATA
+
+    If (DirExist(Obj.File := String) || !FileExist(Obj.File))
+    {
+        Util_AddLog("ERROR", "El archivo especificado es inválido", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
+        Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nEl archivo especificado no existe.`nLínea #" . LineNum . ".", Script)
+    }
 
     Return Obj
 }

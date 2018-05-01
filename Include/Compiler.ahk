@@ -70,6 +70,7 @@
         Return Util_Error("Ha ocurrido un error al abrir el archivo destino.`nError #" . A_LastError . ".", ExeFile)
     }
 
+    FileSetAttrib("N", ExeFile)
     FileSetAttrib("H", ExeFile)    ; ocultamos el archivo para evitar que sea "tocado" por el usuario durante la compilación
 
     ; cargamos el archivo destino para lectura
@@ -83,7 +84,9 @@
     VarSetCapacity(Buffer, 0)
 
     ; incluir el archivo icono principal
-    Local GROUP_ICON := "", ICONS := "", IconGroupID := 0, IconID := 1
+    Local    GROUP_ICON := "",    ICONS := ""
+        ,  GROUP_CURSOR := "",  CURSORS := ""
+        ,        IconID :=  1, CursorID :=  1
     If (hIconFile)
     {
         ; eliminamos todos grupos de iconos
@@ -96,7 +99,7 @@
         }
         ; procesamos y añadimos el icono
         ProcessIcon(hIconFile, IconID, GROUP_ICON, ICONS)
-        AddResource(hUpdate, RT_GROUP_ICON, ++IconGroupID, ObjGetAddress(GROUP_ICON, "Buffer"), GROUP_ICON.Size)
+        AddResource(hUpdate, RT_GROUP_ICON, 1, ObjGetAddress(GROUP_ICON, "Buffer"), GROUP_ICON.Size)
         Loop (ObjLength(ICONS))
             AddResource(hUpdate, RT_ICON, IconID++, ObjGetAddress(ICONS[A_Index], "Buffer"), ICONS[A_Index].Size)
         GROUP_ICON := "", ICONS := ""
@@ -108,26 +111,77 @@
     {
         foo := Data.Directives.Resources[A_Index]
 
+        ; añadimos otros datos binarios (cualquier archivo)
+        ; en RT_RCDATA irán todos los archivos que no tengan un sección específica dedicada a ellos y que el usuario no haya especificado el tipo de recurso
+        ; o cualquier archivo que el usuario haya especificado como "*10" en la directiva AddResource (10 = RT_RCDATA)
+        ; si el usuario especificó un tipo de recurso desconocido, entonces no será añadido a RT_RCDATA (ver el «Else» final de la condición «If»)
+        ; por ejemplo, "*10 archivo.exe" y "archivo.exe" irán a RT_RCDATA, pero para "*9999 archivo.exe" o "*XXX archivo.exe" se creará un nuevo tipo de recurso para ellos con el nombre especificado después de «*» 
         If (foo.ResType == RT_RCDATA)
         {
-            VarSetCapacity(Buffer, Size := FileGetSize(foo.File)), FileOpen(foo.File, "r").RawRead(&Buffer, Size)
-            AddResource(hUpdate, RT_RCDATA, foo.Name, &Buffer, Size, Data.ResourceLang)
+            If (ResFileOpen(Data, foo.File, Buffer, Size))
+                AddResource(hUpdate, RT_RCDATA, foo.ResName, &Buffer, Size, Data)
         }
 
-        Else If (foo.ResType == RT_GROUP_ICON || foo.ResType == RT_ICON)
+        ; añadimos un icono ICO
+        ; un archivo icono normalmente contiene varias imágenes con distintos tamaños, por ello debemos primero crear un grupo de iconos, este grupo especifica información
+        ; de las imágenes y los identificadores de cada imagen en RT_ICON
+        Else If (foo.ResType == RT_ICON)
         {
-            If (hIconFile := FileOpen(foo.File, "r"))
+            If (hIconFile := ResFileOpen(Data, foo.File))
             {
                 ProcessIcon(hIconFile, IconID, GROUP_ICON, ICONS)
-                AddResource(hUpdate, RT_GROUP_ICON, ++IconGroupID, ObjGetAddress(GROUP_ICON, "Buffer"), GROUP_ICON.Size)
+                AddResource(hUpdate, RT_GROUP_ICON, foo.ResName, ObjGetAddress(GROUP_ICON, "Buffer"), GROUP_ICON.Size, Data)
                 Loop (ObjLength(ICONS))
-                    AddResource(hUpdate, RT_ICON, IconID++, ObjGetAddress(ICONS[A_Index], "Buffer"), ICONS[A_Index].Size)
-                hIconFile.Close(), GROUP_ICON := "", ICONS := ""
+                    AddResource(hUpdate, RT_ICON, IconID++, ObjGetAddress(ICONS[A_Index], "Buffer"), ICONS[A_Index].Size, Data)
+                GROUP_ICON := "", ICONS := ""
             }
-            Else
-                Util_AddLog("ADVERTENCIA", "No se ha podido abrir el icono especificado para lectura", Data.Script,, "@Ahk2Exe-AddResource",, obj.File)
         }
 
+        ; añadimos un cursor CUR
+        ; se aplica la misma lógica que para archivos ICO
+        Else If (foo.ResType == RT_CURSOR)
+        {
+            If (hIconFile := ResFileOpen(Data, foo.File))
+            {
+                ProcessIcon(hIconFile, CursorID, GROUP_CURSOR, CURSORS)
+                AddResource(hUpdate, RT_GROUP_CURSOR, foo.ResName, ObjGetAddress(GROUP_CURSOR, "Buffer"), GROUP_CURSOR.Size, Data)
+                Loop (ObjLength(CURSORS))
+                    AddResource(hUpdate, RT_CURSOR, CursorID++, ObjGetAddress(CURSORS[A_Index], "Buffer"), CURSORS[A_Index].Size, Data)
+                GROUP_CURSOR := "", CURSORS := ""
+            }
+        }
+
+        ; añadimos imagen PNG
+        Else If (foo.ResType == ".PNG")
+        {
+            If (ResFileOpen(Data, foo.File, Buffer, Size))
+                AddResource(hUpdate, RT_ICON, foo.ResName, &Buffer, Size, Data)
+        }
+
+        ; añadimos una imagen BITMAP (.bmp)
+        ; debemos eliminar la cabecera BITMAPFILEHEADER al momento de añadir el archivo como un recurso RT_BITMAP
+        Else If (foo.ResType == RT_BITMAP)
+        {
+            If (ResFileOpen(Data, foo.File, Buffer, Size))
+                AddResource(hUpdate, RT_BITMAP, foo.ResName, &Buffer + 14, Size - 14, Data)    ; 14 = sizeof BITMAPFILEHEADER
+        }
+
+        ; añadimos un archivo manifiesto
+        Else If (foo.ResType = RT_MANIFEST)
+        {
+            If (ResFileOpen(Data, foo.File, Buffer, Size))
+                AddResource(hUpdate, RT_MANIFEST, foo.ResName, &Buffer, Size, Data)
+        }
+
+        ; añadimos cualquier otro tipo de recurso no reconocido o no soportado actualmente por el compilador (se incluye el archivo entero debido a que desconocemos sus datos)
+        ; esto es muy raro, normalmente los recursos que no tengan un nombre de tipo de recurso reconocido irán a RT_RCDATA
+        Else
+        {
+            If (ResFileOpen(Data, foo.File, Buffer, Size))
+                AddResource(hUpdate, foo.ResType, foo.ResName, &Buffer, Size, Data)    ; si es necesario, se crea el nuevo tipo de recurso con el nombre en foo.ResType
+        }
+
+        hIconFile := 0
         VarSetCapacity(Buffer, 0)
     }
     
@@ -137,7 +191,14 @@
     ; cerramos el archivo destino
     DllCall("Kernel32.dll\FreeLibrary", "Ptr", hExe, "Ptr")
     DllCall("Kernel32.dll\EndUpdateResourceW", "Ptr", hUpdate, "Int", FALSE)
-    FileSetAttrib("N", ExeFile)    ; ya podemos hacer visible el archivo destino
+
+    ; establecemos el subsistema requerido para ejecutar el archivo destino
+    ; PE File Format: https://blog.kowalczyk.info/articles/pefileformat.html
+    hExeFile := FileOpen(ExeFile, "rw")    ; asumimos que no fallará debido a que recien estuvimos trabajando con el archivo
+    hExeFile.Seek(60)    ; IMAGE_DOS_HEADER.e_lfanew (File address of PE header)
+    hExeFile.Seek(hExeFile.ReadUInt() + 20 + 72)    ; IMAGE_OPTIONAL_HEADER.Subsystem | 20 = sizeof IMAGE_FILE_HEADER | ReadUInt() = &IMAGE_OPTIONAL_HEADER
+    hExeFile.WriteUShort(Data.Directives.Subsystem)
+    hExeFile.Close()
 
 
     ; ======================================================================================================================================================
@@ -171,9 +232,38 @@
 
 
     ; ======================================================================================================================================================
-    ; ÉXITO!
+    ; Finalizar
     ; ======================================================================================================================================================
+    If (Data.Directives.PostExec != "")
+        Run(Data.Directives.PostExec)
+
+
+    ; ======================================================================================================================================================
+    ; ÉXITO! | TERMINAMOS
+    ; ======================================================================================================================================================
+    FileSetAttrib("N", ExeFile)    ; ya podemos hacer visible el archivo destino
     TaskDialog(INFO_ICON, [Gui.Title,"Compilación.."], ["La compilación a finalizado con éxito!",ExeFile])
 
     Return TRUE
+}
+
+
+
+
+
+ResFileOpen(Data, FileName, ByRef Buffer := "", ByRef Size := 0)
+{
+    If (f := FileOpen(FileName, "r"))
+    {
+        If (IsByRef(Buffer))
+        {
+            VarSetCapacity(Buffer, Size := f.Length)
+            f.RawRead(&Buffer, Size), f.Close()
+            Return TRUE
+        }
+        Return f
+    }
+
+    Util_AddLog("ADVERTENCIA", "No se ha podido abrir el archivo para lectura", Data.Script,, "@Ahk2Exe-AddResource",, FileName)
+    Return FALSE
 }

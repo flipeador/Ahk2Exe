@@ -85,6 +85,8 @@ global       RT_CURSOR := 1    ; Resource-Definition Statements - https://msdn.m
      , RT_GROUP_CURSOR := 12  ; RT_CURSOR + 11 - MAKEINTRESOURCE((ULONG_PTR)(RT_CURSOR) + DIFFERENCE)
      ,   RT_GROUP_ICON := 14  ;   RT_ICON + 11 - MAKEINTRESOURCE((ULONG_PTR)(  RT_ICON) + DIFFERENCE)
      ,      RT_VERSION := 16
+     ,    RT_ANICURSOR := 21
+     ,      RT_ANIICON := 22
      ,         RT_HTML := 23
      ,     RT_MANIFEST := 24
 
@@ -100,6 +102,8 @@ global       TD_ERROR_ICON := 0xFFFE,   ERROR_ICON := [0, TD_ERROR_ICON]
      , TD_INFORMATION_ICON := 0xFFFD,    INFO_ICON := [0, TD_INFORMATION_ICON]
      ,      TD_SHIELD_ICON := 0xFFFC,  SHIELD_ICON := [0, TD_SHIELD_ICON]
 
+global IMAGE_SUBSYSTEM_WINDOWS_GUI := 2
+    ,  IMAGE_SUBSYSTEM_WINDOWS_CUI := 3
 
 
 ; determina si se pasaron parámetros al compilador
@@ -540,7 +544,7 @@ Util_GetFullPathName(Path)
 Util_AddLog(What, Message, Script := "-", Line := "-", Extra := "-", ErrorCode := "-", Other := "-")
 {
     Gui.Control["lvlog"].Add(, What, Message, Script, Line, Extra, ErrorCode, Other, FormatTime(, "dd/MM/yyyy hh:mm:ss"))
-    Loop 5
+    Loop 7
         Gui.Control["lvlog"].ModifyCol(A_Index, "AutoHdr")
 }
 

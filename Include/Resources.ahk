@@ -1,15 +1,9 @@
-﻿; si se espera una cadena en el parámetro ResType o ResName, debe especificarse la direccion de memoria de la misma
-
-
-
-
-
-EnumResourceNames(hExe, ResType, LangId := "", Flags := 0)
+﻿EnumResourceNames(hExe, ResType, LangId := "", Flags := 0)
 {
     Local EnumResNameProc := CallbackCreate("EnumResNameProc", "&", 4)
         ,           Data  := []
 
-    DllCall("Kernel32.dll\EnumResourceNamesExW", "Ptr", hExe, "UPtr", ResType, "UPtr", EnumResNameProc, "UPtr", 0, "UInt", Flags, "UShort", LangID == "" ? SUBLANG_ENGLISH_US : LangID)
+    DllCall("Kernel32.dll\EnumResourceNamesExW", "Ptr", hExe, "UPtr", RES_TYPE(ResType), "UPtr", EnumResNameProc, "UPtr", 0, "UInt", Flags, "UShort", RES_LANG(LangID))
     CallbackFree(EnumResNameProc)
     Return Data
 
@@ -35,7 +29,7 @@ EnumResourceNames(hExe, ResType, LangId := "", Flags := 0)
 
 DeleteResource(hUpdate, ResType, ResName, LangID := "")
 {
-    Return DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Ptr", ResType, "UPtr", ResName, "UShort", LangID == "" ? SUBLANG_ENGLISH_US : LangID, "UPtr", 0, "UInt", 0)
+    Return DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", RES_LANG(LangID), "UPtr", 0, "UInt", 0)
 }
 
 
@@ -44,7 +38,9 @@ DeleteResource(hUpdate, ResType, ResName, LangID := "")
 
 AddResource(hUpdate, ResType, ResName, pData, Size, LangID := "")
 {
-    Return DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Ptr", ResType, "UPtr", ResName, "UShort", LangID == "" ? SUBLANG_ENGLISH_US : LangID, "UPtr", pData, "UInt", Size)
+    If (!IS_ADDRESSORSIZE(pData) || !IS_ADDRESSORSIZE(Size))
+        Return FALSE
+    Return DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", RES_LANG(LangID), "UPtr", pData, "UInt", Size)
 }
 
 
@@ -54,7 +50,7 @@ AddResource(hUpdate, ResType, ResName, pData, Size, LangID := "")
 
 FindResource(hExe, ResType, ResName, LangID := "")
 {
-    Return DllCall("Kernel32.dll\FindResourceExW", "Ptr", hExe, "Ptr", ResType, "UPtr", ResName, "UShort", LangID == "" ? SUBLANG_ENGLISH_US : LangID, "Ptr")
+    Return DllCall("Kernel32.dll\FindResourceExW", "Ptr", hExe, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", RES_LANG(LangID), "Ptr")
 }
 
 
@@ -128,13 +124,14 @@ EnumResourceIcons(hExe, IconGroupName, LangId := "")
 */
 ProcessIcon(hIconFile, IconIDs, ByRef GROUP_ICON, ByRef ICONS)
 {
-    hIconFile.Seek(4), GROUP_ICON := {Buffer: "", Size: 0}, ICONS := []
-    Local     Images := hIconFile.ReadUShort()    ; número de imágenes en el archivo
+    hIconFile.Seek(2), GROUP_ICON := {Buffer: "", Size: 0}, ICONS := []
+    Local   Type := hIconFile.ReadUShort()    ; 1 = ICO | 2 = CUR
+        , Images := hIconFile.ReadUShort()    ; número de imágenes en el archivo
 
     ObjRawSet(GROUP_ICON, "Size", 6 + Images * (12 + 2))
     ObjSetCapacity(GROUP_ICON, "Buffer", GROUP_ICON.Size)
     NumPut(0x0000, ObjGetAddress(GROUP_ICON, "Buffer") + 0, "UShort")
-    NumPut(0x0001, ObjGetAddress(GROUP_ICON, "Buffer") + 2, "UShort")
+    NumPut(Type  , ObjGetAddress(GROUP_ICON, "Buffer") + 2, "UShort")
     NumPut(Images, ObjGetAddress(GROUP_ICON, "Buffer") + 4, "UShort")
 
     Local pGROUP_ICON := ObjGetAddress(GROUP_ICON, "Buffer") + 6, ImageOffset := 0, Offset := 0
@@ -148,9 +145,9 @@ ProcessIcon(hIconFile, IconIDs, ByRef GROUP_ICON, ByRef ICONS)
         hIconFile.Seek(ImageOffset)
 
         ObjPush(ICONS, {Buffer: "", Size: 0})
-        ObjRawSet(ICONS[A_Index], "Size", NumGet(pGROUP_ICON - 2 - 4, "UInt"))
+        ObjRawSet(ICONS[A_Index], "Size", NumGet(pGROUP_ICON - 2 - 4, "UInt") + (Type == 2 ? 4 : 0))    ; por algún motivo que desconozco, la imagen cursor debe empezar con unos 4 bytes adicionales
         ObjSetCapacity(ICONS[A_Index], "Buffer", ICONS[A_Index].Size)
-        hIconFile.RawRead(ObjGetAddress(ICONS[A_Index], "Buffer"), ICONS[A_Index].Size)
+        hIconFile.RawRead(ObjGetAddress(ICONS[A_Index], "Buffer") + (Type == 2 ? 4 : 0), ICONS[A_Index].Size - (Type == 2 ? 4 : 0))
         hIconFile.Seek(Offset)
     }
 }
@@ -160,7 +157,35 @@ ProcessIcon(hIconFile, IconIDs, ByRef GROUP_ICON, ByRef ICONS)
 
 
 ; devuelve TRUE si «r» es una dirección de memoria, o cero si es un número entero válido como nombre de recurso
-IS_INTRESOURCE(r)    ; IS_INTRESOURCE(_r) ((((ULONG_PTR)(_r)) >> 16) == 0)
+; el nombre de un recurso no puede ser mayor o igual a 65536, de lo contrario la función lo interpreta como una dirección de memoria
+; devuelve un ERROR si «r» no es un número válido
+IS_INTRESOURCE(ByRef r)    ; IS_INTRESOURCE(_r) ((((ULONG_PTR)(_r)) >> 16) == 0)
 {
-    Return r >> 16 == 0    ; r < 0x10000
+    Return (r:=Integer(r)) >> 16 == 0    ; r < 0x10000
+}
+
+; determina si «n» es un número y es mayor que cero, si el valor es de tipo float, se quita la parte decimal
+; devuelve un ERROR si «n» no es un número válido
+IS_ADDRESSORSIZE(ByRef n)
+{
+    Return (n:=Integer(n)) > 0 ? n : FALSE
+}
+
+; corrige el nombre del recurso y devuelve siempre un entero
+; si «s» no es un entero positivo comprendido entre 1 y 65535 inclusive devuelve la dirección de memoria de una cadena (caracteres en mayúscula), caso contrario devuelve un número
+RES_NAME(ByRef s)
+{
+    Return s is "Float" || !(s is "Integer") || StrLen(s) > 7 || s >= 0x10000 || s < 0 ? &(s:=Format("{:U}", String(s))) : Integer(s)
+}
+
+; corrige el nombre del tipo del recurso y devuelve siempre un entero
+; si «s» no es un entero positivo comprendido entre 1 y 65535 inclusive devuelve la dirección de memoria de una cadena (caracteres en mayúscula), caso contrario devuelve un número
+RES_TYPE(ByRef s)
+{
+    Return s is "Float" || !(s is "Integer") || StrLen(s) > 7 || s >= 0x10000 || s < 0 ? &(s:=Format("{:U}", String(s))) : Integer(s)
+}
+
+RES_LANG(l)
+{
+    Return IsObject(l) ? l.Directives.ResourceLang : (l == "" ? SUBLANG_ENGLISH_US : l)
 }
