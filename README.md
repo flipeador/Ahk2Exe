@@ -1,6 +1,8 @@
 # Ahk2Exe
 Compilador no oficial para AutoHotkey v2 en español.
-![Ahk2Exe For AHKv2](https://github.com/flipeador/Ahk2Exe/raw/master/preview.jpg)
+<p align="center">
+  <img src="https://github.com/flipeador/Ahk2Exe/raw/master/preview.jpg" alt="Ahk2Exe For AHKv2"/>
+</p>
 
 Notas:
 - Los archivos `Ahk2Exe.exe` y `Ahk2Exe64.exe` son totalmente independientes, no requieren de ningún otro archivo para su funcionamiento, aunque para poder compilar los scripts es necesario tener los archivos `BIN` en el mismo directorio que `Ahk2Exe.exe`.
