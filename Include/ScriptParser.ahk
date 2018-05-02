@@ -346,10 +346,13 @@
         If (LineTxt ~= "i)^FileInstall")    ; ¿la línea comienza con "FileInstall"?
         {
             ; evitamos trabajar con la variable original (LineTxt) ya que debe ser añadida al script compilado
-            foo := ParseFuncParams(SubStr(LineTxt, 8))[1]    ; eliminamos "FileInstall" al principio de la línea y recuperamos el primer parámetro correctamente formateado
-            If (ERROR)
-                Return FALSE
-            ObjPush(Directives.Resources, "*10 " . foo)    ; incluimos el archivo para ser añadido en RT_RCDATA
+            foo := ParseFuncParams(SubStr(LineTxt, 12))[1]    ; eliminamos "FileInstall" al principio de la línea y recuperamos el primer parámetro correctamente formateado
+            If (DirExist(foo) || !FileExist(foo))
+            {
+                    Util_AddLog("ERROR", "Archivo a incluir no encontrado", Script, A_Index, foo,, "FileInstall")
+                    Return Util_Error("Error en archivo FileInstall. El archivo a incluir no existe.`nLínea #" . LineNum . ".", Script)
+            }
+            ObjPush(Directives.Resources, ParseResourceStr("*10 " . foo, A_Index, Script))    ; incluimos el archivo para ser añadido en RT_RCDATA
         }
 
 
@@ -385,21 +388,6 @@ IsAlreadyIncluded(FileList, AhkFile, IncludeAgain)
             If (FileList[A_Index] = AhkFile)
                 Return TRUE
     Return FALSE
-}
-
-
-
-
-
-DerefVar(ByRef String)
-{
-    String := StrReplace(String,     "%A_ScriptDir%",    A_WorkingDir)
-    String := StrReplace(String,       "%A_AppData%",       A_AppData)
-    String := StrReplace(String, "%A_AppDataCommon%", A_AppDataCommon)
-    String := StrReplace(String,      "%A_LineFile%",      A_LineFile)
-    String := StrReplace(String,       "%A_Desktop%",       A_Desktop)
-    String := StrReplace(String,   "%A_MyDocuments%",   A_MyDocuments)
-    String := StrReplace(String,  "%A_ProgramFiles%",  A_ProgramFiles)
 }
 
 
@@ -471,11 +459,61 @@ ParseVersionInfo(Script)
 
 
 
-ParseFuncParams(Params)
+DerefVar(ByRef String, Chr := "%")
+{
+    String := StrReplace(String, Chr .     "A_ScriptDir" . Chr,    A_WorkingDir)
+    String := StrReplace(String, Chr .       "A_AppData" . Chr,       A_AppData)
+    String := StrReplace(String, Chr . "A_AppDataCommon" . Chr, A_AppDataCommon)
+    String := StrReplace(String, Chr .      "A_LineFile" . Chr,      A_LineFile)
+    String := StrReplace(String, Chr .       "A_Desktop" . Chr,       A_Desktop)
+    String := StrReplace(String, Chr .   "A_MyDocuments" . Chr,   A_MyDocuments)
+    String := StrReplace(String,  Chr . "A_ProgramFiles" . Chr,  A_ProgramFiles)
+    String := StrReplace(String,  Chr .       "A_WinDir" . Chr,        A_WinDir)
+    String := StrReplace(String,  Chr .         "A_Temp" . Chr,          A_Temp)
+
+    Return String
+}
+
+
+
+
+
+ParseFuncParams(Params)    ; FileInstall Source, Dest
 {
     Local Arr := []
+        , prm := 1
+        , foo := "", bar := ""
 
-    ERROR := 1
+    Loop Parse, Params
+    {
+        If (foo != "")
+        {
+            If (A_LoopField == foo)
+                foo := ""
+            Else
+                Arr[prm] .= A_LoopField
+        }
+
+        Else IF (bar != "")
+        {
+            If (InStr("`t`s,", A_LoopField))
+                Arr[prm] .= DerefVar(bar, ""), bar := "", prm += A_LoopField == ","
+            Else
+                bar .= A_LoopField
+        }
+
+        Else If (A_LoopField == "`"" || A_LoopField == "'")
+            foo := A_LoopField
+
+        Else If (A_LoopField == ",")
+            ++prm
+
+        Else If (!InStr("`t`s.", A_LoopField))
+            bar := A_LoopField
+    }
+
+    If (bar != "")
+        Arr[prm] .= DerefVar(bar, "")
 
     Return Arr
 }

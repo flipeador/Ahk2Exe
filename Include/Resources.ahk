@@ -1,4 +1,18 @@
-﻿EnumResourceNames(hExe, ResType, LangId := "", Flags := 0)
+﻿BeginUpdateResource(FileName, DeleteExistingResources := FALSE)
+{
+    Return DllCall("Kernel32.dll\BeginUpdateResourceW", "UPtr", &FileName, "Int", DeleteExistingResources, "Ptr")
+} ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms648030(v=vs.85).aspx
+
+EndUpdateResource(hUpdate, Discard := FALSE)
+{
+    Return DllCall("Kernel32.dll\EndUpdateResourceW", "Ptr", hUpdate, "Int", Discard)
+} ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms648032(v=vs.85).aspx
+
+
+
+
+
+EnumResourceNames(hExe, ResType, LangId := "", Flags := 0)
 {
     Local EnumResNameProc := CallbackCreate("EnumResNameProc", "&", 4)
         ,           Data  := []
@@ -71,6 +85,61 @@ LoadResource(hExe, hResInfo)
     Return DllCall("Kernel32.dll\LoadResource", "Ptr", hExe, "Ptr", hResInfo, "Ptr")
 }
 
+LoadResource2(hExe, hResInfo)
+{
+    Return LockResource(LoadResource(hExe, hResInfo))
+}
+
+LoadResource3(hExe, ResType, ResName, ByRef Size, LangID := "")
+{
+    Local hResInfo := FindResource(hExe, ResType, ResName, LangID)
+    Size := SizeofResource(hExe, hResInfo)
+    Return LoadResource2(hExe, hResInfo)    
+}
+
+
+
+
+
+SizeofResource(hExe, hResInfo)
+{
+    Return DllCall("Kernel32.dll\SizeofResource", "Ptr", hExe, "Ptr", hResInfo, "UInt")
+}
+
+
+
+
+
+FreeLibrary(hModule)
+{
+    Return hModule ? DllCall("Kernel32.dll\FreeLibrary", "Ptr", hModule) : 0
+} ; https://msdn.microsoft.com/es-es/library/windows/desktop/ms683152(v=vs.85).aspx
+
+
+
+
+
+LoadLibrary(DllName, Flags := 0)
+{
+    Return DllCall("Kernel32.dll\LoadLibraryEx", "UPtr", &DllName, "UInt", 0, "UInt", Flags, "Ptr")
+}
+
+
+
+
+
+LoadImage(hInstance, Name, Type := 0, W := 0, H := 0, Flags := "")
+{
+    Local hExe := 0
+    If (hInstance == -1)
+        hInstance := hExe := LoadLibrary(A_ScriptFullPath, 2)
+    Flags := Flags == "" ? (hInstance ? 0 : 0x10) : Flags
+    Local hImage := DllCall("User32.dll\LoadImageW", "Ptr", hInstance, "UPtr", Type(Name) == "Integer" ? Name : &Name, "UInt", Type, "Int", W, "Int", H, "UInt", Flags, "Ptr")
+    FreeLibrary(hExe)
+    Return hImage
+} ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms648045(v=vs.85).aspx
+
+
 
 
 
@@ -130,7 +199,7 @@ ProcessIcon(hIconFile, IconIDs, ByRef GROUP_ICON, ByRef ICONS)
 
     ObjRawSet(GROUP_ICON, "Size", 6 + Images * (12 + 2))
     ObjSetCapacity(GROUP_ICON, "Buffer", GROUP_ICON.Size)
-    NumPut(0x0000, ObjGetAddress(GROUP_ICON, "Buffer") + 0, "UShort")
+    NumPut(0x0000, ObjGetAddress(GROUP_ICON, "Buffer") + 0, "UShort")    ; siempre debe ser cero
     NumPut(Type  , ObjGetAddress(GROUP_ICON, "Buffer") + 2, "UShort")
     NumPut(Images, ObjGetAddress(GROUP_ICON, "Buffer") + 4, "UShort")
 

@@ -43,14 +43,14 @@
         Return Util_Error("No se ha podido abrir el icono principar para lectura.", IconFile)
     }
 
-    ; comprobamos que el archivo icono principal sea un icono válido comprobando algunos datos del encabezado (ICONDIR structure)
+    ; comprobamos que el archivo icono principal sea un icono válido comprobando algunos datos del encabezado (ICONDIR structure) (esto no asegura nada)
     If (hIconFile && (hIconFile.ReadUShort() != 0 || hIconFile.ReadUShort() != 1))
     {
         Util_AddLog("ERROR", "El archivo icono principal no es un icono válido", IconFile,, Data.Script)
         Return Util_Error("El archivo icono principal no es un icono válido.", IconFile)
     }
 
-    FileSetAttrib("N", ExeFile)
+    FileSetAttrib("N", ExeFile)    ; evita errores bajo ciertas condiciones
     If (!FileCopy(BinFile, ExeFile, TRUE))    ; ¿no se pudo copiar el archivo BIN al destino?
     {
         Util_AddLog("ERROR", "No ha sido posible copiar el arcivo BIN al destino", ExeFile,, Data.Script)
@@ -61,8 +61,8 @@
     ; ======================================================================================================================================================
     ; Iniciar compilación
     ; ======================================================================================================================================================
-    ; abrimos el archivo destino para escribir/añadir los recursos en él
-    Local hUpdate := DllCall("Kernel32.dll\BeginUpdateResourceW", "UPtr", &ExeFile, "Int", FALSE, "Ptr")
+    ; abrimos el archivo destino para eliminar/añadir/modificar los recursos en él
+    Local hUpdate := BeginUpdateResource(ExeFile)
     If (!hUpdate)
     {
         FileDelete(ExeFile)    ; eliminamos el archivo destino, la compilación no ha terminado correctamente
@@ -75,21 +75,24 @@
 
     ; cargamos el archivo destino para lectura
     ; todas las funciones ejecutadas a continuación asumimos que no fallarán, debido a que tuvo éxito la función BeginUpdateResource, y que además es raro (¿lo és?)
-    Local hExe := DllCall("Kernel32.dll\LoadLibraryExW", "UPtr", &ExeFile, "UInt", 0, "UInt", 0x2, "Ptr")
+    Local hExe := LoadLibrary(ExeFile, 2)
 
     ; incluir el archivo fuente
+    ; se incluye como texto simple, con el nombre ">AUTOHOTKEY SCRIPT<" que AHK (archivo bin) reconocerá para proceder a ejecutar el Script
     Local Size := StrPut(Data.Code, "UTF-8") - 1, Buffer := ""
     VarSetCapacity(Buffer, Size), StrPut(Data.Code, &Buffer, Size, "UTF-8")
-    DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Int", 10, "Str", ">AUTOHOTKEY SCRIPT<", "UShort", SUBLANG_ENGLISH_US, "UPtr", &Buffer, "UInt", Size)
+    AddResource(hUpdate, RT_RCDATA, ">AUTOHOTKEY SCRIPT<", &Buffer, Size)
     VarSetCapacity(Buffer, 0)
 
     ; incluir el archivo icono principal
+    ; el primer icono (grupo #1) es el que tomará Windows como el icono principal del archivo
+    ; antes de añadir un icono, debemos eliminar los iconos actuales por defecto de AHK
     Local    GROUP_ICON := "",    ICONS := ""
         ,  GROUP_CURSOR := "",  CURSORS := ""
         ,        IconID :=  1, CursorID :=  1
     If (hIconFile)
     {
-        ; eliminamos todos grupos de iconos
+        ; eliminamos todos los grupos de iconos
         For Each, Resource in EnumResourceNames(hExe, RT_GROUP_ICON)
         {
             ; eliminamos todos los iconos en el grupo actual
@@ -189,14 +192,13 @@
     ; ...
 
     ; cerramos el archivo destino
-    DllCall("Kernel32.dll\FreeLibrary", "Ptr", hExe, "Ptr")
-    DllCall("Kernel32.dll\EndUpdateResourceW", "Ptr", hUpdate, "Int", FALSE)
+    FreeLibrary(hExe), EndUpdateResource(hUpdate)
 
     ; establecemos el subsistema requerido para ejecutar el archivo destino
     ; PE File Format: https://blog.kowalczyk.info/articles/pefileformat.html
     hExeFile := FileOpen(ExeFile, "rw")    ; asumimos que no fallará debido a que recien estuvimos trabajando con el archivo
     hExeFile.Seek(60)    ; IMAGE_DOS_HEADER.e_lfanew (File address of PE header)
-    hExeFile.Seek(hExeFile.ReadUInt() + 20 + 72)    ; IMAGE_OPTIONAL_HEADER.Subsystem | 20 = sizeof IMAGE_FILE_HEADER | ReadUInt() = &IMAGE_OPTIONAL_HEADER
+    hExeFile.Seek(hExeFile.ReadUInt() + 20 + 72)    ; IMAGE_OPTIONAL_HEADER.Subsystem | 20 = sizeof IMAGE_FILE_HEADERs
     hExeFile.WriteUShort(Data.Directives.Subsystem)
     hExeFile.Close()
 
@@ -242,7 +244,7 @@
     ; ÉXITO! | TERMINAMOS
     ; ======================================================================================================================================================
     FileSetAttrib("N", ExeFile)    ; ya podemos hacer visible el archivo destino
-    TaskDialog(INFO_ICON, [Gui.Title,"Compilación.."], ["La compilación a finalizado con éxito!",ExeFile])
+    TaskDialog(INFO_ICON, [Title,"Compilación.."], ["La compilación a finalizado con éxito!",ExeFile])
 
     Return TRUE
 }
