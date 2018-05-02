@@ -7,6 +7,10 @@
 ;@Ahk2Exe-SetOrigFilename    Ahk2Exe.ahk
 ;@Ahk2Exe-SetMainIcon        Ahk2Exe.ico
 
+;@Ahk2Exe-AddResource logo.bmp
+;@Ahk2Exe-AddResource separator.bmp
+;@Ahk2Exe-AddResource waterctrl.dll
+
 
 
 
@@ -33,6 +37,7 @@ SetRegView 64
 ; INCLUDES
 ; =====================================================================================================================================================
 #Include Lib\LinearGradient.ahk
+#Include Lib\ImageButton.ahk
 #Include Lib\ComboBox.ahk
 #Include Lib\RunAsAdmin.ahk
 #Include Lib\TaskDialog.ahk
@@ -43,6 +48,7 @@ SetRegView 64
 #Include Include\Compiler.ahk
 #Include Include\ScriptParser.ahk
 #Include Include\Resources.ahk
+#Include Include\CommandLine.ahk
 
 
 
@@ -79,12 +85,17 @@ global       RT_CURSOR := 1    ; Resource-Definition Statements - https://msdn.m
      ,         RT_MENU := 4
      ,       RT_DIALOG := 5
      ,       RT_STRING := 6
+     ,      RT_FONTDIR := 7
+     ,         RT_FONT := 8
      , RT_ACCELERATORS := 9
      ,       RT_RCDATA := 10
      , RT_MESSAGETABLE := 11
      , RT_GROUP_CURSOR := 12  ; RT_CURSOR + 11 - MAKEINTRESOURCE((ULONG_PTR)(RT_CURSOR) + DIFFERENCE)
      ,   RT_GROUP_ICON := 14  ;   RT_ICON + 11 - MAKEINTRESOURCE((ULONG_PTR)(  RT_ICON) + DIFFERENCE)
      ,      RT_VERSION := 16
+     ,   RT_DLGINCLUDE := 17
+     ,     RT_PLUGPLAY := 19
+     ,          RT_VXD := 20
      ,    RT_ANICURSOR := 21
      ,      RT_ANIICON := 22
      ,         RT_HTML := 23
@@ -108,19 +119,15 @@ global IMAGE_SUBSYSTEM_WINDOWS_GUI := 2
 
 ; determina si se pasaron parámetros al compilador
 If (ObjLength(A_Args))
-{
-    ExitApp
-}
-
-
-; arquitectura AHK (x32 necesario para el funcionamiento de waterctrl.dll)
-If (A_PtrSize != 4)
-    Util_Error("Error de arquitectura.`nDebe ejecutar el compilador con AutoHotkey 32-bit.",, TRUE)
+    ProcessCmdLine(), ExitApp()
 
 
 ; variables super-globales necesarias cuando se muestra la interfaz GUI
 global Gui := 0        ; almacena el objeto GUI de la ventana principal
 global Log := ""       ; almacena una serie de registros de una operación en contreto separados por "`n"
+global wctrltimer := 0
+global ButtonStyle := [[3, 0xFEF5BF, 0xFEE88A, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [3, 0xFEDF63, 0xFED025, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [5, 0xFEDF63, 0xFED025, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [0, 0xFEF5BF, "Black", 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [3, 0xFEF5BF, 0xFEE88A, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 2], [0, 0xFEF5BF, "Black", 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1]]
+global ButtonStyle2 := [[0, 0xE1E1E1, "Black", 0x151515, 5, 0xFFFFFF, 0xADADAD, 1], [0, 0xE5F1FB, "Black", 0x151515, 5, 0xFFFFFF, 0x007CE1, 1], [0, 0xCCE4F7, "Black", 0x151515, 5, 0xFFFFFF, 0x005499, 1], [0, 0xE1E1E1, "Black", 0x808080, 5, 0xFFFFFF, 0xADADAD, 1], [0, 0xE1E1E1, "Black", 0x151515, 5, 0xFFFFFF, 0x007CE1, 2], [0, 0xE5F1FB, "Black", 0x151515, 1, 0xFFFFFF, 0x007CE1, 1]]
 
 
 ; constantes
@@ -147,21 +154,12 @@ Gui := GuiCreate("-DPIScale -Resize -MaximizeBox +MinSize690x481 +E0x00000400", 
     ERROR_ICON[1] := WARNING_ICON[1] := INFO_ICON[1] := SHIELD_ICON[1] := Gui.Hwnd
 Gui.SetFont("s9", "Segoe UI")
 
-Gui.AddText("x0 y0 w690 h100 vtbg BackgroundFFFFFF +E0x08000000")    ; fondo blanco para la parte superior
-Gui.AddPic("x0 y415 w690 h76 vbbg +E0x08000000")    ; fondo de pié de página
-    LinearGradient(Gui.Control["bbg"], [0xF0F0F0,0xCDCDCD],, 1)  ; 1=VERTICAL
-Gui.AddText("x10 y5 w270 h92 vlogo")
-    ; establecemos efecto de agua a la imagen logo AHK
-    ; https://autohotkey.com/boards/viewtopic.php?t=3302
-    DllCall("Kernel32.dll\LoadLibraryW", "Str", "waterctrl.dll")
-    hLogo := DllCall("User32.dll\LoadImageW", "Ptr", 0, "Str", "logo.bmp", "UInt", 0, "Int", 270, "Int", 92, "UInt", 0x2010)
-    DllCall("waterctrl\enablewater", "Ptr", Gui.Hwnd, "Int", 0, "Int", 0, "Ptr", hLogo, "Int", 3, "Int", 20)
-    DllCall("waterctrl\setwaterparent", "Ptr", Gui.Control["logo"].Hwnd)
-    global wctrltimer := 0
-    If (WATER_BLOB_INTERVAL)
-        SetTimer(wctrltimer := () => DllCall("waterctrl\waterblob", "Int", Random(1, 270), "Int", Random(1, 92), "Int", Random(3, 12), "Int", Random(20, 75)), WATER_BLOB_INTERVAL)
-Gui.AddLink("x300 y10 w370 h80 BackgroundFFFFFF c242424 vlnk", "©2004-2009 Chris Mallet`n©2008-2011 Steve Gray (lexikos)`n©2018-2018 Flipeador  (©2011-2013 fincs)`n<a href=`"https://autohotkey.com/`">https://autohotkey.com/</a>`nNota: La compilación no garantiza la protección del código fuente.")
-Gui.AddText("x10 y110 w670 h2 +0x10")    ; separador
+If (A_PtrSize == 4)
+    Gui.AddText("x0 y0 w690 h110 vlogo"), Util_LoadWaterCtrl(), Util_EnableWater(Gui.Control["logo"].Hwnd, Util_LoadLogo())
+Else
+    Gui.AddPic("x0 y0 w690 h110 vlogo", "HBITMAP:" . Util_LoadLogo())
+;Gui.AddLink("x300 y10 w370 h80 BackgroundFFFFFF c0 vlnk", "©2004-2009 Chris Mallet`n©2008-2011 Steve Gray (lexikos)`n©2018-2018 Flipeador  (©2011-2013 fincs)`n<a href=`"https://autohotkey.com/`">https://autohotkey.com/</a>`nNota: La compilación no garantiza la protección del código fuente.")
+    ;WinSetTransColor("FFFFFF", "ahk_id" . Gui.Control["lnk"].Hwnd)
 Gui.AddTab3("x10 y120 w670 h287 vtab", "General|Información de la versión|Registros")
 
 Gui.Control["tab"].UseTab(1)
@@ -174,20 +172,21 @@ Gui.AddComboBox("x180 y175 w435 h22 vddlsrc R6 Choose1 +0x400 +0x100", RTrim(Str
     CB_SetSelection(Gui.Control["ddlsrc"], CB_FindString(Gui.Control["ddlsrc"], Cfg.LastSrcFile))
 Gui.AddButton("x620 y175 w40 h22 vbsrc", "•••")
     Gui.Control["bsrc"].OnEvent("Click", "Gui_SrcButton")
+    ImageButton.Create(Gui.Control["bsrc"].Hwnd, ButtonStyle2*)
 Gui.AddText("x30 y202 w120 h20 +0x200", "Destino (archivo exe)")
 Gui.AddEdit("x180 y202 w435 h20 vedest Disabled")
 Gui.AddButton("x620 y202 w40 h20 vbdest", "•••")
     Gui.Control["bdest"].OnEvent("Click", "Gui_DestButton")
+    ImageButton.Create(Gui.Control["bdest"].Hwnd, ButtonStyle2*)
 Gui.AddGroupBox("x20 y245 w650 h83", "Parámetros opcionales")
 Gui.AddText("x30 y266 w120 h20 +0x200", "Icono (archivo ico)")
 Gui.AddComboBox("x180 y266 w435 h22 vddlico R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastIconList, "`r`n", "|"), "|"))
     CB_SetItemHeight(Gui.Control["ddlico"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
     CB_SetItemHeight(Gui.Control["ddlico"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
     CB_SetSelection(Gui.Control["ddlico"], CB_FindString(Gui.Control["ddlico"], Cfg.LastIconFile))
-;Gui.AddButton("x565 y266 w53 h22 vbdico", "Defecto") ; w380
-    ;Gui.Control["bdico"].OnEvent("Click", () => CB_SetText(Gui.Control["ddlico"], ""))
 Gui.AddButton("x620 y266 w40 h22 vbico", "•••")
     Gui.Control["bico"].OnEvent("Click", "Gui_IcoButton")
+    ImageButton.Create(Gui.Control["bico"].Hwnd, ButtonStyle2*)
 Gui.AddText("x32 y293 w120 h22 +0x200", "Archivo base (bin)")
 Gui.AddDDL("x180 y293 w405 h22 vddlbin R6 +0x400")
     CB_SetItemHeight(Gui.Control["ddlbin"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
@@ -195,14 +194,16 @@ Gui.AddDDL("x180 y293 w405 h22 vddlbin R6 +0x400")
     Util_LoadBinFiles(Cfg.LastBinFile)
 Gui.AddButton("x592 y293 w68 h22 vbrefbin", "Refrezcar")
     Gui.Control["brefbin"].OnEvent("Click", () => Util_LoadBinFiles(Cfg.LastBinFile))
+    ImageButton.Create(Gui.Control["brefbin"].Hwnd, ButtonStyle2*)
 Gui.AddGroupBox("x20 y336 w650 h61", "Compresión del archivo exe resultante")
 Gui.AddText("x30 y357 w125 h22 +0x200", "Método de compresión")
 Gui.AddDDL("x180 y357 w405 h22 vddlcomp R4 +0x400")
     CB_SetItemHeight(Gui.Control["ddlcomp"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
     CB_SetItemHeight(Gui.Control["ddlcomp"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
     Util_LoadCompressionFiles(Cfg.Compression)
-Button := Gui.AddButton("x592 y357 w68 h22", "Descargar")
-    Button.OnEvent("Click", () => InStr(CB_GetText(Gui.Control["ddlcomp"]), "upx") ? Run("https://upx.github.io/") : InStr(CB_GetText(Gui.Control["ddlcomp"]), "mpress") ? Run("http://www.matcode.com/mpress.htm") : 0)
+Gui.AddButton("x592 y357 w68 h22 vbdownload", "Descargar")
+    Gui.Control["bdownload"].OnEvent("Click", () => InStr(CB_GetText(Gui.Control["ddlcomp"]), "upx") ? Run("https://upx.github.io/") : InStr(CB_GetText(Gui.Control["ddlcomp"]), "mpress") ? Run("http://www.matcode.com/mpress.htm") : 0)
+    ImageButton.Create(Gui.Control["bdownload"].Hwnd, ButtonStyle2*)
 
 Gui.Control["tab"].UseTab(2)
 Gui.AddListView("x20 y150 w650 h250 vlvri -E0x200", "Nombre|Valor")
@@ -214,15 +215,21 @@ Gui.AddListView("x20 y150 w650 h250 vlvlog -E0x200", "ID|Mensaje|Archivo|Línea|
     DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvlog"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
 
 Gui.Control["tab"].UseTab()
-Gui.AddText("x0 y415 w690 h2 +0x10")
+Gui.AddPic("x0 y413 w690 h3 vbsp", "HBITMAP:" . Util_LoadSeparator())
+Gui.AddPic("x0 y415 w690 h76 vbbg +E0x08000000")    ; fondo de pié de página
+    LinearGradient(Gui.Control["bbg"], [0xFEF5BF, 0xFEE786, 0xFED025],, 1)  ; 1=VERTICAL
 Gui.AddButton("x590 y426 w90 h22 vbclose", "Cerrar")
     Gui.Control["bclose"].OnEvent("Click", "ExitApp")
-Gui.AddButton("x492 y426 w90 h22 vbcompile", "Compilar")
+    ImageButton.Create(Gui.Control["bclose"].Hwnd, ButtonStyle*)
+Gui.AddButton("x492 y426 w90 h22 Default vbcompile", "Compilar")
     Gui.Control["bcompile"].OnEvent("Click", "Gui_CompileButton")
+    ImageButton.Create(Gui.Control["bcompile"].Hwnd, ButtonStyle*)
 Gui.AddButton("x10 y426 w90 h22 vbgit", "Ver en GitHub")
     Gui.Control["bgit"].OnEvent("Click", () => Run("https://github.com/flipeador/Ahk2Exe"))
+    ImageButton.Create(Gui.Control["bgit"].Hwnd, ButtonStyle*)
 Gui.AddButton("x110 y426 w90 h22 vbabout", "Acerca de (F1)")
     Gui.Control["babout"].OnEvent("Click", Func("WM_KEYDOWN").Bind(0x70, 0))
+    ImageButton.Create(Gui.Control["babout"].Hwnd, ButtonStyle*)
 Gui.AddStatusBar("vsb +0x100", "Listo")
 
 Gui.Show("w690 h481", "Ahk2Exe for AutoHotkey v2.0.0.0 | Script a EXE Conversor")
@@ -374,13 +381,6 @@ WM_KEYDOWN(VKCode, lParam)
 
 WM_MOUSEMOVE(VKCode, Coords)
 {
-    Static LnkClr := 0
-
-    MouseGetPos(,,, ControlId, 2)
-    If (!LnkClr && Gui.Control["lnk"].Hwnd == ControlId)
-        Gui.Control["lnk"].SetFont("c1A1AFF"), LnkClr := 1
-    Else If (LnkClr && Gui.Control["lnk"].Hwnd != ControlId)
-        Gui.Control["lnk"].SetFont("c242424"), LnkClr := 0
 } ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms645616(v=vs.85).aspx
 
 
@@ -389,6 +389,7 @@ WM_MOUSEMOVE(VKCode, Coords)
 
 _OnExit(ExitReason, ExitCode)
 {
+    global wctrltimer
     If (wctrltimer)
         SetTimer(wctrltimer, "Delete")
     DllCall("User32.dll\AnimateWindow", "Ptr", Gui.HWnd, "UInt", 350, "UInt", 0x00080000|0x00010000)
@@ -543,6 +544,8 @@ Util_GetFullPathName(Path)
 
 Util_AddLog(What, Message, Script := "-", Line := "-", Extra := "-", ErrorCode := "-", Other := "-")
 {
+    If (ObjLength(A_Args))
+        Return
     Gui.Control["lvlog"].Add(, What, Message, Script, Line, Extra, ErrorCode, Other, FormatTime(, "dd/MM/yyyy hh:mm:ss"))
     Loop 7
         Gui.Control["lvlog"].ModifyCol(A_Index, "AutoHdr")
@@ -552,6 +555,52 @@ Util_ClearLog()
 {
     Gui.Control["lvlog"].Delete()
 }
+
+Util_LoadLogo()
+{
+    Local hBitmap := LoadImage(A_IsCompiled ? -1 : 0, "LOGO.BMP")
+
+    If (A_PtrSize == 4)
+    {
+        ; necesario rotar la imagen para la correcta visualización con waterctrl
+        Local pBitmap := 0
+        DllCall("Gdiplus.dll\GdipCreateBitmapFromHBITMAP", "Ptr", hBitmap, "Ptr", 0, "UPtrP", pBitmap)
+        DllCall("Gdi32.dll\DeleteObject", "Ptr", hBitmap)
+        ; https://msdn.microsoft.com/en-us/library/ms534041(v=vs.85).aspx
+        DllCall("Gdiplus.dll\GdipImageRotateFlip", "UPtr", pBitmap, "Int", 6)    ; 6 = Rotate180FlipX (https://msdn.microsoft.com/en-us/library/ms534171(v=vs.85).aspx)
+        DllCall("Gdiplus.dll\GdipCreateHBITMAPFromBitmap", "UPtr", pBitmap, "PtrP", hBitmap, "Int", 0xFFFFFFFF)
+        DllCall("Gdiplus.dll\GdipDisposeImage", "UPtr", pBitmap)
+    }
+
+    Return hBitmap
+}
+
+Util_LoadSeparator()
+{
+    Return LoadImage(A_IsCompiled ? -1 : 0, "SEPARATOR.BMP")
+}
+
+Util_LoadWaterCtrl()
+{
+    If (!A_IsCompiled)
+        Return LoadLibrary("waterctrl.dll")
+
+    If (FileExist(A_Temp . "\waterctrl.dll"))
+        Return LoadLibrary(A_Temp . "\waterctrl.dll")
+
+    Local hExe := LoadLibrary(A_ScriptFullPath, 2), Size := 0
+    FileOpen(A_Temp . "\waterctrl.dll", "w").RawWrite(LoadResource3(hExe, RT_RCDATA, "WATERCTRL.DLL", Size), Size)
+    FreeLibrary(hExe)
+    Return LoadLibrary(A_Temp . "\waterctrl.dll")
+}
+
+Util_EnableWater(Hwnd, hBitmap)
+{
+    DllCall("waterctrl.dll\enablewater", "Ptr", Gui.Hwnd, "Int", 0, "Int", 0, "Ptr", hBitmap, "Int", 3, "Int", 20)
+    DllCall("waterctrl.dll\setwaterparent", "Ptr", Hwnd)
+    If (WATER_BLOB_INTERVAL)
+        SetTimer(wctrltimer := () => DllCall("waterctrl.dll\waterblob", "Int", Random(0, 690), "Int", Random(0, 110), "Int", Random(3, 12), "Int", Random(20, 75)), WATER_BLOB_INTERVAL)
+} ; https://autohotkey.com/boards/viewtopic.php?t=3302
 
 
 
