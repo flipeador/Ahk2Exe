@@ -8,7 +8,6 @@
 ;@Ahk2Exe-SetMainIcon        Ahk2Exe.ico
 
 ;@Ahk2Exe-AddResource logo.bmp
-;@Ahk2Exe-AddResource separator.bmp
 ;@Ahk2Exe-AddResource waterctrl.dll
 
 
@@ -44,6 +43,7 @@ SetRegView 64
 #Include Lib\GetDirParent.ahk
 #Include Lib\SaveFile.ahk
 #Include Lib\ChooseFile.ahk
+#Include Lib\GuiControlTips.ahk
 
 #Include Include\Compiler.ahk
 #Include Include\ScriptParser.ahk
@@ -58,7 +58,7 @@ SetRegView 64
 ; INICIO
 ; =====================================================================================================================================================
 A_ScriptName := "Ahk2Exe Compilador"
-global Title := "Ahk2Exe para AutoHotkey v" . A_AhkVersion . " | Script a EXE Conversor"
+global Title := "Ahk2Exe para AutoHotkey v" . A_AhkVersion . " | Script a EXE Conversor (" . (A_PtrSize==4?"32-Bit)":"64-Bit)")
 
 
 ; comprobamos instancia (no permitir más de una instancia)
@@ -152,85 +152,113 @@ FileDelete(A_ScriptDir . "\~tmp"), A_IconHidden := A_IsCompiled
 ; creamos la interfaz de usuario (GUI)
 Gui := GuiCreate("-DPIScale -Resize -MaximizeBox +MinSize690x481 +E0x00000400", Title)
     ERROR_ICON[1] := WARNING_ICON[1] := INFO_ICON[1] := SHIELD_ICON[1] := Gui.Hwnd
+    GCT := new GuiControlTips(Gui)
+    GCT.SetTitle("Ahk2Exe", 1)
+    GCT.SetFont("Italic", "Segoe UI")
 Gui.SetFont("s9", "Segoe UI")
 
 If (A_PtrSize == 4)
     Gui.AddText("x0 y0 w690 h110 vlogo"), Util_LoadWaterCtrl(), Util_EnableWater(Gui.Control["logo"].Hwnd, Util_LoadLogo())
 Else
     Gui.AddPic("x0 y0 w690 h110 vlogo", "HBITMAP:" . Util_LoadLogo())
-;Gui.AddLink("x300 y10 w370 h80 BackgroundFFFFFF c0 vlnk", "©2004-2009 Chris Mallet`n©2008-2011 Steve Gray (lexikos)`n©2018-2018 Flipeador  (©2011-2013 fincs)`n<a href=`"https://autohotkey.com/`">https://autohotkey.com/</a>`nNota: La compilación no garantiza la protección del código fuente.")
-    ;WinSetTransColor("FFFFFF", "ahk_id" . Gui.Control["lnk"].Hwnd)
-Gui.AddTab3("x10 y120 w670 h287 vtab", "General|Información de la versión|Registros")
+Gui.AddButton("x318 y4 w368 h100 vinfo Left", "  ©2004-2009 Chris Mallet`n  ©2008-2011 Steve Gray (Lexikos)`n  ©2011-2018 fincs`n  ©2018-2018 Flipeador`n`n  Nota: La compilación no garantiza la protección del código fuente.")
+    DllCall("User32.dll\SetParent", "Ptr", Gui.Control["info"].Hwnd, "Ptr", Gui.Control["logo"].Hwnd)
+    ImageButton.Create(Gui.Control["a"].Hwnd, [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEE786, 0xFEF5BF, 0x2D4868, 5, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1])
+    Gui.Control["info"].OnEvent("Click", Func("WM_KEYDOWN").Bind(0x70, 0))
+
+Gui.AddTab3("x0 y110 w692 h304 vtab", "General|Información de la versión|Registros")
 
 Gui.Control["tab"].UseTab(1)
-Gui.AddGroupBox("x20 y150 w650 h86", "Parámetros requeridos")
+Gui.AddGroupBox("x20 y150 w650 h90", "Parámetros requeridos")
 Gui.AddText("x30 y175 w120 h20 +0x200", "Fuente (archivo script)")
 Gui.AddComboBox("x180 y175 w435 h22 vddlsrc R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastSrcList, "`r`n", "|"), "|"))
     CB_SetItemHeight(Gui.Control["ddlsrc"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
     CB_SetItemHeight(Gui.Control["ddlsrc"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
     Gui.Control["ddlsrc"].OnEvent("Change", "Util_UpdateSrc")
     CB_SetSelection(Gui.Control["ddlsrc"], CB_FindString(Gui.Control["ddlsrc"], Cfg.LastSrcFile))
+    GCT.Attach(Gui.Control["ddlsrc"], "Buscar y seleccionar el archivo fuente en la lista")
+    GCT.Attach(CB_GetInfo(Gui.Control["ddlsrc"]).Edit, "El archivo fuente script a compilar")
 Gui.AddButton("x620 y175 w40 h22 vbsrc", "•••")
     Gui.Control["bsrc"].OnEvent("Click", "Gui_SrcButton")
     ImageButton.Create(Gui.Control["bsrc"].Hwnd, ButtonStyle2*)
+    GCT.Attach(Gui.Control["bsrc"], "Buscar y seleccionar un archivo fuente")
 Gui.AddText("x30 y202 w120 h20 +0x200", "Destino (archivo exe)")
-Gui.AddEdit("x180 y202 w435 h20 vedest Disabled")
+Gui.AddEdit("x180 y202 w435 h20 vedest ReadOnly")
+    GCT.Attach(Gui.Control["edest"], "El archivo destino compilado EXE")
 Gui.AddButton("x620 y202 w40 h20 vbdest", "•••")
     Gui.Control["bdest"].OnEvent("Click", "Gui_DestButton")
     ImageButton.Create(Gui.Control["bdest"].Hwnd, ButtonStyle2*)
-Gui.AddGroupBox("x20 y245 w650 h83", "Parámetros opcionales")
-Gui.AddText("x30 y266 w120 h20 +0x200", "Icono (archivo ico)")
-Gui.AddComboBox("x180 y266 w435 h22 vddlico R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastIconList, "`r`n", "|"), "|"))
+    GCT.Attach(Gui.Control["bdest"], "Seleccionar el archivo destino")
+Gui.AddGroupBox("x20 y249 w650 h85", "Parámetros opcionales")
+Gui.AddText("x30 y272 w120 h20 +0x200", "Icono (archivo ico)")
+Gui.AddComboBox("x180 y272 w435 h22 vddlico R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastIconList, "`r`n", "|"), "|"))
     CB_SetItemHeight(Gui.Control["ddlico"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
     CB_SetItemHeight(Gui.Control["ddlico"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
     CB_SetSelection(Gui.Control["ddlico"], CB_FindString(Gui.Control["ddlico"], Cfg.LastIconFile))
-Gui.AddButton("x620 y266 w40 h22 vbico", "•••")
+    GCT.Attach(Gui.Control["ddlico"], "Buscar y seleccionar un icono en la lista")
+    GCT.Attach(CB_GetInfo(Gui.Control["ddlico"]).Edit, "El icono principal del archivo compilado")
+Gui.AddButton("x620 y272 w40 h22 vbico", "•••")
     Gui.Control["bico"].OnEvent("Click", "Gui_IcoButton")
     ImageButton.Create(Gui.Control["bico"].Hwnd, ButtonStyle2*)
-Gui.AddText("x32 y293 w120 h22 +0x200", "Archivo base (bin)")
-Gui.AddDDL("x180 y293 w405 h22 vddlbin R6 +0x400")
+    GCT.Attach(Gui.Control["bico"], "Buscar y seleccionar un archivo icono")
+Gui.AddText("x32 y296 w120 h22 +0x200", "Archivo base (bin)")
+Gui.AddDDL("x180 y296 w405 h22 vddlbin R6 +0x400")
     CB_SetItemHeight(Gui.Control["ddlbin"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
     CB_SetItemHeight(Gui.Control["ddlbin"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
     Util_LoadBinFiles(Cfg.LastBinFile)
-Gui.AddButton("x592 y293 w68 h22 vbrefbin", "Refrezcar")
+    GCT.Attach(Gui.Control["ddlbin"], "El archivo base BIN AutoHotkey")
+Gui.AddButton("x592 y296 w68 h22 vbrefbin", "Refrezcar")
     Gui.Control["brefbin"].OnEvent("Click", () => Util_LoadBinFiles(Cfg.LastBinFile))
     ImageButton.Create(Gui.Control["brefbin"].Hwnd, ButtonStyle2*)
-Gui.AddGroupBox("x20 y336 w650 h61", "Compresión del archivo exe resultante")
-Gui.AddText("x30 y357 w125 h22 +0x200", "Método de compresión")
-Gui.AddDDL("x180 y357 w405 h22 vddlcomp R4 +0x400")
+    GCT.Attach(Gui.Control["brefbin"], "Volver a leer los archivos BIN")
+Gui.AddGroupBox("x20 y344 w650 h61", "Compresión del archivo exe resultante")
+Gui.AddText("x30 y367 w125 h22 +0x200", "Método de compresión")
+Gui.AddDDL("x180 y367 w405 h22 vddlcomp R4 +0x400")
     CB_SetItemHeight(Gui.Control["ddlcomp"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
     CB_SetItemHeight(Gui.Control["ddlcomp"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
     Util_LoadCompressionFiles(Cfg.Compression)
-Gui.AddButton("x592 y357 w68 h22 vbdownload", "Descargar")
+    GCT.Attach(Gui.Control["ddlcomp"], "El método de compresión del archivo EXE")
+Gui.AddButton("x592 y367 w68 h22 vbdownload", "Descargar")
     Gui.Control["bdownload"].OnEvent("Click", () => InStr(CB_GetText(Gui.Control["ddlcomp"]), "upx") ? Run("https://upx.github.io/") : InStr(CB_GetText(Gui.Control["ddlcomp"]), "mpress") ? Run("http://www.matcode.com/mpress.htm") : 0)
     ImageButton.Create(Gui.Control["bdownload"].Hwnd, ButtonStyle2*)
+    GCT.Attach(Gui.Control["bdownload"], "Ir a la página oficial para descargar la herramienta seleccionada")
 
 Gui.Control["tab"].UseTab(2)
-Gui.AddListView("x20 y150 w650 h250 vlvri -E0x200", "Nombre|Valor")
+Gui.AddListView("x2 y138 w686 h272 vlvri -E0x200", "Nombre|Valor")
     DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvri"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
     Util_UpdateSrc()
 
 Gui.Control["tab"].UseTab(3)
-Gui.AddListView("x20 y150 w650 h250 vlvlog -E0x200", "ID|Mensaje|Archivo|Línea|Detalles|Código de error|Información adicional|Tiempo")
+Gui.AddListView("x2 y138 w686 h272 vlvlog -E0x200", "ID|Mensaje|Archivo|Línea|Detalles|Código de error|Información adicional|Tiempo")
     DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvlog"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
 
 Gui.Control["tab"].UseTab()
-Gui.AddPic("x0 y413 w690 h3 vbsp", "HBITMAP:" . Util_LoadSeparator())
+Gui.AddText("x0 y413 w690 h2 vbsp BackgroundFED22C")    ; separador
 Gui.AddPic("x0 y415 w690 h76 vbbg +E0x08000000")    ; fondo de pié de página
-    LinearGradient(Gui.Control["bbg"], [0xFEF5BF, 0xFEE786, 0xFED025],, 1)  ; 1=VERTICAL
+    LinearGradient(Gui.Control["bbg"], [0xFEF5BF, 0xFEE786],, 1)  ; 1=VERTICAL
 Gui.AddButton("x590 y426 w90 h22 vbclose", "Cerrar")
     Gui.Control["bclose"].OnEvent("Click", "ExitApp")
     ImageButton.Create(Gui.Control["bclose"].Hwnd, ButtonStyle*)
-Gui.AddButton("x492 y426 w90 h22 Default vbcompile", "Compilar")
+    GCT.Attach(Gui.Control["bclose"], "Cerrar el compilador y guardar la sesión")
+Gui.AddButton("x492 y426 w90 h22 Default vbcompile", ">Compilar<")
     Gui.Control["bcompile"].OnEvent("Click", "Gui_CompileButton")
+    Gui.Control["bcompile"].SetFont("Bold")
     ImageButton.Create(Gui.Control["bcompile"].Hwnd, ButtonStyle*)
+    GCT.Attach(Gui.Control["bcompile"], "Compilar el archivo fuente seleccionado")
 Gui.AddButton("x10 y426 w90 h22 vbgit", "Ver en GitHub")
     Gui.Control["bgit"].OnEvent("Click", () => Run("https://github.com/flipeador/Ahk2Exe"))
     ImageButton.Create(Gui.Control["bgit"].Hwnd, ButtonStyle*)
+    GCT.Attach(Gui.Control["bgit"], "Ver el código fuente del compilador en GitHub")
 Gui.AddButton("x110 y426 w90 h22 vbabout", "Acerca de (F1)")
     Gui.Control["babout"].OnEvent("Click", Func("WM_KEYDOWN").Bind(0x70, 0))
     ImageButton.Create(Gui.Control["babout"].Hwnd, ButtonStyle*)
+    GCT.Attach(Gui.Control["babout"], "Ver acerca de..")
+Gui.AddLink("x210 y429 w200 h22 BackgroundFFFFFF vlnk", "<a href=`"https://autohotkey.com/`">https://autohotkey.com/</a>")
+    WinSetTransColor("FFFFFF", "ahk_id" . Gui.Control["lnk"].Hwnd)
+    GCT.Attach(Gui.Control["lnk"], "Ir a la página oficial de AutoHotkey")
 Gui.AddStatusBar("vsb +0x100", "Listo")
+    GCT.Attach(Gui.Control["sb"], "Muestra información del estado actual")
+    ;WinSetTransColor("F0F0F0", "ahk_id" . Gui.Control["sb"].Hwnd)
 
 Gui.Show("w690 h481", "Ahk2Exe for AutoHotkey v2.0.0.0 | Script a EXE Conversor")
     Gui.OnEvent("Close", "ExitApp")
@@ -368,9 +396,9 @@ WM_KEYDOWN(VKCode, lParam)
                                                         . "Copyright ©2004-2009 Chris Mallet`n"
                                                         . "Copyright ©2008-2011 Steve Gray (Lexikos)`n`n"
                                                         . "Script rewrite:`n"
-                                                        . "Copyright ©2011-2013 fincs`n"
+                                                        . "Copyright ©2011-2018 fincs`n"
                                                         . "Copyright ©2018-2018 Flipeador"
-                                                           , "flipeador@gmail.com"] )
+                                                        , "flipeador@gmail.com"] )
         Gui.Control["sb"].SetText("Listo")
     }
 } ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms646280(v=vs.85).aspx
@@ -573,11 +601,6 @@ Util_LoadLogo()
     }
 
     Return hBitmap
-}
-
-Util_LoadSeparator()
-{
-    Return LoadImage(A_IsCompiled ? -1 : 0, "SEPARATOR.BMP")
 }
 
 Util_LoadWaterCtrl()
