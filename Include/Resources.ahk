@@ -52,7 +52,7 @@ DeleteResource(hUpdate, ResType, ResName, LangID := "")
 
 AddResource(hUpdate, ResType, ResName, pData, Size, LangID := "")
 {
-    If (!IS_ADDRESSORSIZE(pData) || !IS_ADDRESSORSIZE(Size))
+    If (!IS_ADDRESSORSIZE(pData) || !IS_ADDRESSORSIZE(Size))    ; ayuda a detectar errores (no esperamos una cadena en estos parámetros o un valor < 1)
         Return FALSE
     Return DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", RES_LANG(LangID), "UPtr", pData, "UInt", Size)
 }

@@ -238,7 +238,7 @@
         If (SubStr(LineTxt, 1, 9) = "#Include ")    ; ¿en esta línea hay un #Include?
         {
             LineTxt := Trim(SubStr(LineTxt, 9))    ; eliminamos la palabra "#Include" del inicio y luego espacios en blanco
-            DerefVar(LineTxt)    ; desreferenciamos las variables incluidas entre signos de porcentaje
+            DerefVar(LineTxt,, Script)    ; desreferenciamos las variables incluidas entre signos de porcentaje
 
             If (SubStr(LineTxt, 1, 2) == "*i")    ; ¿el archivo a incluir es opcional?
             {
@@ -346,7 +346,7 @@
         If (LineTxt ~= "i)^FileInstall")    ; ¿la línea comienza con "FileInstall"?
         {
             ; evitamos trabajar con la variable original (LineTxt) ya que debe ser añadida al script compilado
-            foo := ParseFuncParams(SubStr(LineTxt, 12))[1]    ; eliminamos "FileInstall" al principio de la línea y recuperamos el primer parámetro correctamente formateado
+            foo := ParseFuncParams(SubStr(LineTxt, 12), Script)[1]    ; eliminamos "FileInstall" al principio de la línea y recuperamos el primer parámetro correctamente formateado
             If (DirExist(foo) || !FileExist(foo))
             {
                     Util_AddLog("ERROR", "Archivo a incluir no encontrado", Script, A_Index, foo,, "FileInstall")
@@ -459,12 +459,12 @@ ParseVersionInfo(Script)
 
 
 
-DerefVar(ByRef String, Chr := "%")
+DerefVar(ByRef String, Chr := "%", Script := "")
 {
     String := StrReplace(String, Chr .     "A_ScriptDir" . Chr,    A_WorkingDir)
     String := StrReplace(String, Chr .       "A_AppData" . Chr,       A_AppData)
     String := StrReplace(String, Chr . "A_AppDataCommon" . Chr, A_AppDataCommon)
-    String := StrReplace(String, Chr .      "A_LineFile" . Chr,      A_LineFile)
+    String := StrReplace(String, Chr .      "A_LineFile" . Chr,          Script)
     String := StrReplace(String, Chr .       "A_Desktop" . Chr,       A_Desktop)
     String := StrReplace(String, Chr .   "A_MyDocuments" . Chr,   A_MyDocuments)
     String := StrReplace(String,  Chr . "A_ProgramFiles" . Chr,  A_ProgramFiles)
@@ -478,7 +478,7 @@ DerefVar(ByRef String, Chr := "%")
 
 
 
-ParseFuncParams(Params)    ; FileInstall Source, Dest
+ParseFuncParams(Params, Script)    ; FileInstall Source, Dest
 {
     Local Arr := []
         , prm := 1
@@ -497,7 +497,7 @@ ParseFuncParams(Params)    ; FileInstall Source, Dest
         Else IF (bar != "")
         {
             If (InStr("`t`s,", A_LoopField))
-                Arr[prm] .= DerefVar(bar, ""), bar := "", prm += A_LoopField == ","
+                Arr[prm] .= DerefVar(bar, "", Script), bar := "", prm += A_LoopField == ","
             Else
                 bar .= A_LoopField
         }

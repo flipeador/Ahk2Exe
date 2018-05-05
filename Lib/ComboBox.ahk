@@ -1,5 +1,22 @@
-﻿
-;CB  := (Gui:=GuiCreate()).AddComboBox("x0 y0 w200", "Item AB|Item AC|Item AD"), Gui.Show(), Gui.OnEvent("Close", "ExitApp")
+﻿;CB  := (Gui:=GuiCreate()).AddComboBox("x0 y0 w200", "Item AB|Item AC|Item AD"), Gui.Show(), Gui.OnEvent("Close", "ExitApp")
+/*
+    Combo Box Styles (https://msdn.microsoft.com/en-us/library/windows/desktop/bb775796(v=vs.85).aspx#CBS_DROPDOWN)
+        0x1 (CBS_SIMPLE)       = Muestra el cuadro de lista en todo momento. La selección actual en el cuadro de lista se muestra en el control de edición.
+        0x2 (CBS_DROPDOWN)     = El cuadro de lista no se muestra a menos que el usuario seleccione un ícono al lado del control de edición. 
+        0x3 (CBS_DROPDOWNLIST) = Similar a CBS_DROPDOWN, excepto que el control de edición se reemplaza por un elemento de texto estático que muestra la selección actual en el cuadro de lista.
+
+        0x0100 (CBS_SORT)             = Clasifica automáticamente cadenas agregadas al cuadro de lista.
+        0x0400 (CBS_NOINTEGRALHEIGHT) = Especifica que el alto del ComboBox es exactamente el tamaño especificado. Normalmente, el sistema lo dimensiona para que no muestre elementos parciales.
+        0x2000 (CBS_UPPERCASE)        = Convierte a mayúsculas todo el texto tanto en el campo de selección como en la lista.
+        0x4000 (CBS_LOWERCASE)        = Convierte a minúsculas todo el texto tanto en el campo de selección como en la lista.
+
+    ComboBoxEx (https://msdn.microsoft.com/en-us/library/windows/desktop/bb775740(v=vs.85).aspx)
+        Gui.AddCustom("ClassComboBoxEx32 +0x2")    ; ComboBoxEx
+        Gui.AddCustom("ClassComboBoxEx32 +0x3")    ; DropDownListEx
+
+    Notas
+        Un control DropDownList no es más que un control ComboBox con el estilo CBS_DROPDOWNLIST (0x3).
+*/
 
 
 
@@ -109,7 +126,7 @@ CB_GetText(CB, Item := -1)
 */
 CB_SetText(CB, String, Item := -1)
 {
-    If (Item == -1)
+    If (Item == -1 && CB.Type == "ComboBox")
         Return DllCall("User32.dll\SetWindowTextW", "Ptr", CB.Hwnd, "UPtr", &String)
     Local Selection := CB_GetSelection(CB)
     If (CB_Delete(CB, Item) == -1)
@@ -117,7 +134,7 @@ CB_SetText(CB, String, Item := -1)
     If ((Item := CB_Insert(CB, String, Item)) < 0)
         Return -1
     If (Selection == Item)
-        DllCall("User32.dll\SetWindowTextW", "Ptr", CB.Hwnd, "UPtr", &String)
+        CB_SetSelection(CB, Item)
     Return Item
 }
 
@@ -236,16 +253,17 @@ CB_Delete(CB, Item := -1)
         Si hubo un error devuelve -1 (CB_ERR).
         Si no hay más espacio para insertar la cadena devuelve -2 (CB_ERRSPACE).
         Si se especificó Flags y ya hay un elemento con el mismo texto, devuelve -3. No es válido si String es un Array.
-        Si se especificó un Array en String, devuelve la posición basada en cero del primer elemento añadido.
+        Si se especificó un Array en String, devuelve la posición basada en cero del primer elemento añadido. -1 si no se ha añadido ningún elemento.
 */
 CB_Insert(CB, String, Item := -1, Flag := -1)
 {
     If (IsObject(String))
     {
+        Local First := -1
         Loop (ObjLength(String))
             If (Flag == -1 || CB_FindString(CB, String, Flag) == -1)
-                Item := DllCall("User32.dll\SendMessageW", "Ptr", CB.Hwnd, "UInt", 0x014A, "Ptr", Item, "UPtr", &String[A_Index], "Ptr")
-        Return Item - ObjLength(String) + 3
+                Item := DllCall("User32.dll\SendMessageW", "Ptr", CB.Hwnd, "UInt", 0x014A, "Ptr", Item, "UPtr", &String[A_Index], "Ptr"), First := A_Index == 1 ? Item : First
+        Return First
     }
 
     ; CB_INSERTSTRING message
@@ -316,6 +334,8 @@ CB_SetItemData(CB, Data, Item)
             CB         : El identificador del control ComboBox.
             Edit       : El identificador del control de edición (Edit).
             DDL        : El identificador de la lista desplegable.
+    Compatibilidad:
+        ComboBox
 */
 CB_GetInfo(CB)
 {
