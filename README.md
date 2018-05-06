@@ -32,7 +32,7 @@ Compilador no oficial para AutoHotkey v2 en español.
 
 # Compilación por línea de comandos
 - Sintaxis
-  - Ahk2Exe.exe infile.ahk /in infile.ahk [/out outfile.exe] [/icon iconfile.ico] [/bin binfile.bin] [/upx] [/mpress]
+  - Ahk2Exe.exe [/in] infile.ahk [/out outfile.exe] [/icon iconfile.ico] [/bin binfile.bin] [/upx] [/mpress]
 - Descripción
   - `infile.ahk` Es el archivo fuente AHK a compilar. Utiliza el directorio de trabajo del compilador. El archivo fuente es obligatorio.
   - `outfile.exe` Es el archivo EXE de salida compilado. Utiliza el directorio de trabajo de `infile.ahk` o el directorio del compilador si `infile.ahk` no se especificó antes. Si no se especifica, se establece por defecto a `infile.exe`.
