@@ -44,3 +44,4 @@ Compilador no oficial para AutoHotkey v2 en español.
 # Pensamientos para futuras actualizaciones
 - Mejorar el procesado del Script para reducir al máximo el tamaño del archivo compilado.
 - Añadir soporte para modificar la información de la versión.
+- Implementar más opciones en la interfaz.
