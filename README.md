@@ -13,13 +13,13 @@ Compilador no oficial para AutoHotkey v2 en español.
 
 # Características:
 
- - [x] Compilar Scripts (obviamente).
+ - [x] Compilar Scripts (función principal).
   - [x] La configuración se guarda en el registro, en donde se incluye las últimas opciones conocidas al momento de cerrar el compilador y además, almacena una lista con los 10 primeros archivos fuente e iconos en el control.
   - [x] Detección de errores y registro de los mismos.
    - [x] Detectar y remover comentarios en el script.
  - [x] Detectar y remover espacios innecesarios al inicio y final de la línea.
  - [x] Detectar secciones de continuación
- - [ ] Soporte para compilar por medio de la línea de comandos.
+ - [x] Soporte para compilar por medio de la línea de comandos.
  - [x] Soporte para cambiar el icono principal.
  - [x] Soporte para añadir cualquier tipo de iconos y cursores.
  - [x] Soporte variado para añadir recursos en el ejecutable y crear nuevos tipos.
@@ -27,6 +27,6 @@ Compilador no oficial para AutoHotkey v2 en español.
  - [ ] Soporte para cambiar la información de la versión.
  - [x] Soporte para cambiar el sub-sistema del ejecutable a modo consola.
  - [x] Soporte completo para las directivas `#Include` y `#IncludeAgain`.
- - [x] Soporte para función `FileInstall`.
+ - [x] Soporte para la función `FileInstall`.
  - [x] Soporte para compresión del archivo compilado con `UPX` y `MPRESS`.
 
