@@ -40,10 +40,11 @@ SetRegView 64
 #Include Lib\ComboBox.ahk
 #Include Lib\RunAsAdmin.ahk
 #Include Lib\TaskDialog.ahk
-#Include Lib\GetDirParent.ahk
+#Include Lib\DirGetParent.ahk
 #Include Lib\SaveFile.ahk
 #Include Lib\ChooseFile.ahk
 #Include Lib\GuiControlTips.ahk
+#Include Lib\GetFullPathName.ahk
 
 #Include Include\Compiler.ahk
 #Include Include\ScriptParser.ahk
@@ -68,14 +69,17 @@ If (WinExist(Title))
     WinShow(Title), WinActivate(Title), ExitApp()
 
 
-; variables super-globales obligatorias
+; variables super-globales
+global  g_data := {}
 global     Cfg := Util_LoadCfg()
 global VerInfo := Util_LoadVerInfo()    ; StringFileInfo BLOCK statement - https://msdn.microsoft.com/en-us/library/windows/desktop/aa381049(v=vs.85).aspx
 global    Gdip := new Gdiplus
 global AhkPath := RegRead("HKLM\SOFTWARE\AutoHotkey", "InstallDir")
-    global AhkDir := DirExist(GetDirParent(AhkPath)) ? GetDirParent(AhkPath) : GetDirParent(A_ScriptDir)
+    AhkPath := ErrorLevel || DirExist(AhkPath) || !FileExist(AhkPath) ? RegRead("HKCU\SOFTWARE\AutoHotkey", "InstallDir") : AhkPath
+    global AhkDir := DirExist(DirGetParent(AhkPath)) ? DirGetParent(AhkPath) : DirGetParent(A_ScriptDir)
     global AhkLib := [ DirExist(AhkDir . "\Lib") ? AhkDir . "\Lib" : ""
                      , DirExist(A_MyDocuments . "\AutoHotkey\Lib") ? A_MyDocuments . "\AutoHotkey\Lib" : "" ]
+global ERROR := FALSE
 
 
 ; constantes
@@ -106,8 +110,6 @@ global    UPX := 1
 
 global SUBLANG_ENGLISH_US := 0x0409    ; https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693(v=vs.85).aspx
 
-global ERROR := FALSE
-
 global       TD_ERROR_ICON := 0xFFFE,   ERROR_ICON := [0, TD_ERROR_ICON]
      ,     TD_WARNING_ICON := 0xFFFF, WARNING_ICON := [0, TD_WARNING_ICON]
      , TD_INFORMATION_ICON := 0xFFFD,    INFO_ICON := [0, TD_INFORMATION_ICON]
@@ -118,8 +120,9 @@ global IMAGE_SUBSYSTEM_WINDOWS_GUI := 2
 
 
 ; determina si se pasaron parámetros al compilador
-If (ObjLength(A_Args))
-    ProcessCmdLine(), ExitApp()
+global CMDLN := ObjLength(A_Args)
+If (CMDLN)
+    ExitApp ProcessCmdLine()
 
 
 ; variables super-globales necesarias cuando se muestra la interfaz GUI
@@ -166,7 +169,8 @@ Gui.AddButton("x318 y4 w368 h100 vinfo Left", "  ©2004-2009 Chris Mallet`n  ©2
     ImageButton.Create(Gui.Control["a"].Hwnd, [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEE786, 0xFEF5BF, 0x2D4868, 5, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1])
     Gui.Control["info"].OnEvent("Click", Func("WM_KEYDOWN").Bind(0x70, 0))
 
-Gui.AddTab3("x0 y110 w692 h304 vtab", "General|Información de la versión|Registros")
+Gui.AddTab3("x0 y110 w692 h304 vtab", "General|Información de la versión|Registros|AutoHotkey")
+    Gui.Control["tab"].OnEvent("Change", "Gui_Tab")
 
 Gui.Control["tab"].UseTab(1)
 Gui.AddGroupBox("x20 y150 w650 h90", "Parámetros requeridos")
@@ -232,6 +236,17 @@ Gui.Control["tab"].UseTab(3)
 Gui.AddListView("x2 y138 w686 h272 vlvlog -E0x200", "ID|Mensaje|Archivo|Línea|Detalles|Código de error|Información adicional|Tiempo")
     DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvlog"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
 
+Gui.Control["tab"].UseTab(4)
+Gui.AddGroupBox("x20 y150 w650 h90", "Instalación de AutoHotkey")
+Gui.AddText("x30 y175 w120 h20 +0x200", "Ruta de instalación")
+Gui.AddEdit("x180 y175 w435 h20 veahkp ReadOnly")
+Gui.AddButton("x620 y175 w40 h20 vbahkp", "•••")
+    Gui.Control["bahkp"].OnEvent("Click", "Gui_FindAHKButton")
+Gui.AddRadio("x30 y212 w130 h20 vrcurru Disabled", "Usuario actual")
+    Gui.Control["rcurru"].OnEvent("Click", "Gui_CurrURadio")
+Gui.AddRadio("x180 y212 w130 h20 vrallu Disabled", "Todos los usuarios")
+    Gui.Control["rallu"].OnEvent("Click", "Gui_AllURadio")
+
 Gui.Control["tab"].UseTab()
 Gui.AddText("x0 y413 w690 h2 vbsp BackgroundFED22C")    ; separador
 Gui.AddPic("x0 y415 w690 h76 vbbg +E0x08000000")    ; fondo de pié de página
@@ -248,7 +263,7 @@ Gui.AddButton("x492 y426 w90 h22 Default vbcompile", ">Compilar<")
 Gui.AddButton("x10 y426 w90 h22 vbgit", "Ver en GitHub")
     Gui.Control["bgit"].OnEvent("Click", () => Run("https://github.com/flipeador/Ahk2Exe"))
     ImageButton.Create(Gui.Control["bgit"].Hwnd, ButtonStyle*)
-    GCT.Attach(Gui.Control["bgit"], "Ver el código fuente del compilador en GitHub")
+    GCT.Attach(Gui.Control["bgit"], "Ir a la página oficial en GitHub")
 Gui.AddButton("x110 y426 w90 h22 vbabout", "Acerca de (F1)")
     Gui.Control["babout"].OnEvent("Click", Func("WM_KEYDOWN").Bind(0x70, 0))
     ImageButton.Create(Gui.Control["babout"].Hwnd, ButtonStyle*)
@@ -260,7 +275,7 @@ Gui.AddStatusBar("vsb +0x100", "Listo")
     GCT.Attach(Gui.Control["sb"], "Muestra información del estado actual")
     ;WinSetTransColor("F0F0F0", "ahk_id" . Gui.Control["sb"].Hwnd)
 
-Gui.Show("w690 h481", "Ahk2Exe for AutoHotkey v2.0.0.0 | Script a EXE Conversor")
+Gui.Show("w690 h481")
     Gui.OnEvent("Close", "ExitApp")
     Gui.OnEvent("Size", "Gui_Size")
     Gui.OnEvent("Escape", () => MsgBox("¿Esta seguro de que desea cerrar la aplicación?",, 0x2024) == "Yes" ? ExitApp() : 0)
@@ -311,6 +326,47 @@ Gui_DropFiles(Gui, Ctrl, FileArray, X, Y)
     }
 }
 
+Gui_Tab(Tab)
+{
+    If (Tab.Value == 4)
+    {
+        Local InstallDir := RegRead("HKLM\SOFTWARE\AutoHotkey", "InstallDir")
+        If (ErrorLevel || DirExist(InstallDir) || !FileExist(InstallDir))
+        {
+            InstallDir := RegRead("HKCU\SOFTWARE\AutoHotkey", "InstallDir")
+            If (ErrorLevel || DirExist(InstallDir) || !FileExist(InstallDir))
+                Gui.Control["rcurru"].Value := FALSE, Gui.Control["rallu"].Value := FALSE
+            Else
+                Gui.Control["rcurru"].Value := TRUE
+        }
+        Else
+            Gui.Control["rallu"].Value := TRUE
+
+        Gui.Control["eahkp"].Text := InstallDir
+    }
+}
+
+Gui_FindAHKButton()
+{
+    Local File := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar ruta de instalación de AutoHotkey.exe"],, {Ejecutables: "#*.exe"})
+    If (File)
+    {
+        RegWrite(File, "REG_SZ", "HKLM\SOFTWARE\AutoHotkey", "InstallDir")
+        If (ErrorLevel)
+            TaskDialog(INFO_ICON, [Title,"AutoHotkey"], ["Ha ocurrido un error al escribir la clave.`nIntente ejecutar el compilador como Administrador.",File])
+        Else
+            Gui.Control["eahkp"].Text := File, Gui.Control["rallu"].Value := TRUE
+    }
+}
+
+Gui_CurrURadio()
+{
+}
+
+Gui_AllURadio()
+{
+}
+
 Gui_SrcButton()
 {
     Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo fuente AHK..")
@@ -342,7 +398,7 @@ Gui_IcoButton()
 Gui_DestButton()
 {
     Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo de destino..")
-    Local File := Gui.Control["edest"].Text == "" ? (CB_GetSelection(Gui.Control["ddlsrc"]) == -1 ? GetDirParent(Cfg.LastExeFile) . "\" : CB_GetText(Gui.Control["ddlsrc"])) : Gui.Control["edest"].Text
+    Local File := Gui.Control["edest"].Text == "" ? (CB_GetSelection(Gui.Control["ddlsrc"]) == -1 ? DirGetParent(Cfg.LastExeFile) . "\" : CB_GetText(Gui.Control["ddlsrc"])) : Gui.Control["edest"].Text
         , File := SaveFile([Gui.Hwnd,"Ahk2Exe - Guardar como"], SubStr(File, -4) = ".ahk" ? SubStr(File, 1, -4) . ".exe" : File, {Ejecutables: "#*.exe"})
     If (File)
     {
@@ -518,6 +574,9 @@ Util_LoadBinFiles(Default)
 
 Util_CheckBinFile(Name)
 {
+    If (InStr(Name, ".bin"))
+        Return FileExist(Name) ? Name : ""
+
     Local BinFile := ""
     Return FileExist(BinFile := SubStr(Name, InStr(Name, A_Space)+1) . ".bin") ? BinFile : FALSE
 }
@@ -560,19 +619,9 @@ Util_UpdateSrc()
     }
 }
 
-Util_GetFullPathName(Path)
-{
-    ;If (!InStr(Path, ".."))
-    ;    Return InStr(Path, ":") ? Path : A_WorkingDir . "\" . Path
-
-    VarSetCapacity(Buffer, 2002, 0)
-    DllCall("Kernel32.dll\GetFullPathNameW", "UPtr", &Path, "UInt", 1000, "Str", Buffer, "UPtr", 0, "UInt")
-    Return Buffer
-}
-
 Util_AddLog(What, Message, Script := "-", Line := "-", Extra := "-", ErrorCode := "-", Other := "-")
 {
-    If (ObjLength(A_Args))
+    If (CMDLN)
         Return
     Gui.Control["lvlog"].Add(, What, Message, Script, Line, Extra, ErrorCode, Other, FormatTime(, "dd/MM/yyyy hh:mm:ss"))
     Loop 7

@@ -8,14 +8,14 @@
     ; ======================================================================================================================================================
     ; Comprobar archivos
     ; ======================================================================================================================================================
-    Local BinFile := Util_CheckBinFile(CB_GetText(Gui.Control["ddlbin"]))
+    Local BinFile := Util_CheckBinFile(CMDLN ? g_data.BinFile : CB_GetText(Gui.Control["ddlbin"]))
     If (!BinFile)    ; ¿el archivo BIN no existe?
     {
         Util_AddLog("ERROR", "El archivo BIN no se ha encontrado", BinFile,, Data.Script)
         Return Util_Error("El archivo BIN no existe.", BinFile)
     }
 
-    Local ExeFile := Gui.Control["edest"].Text
+    Local ExeFile := CMDLN ? g_data.ExeFile : Gui.Control["edest"].Text
     If (ExeFile == "")    ; si no se a especificado un archivo destino, utiliza la misma carpeta y nombre que el archivo fuente
     {
         Local SrcDir := "", SrcName := ""
@@ -23,13 +23,13 @@
         ExeFile := SrcDir . "\" . SrcName . ".exe"
     }
 
-    If (!DirExist(GetDirParent(ExeFile)))    ; ¿el directorio del archivo EXE resultante no existe?
+    If (!DirExist(DirGetParent(ExeFile)))    ; ¿el directorio del archivo EXE resultante no existe?
     {
         Util_AddLog("ERROR", "El directorio del archivo destino no existe", ExeFile,, Data.Script)
         Return Util_Error("El directorio del archivo resultante EXE no existe.", ExeFile)
     }
 
-    Local IconFile := CB_GetText(Gui.Control["ddlico"])
+    Local IconFile := CMDLN ? g_data.IcoFile : CB_GetText(Gui.Control["ddlico"])
     If (IconFile != "" && (DirExist(IconFile) || !FileExist(IconFile)))
     {
         Util_AddLog("ERROR", "No se ha encontrado el icono principal", IconFile,, Data.Script)
@@ -106,8 +106,9 @@
         Loop (ObjLength(ICONS))
             AddResource(hUpdate, RT_ICON, IconID++, ObjGetAddress(ICONS[A_Index], "Buffer"), ICONS[A_Index].Size)
         GROUP_ICON := "", ICONS := ""
+        
+        hIconFile.Close()    ; cerramos el archivo icono principal
     }
-    hIconFile.Close()    ; cerramos el archivo icono principal
 
     ; incluimos los recursos
     Loop (ObjLength(Data.Directives.Resources))
@@ -162,7 +163,7 @@
         }
 
         ; añadimos una imagen BITMAP (.bmp)
-        ; debemos eliminar la cabecera BITMAPFILEHEADER al momento de añadir el archivo como un recurso RT_BITMAP
+        ; debemos excluir la cabecera BITMAPFILEHEADER al momento de añadir el archivo como un recurso RT_BITMAP
         Else If (foo.ResType == RT_BITMAP)
         {
             If (ResFileOpen(Data, foo.File, Buffer, Size))
@@ -206,7 +207,7 @@
     ; ======================================================================================================================================================
     ; Iniciar compresión
     ; ======================================================================================================================================================
-    Local CompressionMode := CB_GetSelection(Gui.Control["ddlcomp"])
+    Local CompressionMode := CMDLN ? g_data.Compression : CB_GetSelection(Gui.Control["ddlcomp"])
     If (CompressionMode == UPX)
     {
         Util_AddLog("INFO", "Iniciando compresión del archivo destino", ExeFile)

@@ -6,7 +6,7 @@
 
         FileList := []    ; almacena una lista con todos los archivos incluidos (para evitar varias inclusiones de un mismo archivo)
         ; almacena los archivos a añadir luego de la compilación al archivo EXE resultante y otras configuraciones
-        Directives := {         MainIcon: CB_GetText(Gui.Control["ddlico"])
+        Directives := {         MainIcon: CMDLN ? g_data.IcoFile : CB_GetText(Gui.Control["ddlico"])
                       ,        Subsystem: IMAGE_SUBSYSTEM_WINDOWS_GUI
                       ,     ResourceLang: SUBLANG_ENGLISH_US
                       ,         PostExec: ""
@@ -34,7 +34,7 @@
         Util_Error("El archivo de código fuente AHK no existe.", Script)
         Return FALSE    ; terminamos pre-procesado debido a un error
     }
-    Local WorkingDir := new TempWorkingDir(GetDirParent(Script))    ; establece temporalmente el directorio de trabajo actual al del script ha procesar
+    Local WorkingDir := new TempWorkingDir(DirGetParent(Script))    ; establece temporalmente el directorio de trabajo actual al del script ha procesar
 
 
     ; ======================================================================================================================================================
@@ -79,7 +79,7 @@
                 {
                     If (bar == "")    ; ¿no se especificó nada luego del comando?
                         Util_Error("Uso inválido de la directiva @Ahk2Exe-SetMainIcon.`nDebe especificar un icono.`nLínea #" . A_Index . ".", Script)
-                    Else If (DirExist(bar := Util_GetFullPathName(bar)) || !FileExist(bar))
+                    Else If (DirExist(bar := GetFullPathName(bar)) || !FileExist(bar))
                         Util_Error("Error en la directiva @Ahk2Exe-SetMainIcon.`nEl archivo icono especificado no existe.`n" . bar . "`nLínea #" . A_Index . ".", Script)
                     Else
                         Directives.MainIcon := bar
@@ -262,7 +262,7 @@
                 LineTxt := Trim(SubStr(LineTxt, 1, bar-1))    ; removemos el caracter de cierre ">" y luego eliminamos espacios en blanco
                 LineTxt .= InStr(LineTxt, ".") ? "" : ".ahk"    ; añadimos la extensión ".ahk" si no se especificó una extensión
 
-                bar := GetDirParent(FileList[1]) . "\Lib\"   ; recupera el directorio "Lib" ubicado en el directorio del script principal seleccionado para compilar
+                bar := DirGetParent(FileList[1]) . "\Lib\"   ; recupera el directorio "Lib" ubicado en el directorio del script principal seleccionado para compilar
                 If (FileExist(bar . LineTxt))    ; ¿existe el archivo a incluir en la carpeta "Lib" del script principal?
                 {
                     If (!IsAlreadyIncluded(FileList, bar . LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
@@ -299,7 +299,7 @@
             ; ##############################################################################################################################################
             Else If (InStr(LineTxt, ".") && !DirExist(LineTxt))    ; ¿es un archivo?
             {
-                LineTxt := Util_GetFullPathName(LineTxt)    ; recuperamos la ruta completa del archivo
+                LineTxt := GetFullPathName(LineTxt)    ; recuperamos la ruta completa del archivo
                 If (DirExist(LineTxt) || !FileExist(LineTxt))    ; ¿el archivo a incluir no existe?
                 {
                     If (!foo)
@@ -325,7 +325,7 @@
             ; ##############################################################################################################################################
             Else    ; es un directorio
             {
-                LineTxt := Util_GetFullPathName(LineTxt)    ; recuperamos la ruta completa del supuesto directorio
+                LineTxt := GetFullPathName(LineTxt)    ; recuperamos la ruta completa del supuesto directorio
                 If (!DirExist(LineTxt))    ; ¿el directorio a incluir no existe?
                 {
                     Util_AddLog("INCLUDE", "Directorio a incluir no encontrado", Script, A_Index, "<" . LineTxt . ">")
@@ -398,12 +398,11 @@ class TempWorkingDir
 {
     __New(WorkingDir)
     {
-        this.OldWorkingDir := A_WorkingDir
         A_WorkingDir := WorkingDir
     }
     __Delete()
     {
-        A_WorkingDir := this.OldWorkingDir
+        A_WorkingDir := A_InitialWorkingDir
     }
 }
 
@@ -415,7 +414,7 @@ QuickParse(Script)    ; analiza rápidamente el Script a compilar para recuperar
 {
     If (DirExist(Script) || !FileExist(Script))
         Return FALSE
-    WorkingDir := new TempWorkingDir(GetDirParent(Script))
+    WorkingDir := new TempWorkingDir(DirGetParent(Script))
 
     Local Data := {VerInfo: ParseVersionInfo(Script), MainIcon: ""}
         ,  foo := "" ;, bar := ""
@@ -427,7 +426,7 @@ QuickParse(Script)    ; analiza rápidamente el Script a compilar para recuperar
         {
             If (!DirExist(foo := Trim(SubStr(LTrim(A_LoopReadLine), 22))) && FileExist(foo))
             {
-                foo := Util_GetFullPathName(foo), SplitPath(foo,,, Ext)
+                foo := GetFullPathName(foo), SplitPath(foo,,, Ext)
                 If (Ext = "ico")
                     ObjRawSet(Data, "MainIcon", foo)
             }
