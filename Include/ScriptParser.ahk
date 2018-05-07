@@ -238,7 +238,7 @@
         If (SubStr(LineTxt, 1, 9) = "#Include ")    ; ¿en esta línea hay un #Include?
         {
             LineTxt := Trim(SubStr(LineTxt, 9))    ; eliminamos la palabra "#Include" del inicio y luego espacios en blanco
-            DerefVar(LineTxt,, Script)    ; desreferenciamos las variables incluidas entre signos de porcentaje
+            DerefVar(LineTxt, "%", Script)    ; desreferenciamos las variables incluidas entre signos de porcentaje
 
             If (SubStr(LineTxt, 1, 2) == "*i")    ; ¿el archivo a incluir es opcional?
             {
@@ -398,11 +398,17 @@ class TempWorkingDir
 {
     __New(WorkingDir)
     {
+        ; nota 1: diferencias entre A_ScriptDir, A_WorkingDir y A_InitialWorkingDir
+        ;   A_ScriptDir siempre es el directorio del script (compilado o no)
+        ;   A_WorkingDir es el directorio de trabajo actual del script, por defecto al iniciar un script es el mismo que A_ScriptDir
+        ;   A_InitialWorkingDir es el directorio de trabajo especificado por la aplicación que inició nuestro script (no nos interesa)
+        ; nota 2: el directorio de trabajo es aquel directorio que se utilizará cuando se especifique una ruta no absoluta en cualquier función que espere una ruta de archivo/carpeta
+        ObjRawSet(this, "OldWorkingDir", A_WorkingDir)
         A_WorkingDir := WorkingDir
     }
     __Delete()
     {
-        A_WorkingDir := A_InitialWorkingDir
+        A_WorkingDir := this.OldWorkingDir
     }
 }
 
@@ -458,17 +464,31 @@ ParseVersionInfo(Script)
 
 
 
-DerefVar(ByRef String, Chr := "%", Script := "")
+DerefVar(ByRef String, Chr, Script)
 {
-    String := StrReplace(String, Chr .     "A_ScriptDir" . Chr,    A_WorkingDir)
-    String := StrReplace(String, Chr .       "A_AppData" . Chr,       A_AppData)
-    String := StrReplace(String, Chr . "A_AppDataCommon" . Chr, A_AppDataCommon)
-    String := StrReplace(String, Chr .      "A_LineFile" . Chr,          Script)
-    String := StrReplace(String, Chr .       "A_Desktop" . Chr,       A_Desktop)
-    String := StrReplace(String, Chr .   "A_MyDocuments" . Chr,   A_MyDocuments)
-    String := StrReplace(String,  Chr . "A_ProgramFiles" . Chr,  A_ProgramFiles)
-    String := StrReplace(String,  Chr .       "A_WinDir" . Chr,        A_WinDir)
-    String := StrReplace(String,  Chr .         "A_Temp" . Chr,          A_Temp)
+    String := StrReplace(String, Chr .       "A_ScriptDir" . Chr,         A_WorkingDir)
+    String := StrReplace(String, Chr .         "A_AppData" . Chr,            A_AppData)
+    String := StrReplace(String, Chr .   "A_AppDataCommon" . Chr,      A_AppDataCommon)
+    String := StrReplace(String, Chr .        "A_LineFile" . Chr,               Script)
+    String := StrReplace(String, Chr .         "A_Desktop" . Chr,            A_Desktop)
+    String := StrReplace(String, Chr .   "A_DesktopCommon" . Chr,      A_DesktopCommon)
+    String := StrReplace(String, Chr .     "A_MyDocuments" . Chr,        A_MyDocuments)
+    String := StrReplace(String, Chr .    "A_ProgramFiles" . Chr,       A_ProgramFiles)
+    String := StrReplace(String, Chr .          "A_WinDir" . Chr,             A_WinDir)
+    String := StrReplace(String, Chr .            "A_Temp" . Chr,               A_Temp)
+    String := StrReplace(String, Chr .       "A_ScriptDir" . Chr, DirGetParent(String))
+    String := StrReplace(String, Chr .      "A_ScriptName" . Chr,      Path(String).FN)
+    String := StrReplace(String, Chr .       "A_OSVersion" . Chr,          A_OSVersion)
+    String := StrReplace(String, Chr .       "A_Is64bitOS" . Chr,          A_Is64bitOS)
+    String := StrReplace(String, Chr .        "A_Language" . Chr,           A_Language)
+    String := StrReplace(String, Chr .    "A_ComputerName" . Chr,       A_ComputerName)
+    String := StrReplace(String, Chr .        "A_UserName" . Chr,           A_UserName)
+    String := StrReplace(String, Chr .       "A_StartMenu" . Chr,          A_StartMenu)
+    String := StrReplace(String, Chr . "A_StartMenuCommon" . Chr,    A_StartMenuCommon)
+    String := StrReplace(String, Chr .        "A_Programs" . Chr,           A_Programs)
+    String := StrReplace(String, Chr .  "A_ProgramsCommon" . Chr,     A_ProgramsCommon)
+    String := StrReplace(String, Chr .         "A_Startup" . Chr,            A_Startup)
+    String := StrReplace(String, Chr .   "A_StartupCommon" . Chr,      A_StartupCommon)
 
     Return String
 }
@@ -512,7 +532,7 @@ ParseFuncParams(Params, Script)    ; FileInstall Source, Dest
     }
 
     If (bar != "")
-        Arr[prm] .= DerefVar(bar, "")
+        Arr[prm] .= DerefVar(bar, "", Script)
 
     Return Arr
 }

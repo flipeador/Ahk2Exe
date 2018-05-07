@@ -3,7 +3,7 @@
                 /in infile.ahk                             | compiler WorkingDir
                 [/out outfile.exe]                         |   infile WorkingDir
                 [/icon iconfile.ico]                       |   infile WorkingDir
-                [/bin Unicode 64-bit]                      | compiler WorkingDir
+                [/bin binfile.bin]                         | compiler WorkingDir
                 [/upx]                                     | compiler WorkingDir\upx.exe
                 [/mpress]                                  | compiler WorkingDir\mpress.exe
 */
@@ -11,7 +11,7 @@ ProcessCmdLine()
 {
     Local           n := 1
         , Compression := Cfg.Compression
-        ,     BinFile := GetFullPathName(Cfg.LastBinFile)
+        ,     BinFile := Path(Cfg.LastBinFile).IsFile ? Cfg.LastBinFile : "Unicode " . 8*A_PtrSize . "-bit"
         ,     AhkFile := ""
         ,     ExeFile := ""
         ,     IcoFile := ""

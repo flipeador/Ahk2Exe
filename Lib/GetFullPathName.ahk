@@ -1,20 +1,17 @@
 ﻿GetFullPathName(Path, WorkingDir := "")
 {
-    Local RestoreIWD := FALSE
+    Local RestoreIWD := ""
     If (DirExist(WorkingDir))
     {
-        RestoreIWD := TRUE
+        RestoreIWD := A_WorkingDir
         A_WorkingDir := WorkingDir
     }
-
-    ;If (!InStr(Path, ".."))
-    ;    Return InStr(Path, ":") ? Path : A_WorkingDir . "\" . Path
 
     VarSetCapacity(Buffer, 5000, 0)
     DllCall("Kernel32.dll\GetFullPathNameW", "UPtr", &Path, "UInt", 2498, "Str", Buffer, "UPtr", 0, "UInt")
 
-    If (RestoreIWD)
-        A_WorkingDir := A_InitialWorkingDir
+    If (RestoreIWD != "")
+        A_WorkingDir := RestoreIWD
 
     Return Buffer
 }

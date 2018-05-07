@@ -75,7 +75,7 @@ global     Cfg := Util_LoadCfg()
 global VerInfo := Util_LoadVerInfo()    ; StringFileInfo BLOCK statement - https://msdn.microsoft.com/en-us/library/windows/desktop/aa381049(v=vs.85).aspx
 global    Gdip := new Gdiplus
 global AhkPath := RegRead("HKLM\SOFTWARE\AutoHotkey", "InstallDir")
-    AhkPath := ErrorLevel || DirExist(AhkPath) || !FileExist(AhkPath) ? RegRead("HKCU\SOFTWARE\AutoHotkey", "InstallDir") : AhkPath
+    AhkPath := ErrorLevel || !Path(AhkPath).IsFile ? RegRead("HKCU\SOFTWARE\AutoHotkey", "InstallDir") : AhkPath
     global AhkDir := DirExist(DirGetParent(AhkPath)) ? DirGetParent(AhkPath) : DirGetParent(A_ScriptDir)
     global AhkLib := [ DirExist(AhkDir . "\Lib") ? AhkDir . "\Lib" : ""
                      , DirExist(A_MyDocuments . "\AutoHotkey\Lib") ? A_MyDocuments . "\AutoHotkey\Lib" : "" ]
@@ -574,11 +574,12 @@ Util_LoadBinFiles(Default)
 
 Util_CheckBinFile(Name)
 {
-    If (InStr(Name, ".bin"))
-        Return FileExist(Name) ? Name : ""
-
     Local BinFile := ""
-    Return FileExist(BinFile := SubStr(Name, InStr(Name, A_Space)+1) . ".bin") ? BinFile : FALSE
+    If (Name ~= "^v")
+        Return Path(BinFile := SubStr(Name, InStr(Name, A_Space)+1) . ".bin").IsFile ? BinFile : 0
+
+    Name .= Path(Name).Ext == "" ? ".bin" : ""
+    Return Path(Name).IsFile ? Name : 0 
 }
 
 Util_LoadCompressionFiles(Default)
@@ -673,6 +674,12 @@ Util_EnableWater(Hwnd, hBitmap)
     If (WATER_BLOB_INTERVAL)
         SetTimer(wctrltimer := () => DllCall("waterctrl.dll\waterblob", "Int", Random(0, 690), "Int", Random(0, 110), "Int", Random(3, 12), "Int", Random(20, 75)), WATER_BLOB_INTERVAL)
 } ; https://autohotkey.com/boards/viewtopic.php?t=3302
+
+Path(Path, ByRef FN := "", ByRef Dir := "", ByRef Ext := "", ByRef FNNE := "", ByRef Drive := "", ByRef Attrib := "")
+{
+    SplitPath(Path, FN, Dir, Ext, FNNE, Drive), Attrib := FileExist(Path)
+    Return {Path: Path, FN: FN, Dir: Dir, Ext: Ext, FNNE: FNNE, Drive: Drive, IsDir: InStr(Attrib, "D")?Attrib:0, IsFile: Attrib!=""&&Attrib&&!InStr(Attrib, "D")?Attrib:0, Exist: Attrib!=""&&Attrib}
+}
 
 
 
