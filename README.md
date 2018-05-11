@@ -58,6 +58,7 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
     ```
 - **(SIN SOPORTE AÚN) Directivas que controlan los metadatos ejecutables**
   - **`;@Ahk2Exe-SetProp`**`Value`
+  
   Cambia una propiedad en la información de versión del ejecutable compilado.
   `Prop` debe reemplazarse por el nombre de la propiedad a cambiar.
   `Value` es el valor a establecer a la propiedad.
@@ -72,14 +73,19 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
     | CompanyName | Cambia el nombre de la compañía. |
     
   - **`;@Ahk2Exe-SetMainIcon`**`[IcoFile]`
+  
   Sobrescribe el ícono EXE personalizado utilizado para la compilación. Si utiliza esta directiva, antes de añadir el icono se eliminan todos los iconos por defecto de AHK, incluyendo los iconos de `Pausa` y `Suspensión`, quedando únicamente el icono por defecto especificado. El nombre del grupo en `RT_GROUP_ICON` es `159`, por lo que debe evitar añadir recursos iconos con este nombre mediante `AddResource`.
   - **`;@Ahk2Exe-PostExec`**`Comando`
+  
   Especifica un comando que se ejecutará después de una compilación exitosa. La cadena especificada en `Comando` será ejecutada mediante la función incorporada en AHK `Run`.
   - **`;@Ahk2Exe-ConsoleApp`**
+  
   Cambia el subsistema ejecutable al modo consola. Cuando se ejecute el archivo compilado EXE, se abrirá una ventana de consola. Esto modifica el valor de `IMAGE_OPTIONAL_HEADER.Subsystem` a `IMAGE_SUBSYSTEM_WINDOWS_CUI`.
   - **`;@Ahk2Exe-AddResource`**`FileName [, ResourceName]`
+  
   Agrega un recurso al ejecutable compilado.
   `FileName` Es el nombre del archivo del recurso para agregar. El tipo del recurso (como un entero o una cadena) se puede especificar explícitamente anteponiendo un asterisco a él: `*tipo Filename` o `*"nombre tipo" Filename` si el nombre del tipo contiene espacios.
+  
   `ResourceName` (opcional) Es el nombre que tendrá el recurso (puede ser una cadena o un número entero). Si se omite, el valor predeterminado es el nombre (sin ruta) del archivo, en mayúsculas (incluye la extensión).
   
     Aquí hay una lista de tipos de recursos estándar comunes y las extensiones que los desencadenan de forma predeterminada.
@@ -106,7 +112,9 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
     | .PNG | Imágenes PNG |
     
   - **`;@Ahk2Exe-UseResourceLang`**`LangCode`
+  
   Cambia el lenguaje de recursos utilizado por `@Ahk2Exe-AddResource`.
+  
   `LangCode` Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693%28v=vs.85%29.aspx). Tenga en cuenta que los números hexadecimales deben tener un prefijo `0x`.
 
 ⠀
