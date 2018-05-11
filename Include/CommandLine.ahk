@@ -1,8 +1,7 @@
 ﻿/*
-    Ahk2Exe.exe infile.ahk                                 | compiler WorkingDir
-                /in infile.ahk                             | compiler WorkingDir
-                [/out outfile.exe]                         |   infile WorkingDir
-                [/icon iconfile.ico]                       |   infile WorkingDir
+    Ahk2Exe.exe [/in] infile.ahk                           | compiler WorkingDir (/in is optional)
+                [/out outfile.exe]                         |   infile WorkingDir || compiler WorkingDir
+                [/icon iconfile.ico]                       |   infile WorkingDir || compiler WorkingDir
                 [/bin binfile.bin]                         | compiler WorkingDir
                 [/upx]                                     | compiler WorkingDir\upx.exe
                 [/mpress]                                  | compiler WorkingDir\mpress.exe
@@ -46,10 +45,8 @@ ProcessCmdLine()
     }
 
     If (AhkFile != "" && ExeFile == "")
-    {
-        SplitPath(AhkFile,,,, ExeFile)
-        ExeFile := DirGetParent(AhkFile) . "\" . ExeFile . ".exe"
-    }
+        ExeFile := DirGetParent(AhkFile) . "\" . Path(AhkFile).FNNE . ".exe"
+    
     ; MsgBox "Compression: " . Compression . "`nBinFile: " . BinFile . "`nAhkFile: " . AhkFile . "`nExeFile: " . ExeFile . "`nIcoFile: " . IcoFile
     ObjRawSet(g_data, "IcoFile", IcoFile)
     Local Data := PreprocessScript(AhkFile)
@@ -60,6 +57,5 @@ ProcessCmdLine()
     ObjRawSet(g_data, "BinFile", BinFile)
     ObjRawSet(g_data, "AhkFile", AhkFile)
     ObjRawSet(g_data, "ExeFile", ExeFile)
-
     Return AhkCompile(Data) ? 0 : 774
 }
