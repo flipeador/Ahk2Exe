@@ -4,12 +4,14 @@ Compilador no oficial para AutoHotkey v2 en español.
   <img src="https://github.com/flipeador/Ahk2Exe/raw/master/preview.jpg" alt="Ahk2Exe For AHKv2"/>
 </p>
 
+⠀
 
 # Notas:
 - Los archivos `Ahk2Exe.exe` y `Ahk2Exe64.exe` son totalmente independientes, no requieren de ningún otro archivo para su funcionamiento, aunque para poder compilar los scripts es necesario tener los archivos `BIN` en el mismo directorio que `Ahk2Exe.exe`.
 - Para poder comprimir el archivo `EXE` resultante, es necesario tener `UPX` y/o `MPRESS` en el mismo directorio que `Ahk2Exe.exe`.
 - La versión de 64-bit (`Ahk2Exe64.exe`) no soporta el efecto de agua en el logo `AHK`. La funcionalidad es exactamente la misma que en la de 32-bit.
 
+⠀
 
 # Características:
 - [x] Compilar Scripts (función principal).
@@ -29,6 +31,7 @@ Compilador no oficial para AutoHotkey v2 en español.
 - [x] Soporte para la función `FileInstall`.
 - [x] Soporte para compresión del archivo compilado con `UPX` y `MPRESS`.
 
+⠀
 
 # Compilación por línea de comandos
 - Sintaxis
@@ -40,6 +43,7 @@ Compilador no oficial para AutoHotkey v2 en español.
   - `binfile.bin` Es el archivo BIN de AutoHotkey. Utiliza el directorio de trabajo del compilador. Si no se especifica, se establece en el último archivo BIN utilizado. En caso de no haber una configuración válida guardada del último archivo BIN utiliza, se establece automáticamente dependiendo de la aqrquitectura del compilador `Unicode %8*A_PtrSize%-bit`. Por ejemplo, puede especificar `Unicode 64-bit` (la extensión no es necesaria).
   - `/upx` o `/mpress` Especifica el método de compresión del archivo EXE resultante. Estos archivos deben estar en el mismo directorio que el compilador.
 
+⠀
 
 # Directivas específicas del compilador
 El compilador de scripts acepta ciertas directivas que le permiten personalizar aún más el script compilado (EXE).
@@ -57,14 +61,14 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
   Cambia una propiedad en la información de versión del ejecutable compilado.
   • `Prop` debe reemplazarse por el nombre de la propiedad a cambiar.
   • `Value` es el valor a establecer a la propiedad.
-    |   Propiedad  | Descripción                                                                                                                                                                                                              |
-    |:------------:|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-    |     Name     | Cambia el nombre del producto (`ProductName`) y el nombre interno (`InternalName`).                                                                                                                                      |
-    |  Description | Cambia la descripción del archivo (`FileDescription`).                                                                                                                                                                   |
-    |    Version   | Cambia la versión del archivo (`FileVersion`) y la versión del producto (`ProductVersion`). Si esta propiedad no se modifica, se usa de forma predeterminada la versión de AutoHotkey utilizada para compilar el script. |
-    |   Copyright  | Cambia la información legal de copyright (derechos de autor).                                                                                                                                                            |
-    | OrigFilename | Cambia la información del nombre del archivo original.                                                                                                                                                                   |
-    |  CompanyName | Cambia el nombre de la compañía.                               
+    | Propiedad | Descripción |
+    | --- | --- |
+    | Name | Cambia el nombre del producto (`ProductName`) y el nombre interno (`InternalName`). |
+    | Description | Cambia la descripción del archivo (`FileDescription`). |
+    | Version | Cambia la versión del archivo (`FileVersion`) y la versión del producto (`ProductVersion`). Si esta propiedad no se modifica, se usa de forma predeterminada la versión de AutoHotkey utilizada para compilar el script. |
+    | Copyright  | Cambia la información legal de copyright (derechos de autor). |
+    | OrigFilename | Cambia la información del nombre del archivo original. |
+    | CompanyName | Cambia el nombre de la compañía. |
   - **`;@Ahk2Exe-SetMainIcon`**`[IcoFile]`
   Sobrescribe el ícono EXE personalizado utilizado para la compilación. Si utiliza esta directiva, antes de añadir el icono se eliminan todos los iconos por defecto de AHK, incluyendo los iconos de `Pausa` y `Suspensión`, quedando únicamente el icono por defecto especificado. El nombre del grupo en `RT_GROUP_ICON` es `159`, por lo que debe evitar añadir recursos iconos con este nombre mediante `AddResource`.
   - **`;@Ahk2Exe-PostExec`**`Comando`
@@ -77,33 +81,35 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
   • `ResourceName` (opcional) Es el nombre que tendrá el recurso (puede ser una cadena o un número entero). Si se omite, el valor predeterminado es el nombre (sin ruta) del archivo, en mayúsculas (incluye la extensión).
   
     Aquí hay una lista de tipos de recursos estándar comunes y las extensiones que los desencadenan de forma predeterminada.
-    |    Tipo de recurso   | Extensiones                                                                          |
-    |:--------------------:|--------------------------------------------------------------------------------------|
-    |     1 (RT_CURSOR)    | .cur (cursores)                                                                      |
-    |     2 (RT_BITMAP)    | .bmp; .dib                                                                           |
-    |      3 (RT_ICON)     | .ico (iconos)                                                                        |
-    |      4 (RT_MENU)     |                                                                                      |
-    |     5 (RT_DIALOG)    |                                                                                      |
-    |     6 (RT_STRING)    |                                                                                      |
-    |  9 (RT_ACCELERATORS) |                                                                                      |
-    |    10 (RT_RCDATA)    | Cualquier otra extensión. Este es el recurso utilizado por la función `FileInstall`. |
-    | 11 (RT_MESSAGETABLE) |                                                                                      |
-    |     23 (RT_HTML)     | .htm; .html; .mht                                                                    |
-    |   24 (RT_MANIFEST)   | .manifest                                                                            |
+    |    Tipo de recurso   | Extensiones |
+    | --- | --- |
+    | 1 (RT_CURSOR) | .cur (cursores) |
+    | 2 (RT_BITMAP) | .bmp; .dib |
+    | 3 (RT_ICON) | .ico (iconos) |
+    | 4 (RT_MENU) | - |
+    | 5 (RT_DIALOG) | - |
+    | 6 (RT_STRING) | - |
+    | 9 (RT_ACCELERATORS) | - |
+    | 10 (RT_RCDATA) | Cualquier otra extensión. Este es el recurso utilizado por la función `FileInstall`. |
+    | 11 (RT_MESSAGETABLE) | - |
+    | 23 (RT_HTML)     | .htm; .html; .mht |
+    | 24 (RT_MANIFEST) | .manifest |
   
     Además de los recursos especificados en la tabla de arriba, el compilador soporta los siguientes tipos de recursos que son detectados automáticamente por la extensión, o que puedes especificarse de forma explícita: `*tipo`.
     | Tipo de recurso | Descripción  |
-    |:---------------:|--------------|
-    |       .PNG      | Imágenes PNG |
+    | --- | --- |
+    | .PNG | Imágenes PNG |
   - **`;@Ahk2Exe-UseResourceLang`**`LangCode`
   Cambia el lenguaje de recursos utilizado por `@Ahk2Exe-AddResource`.
   `LangCode` Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693%28v=vs.85%29.aspx). Tenga en cuenta que los números hexadecimales deben tener un prefijo `0x`.
 
+⠀
 
 # Códigos de salida (exitcodes)
 Los códigos de salida indican el tipo de error que ocurrió durante la compilación. Esto le será útil cuando compila un script por medio de la línea de comandos.
 **SIN SOPORTE AÚN**
 
+⠀
 
 # Pensamientos para futuras actualizaciones
 - Mejorar el procesado del Script para reducir al máximo el tamaño del archivo compilado y, si es posible, mejorar el rendimiento.
