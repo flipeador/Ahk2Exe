@@ -96,9 +96,11 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
     | 24 (RT_MANIFEST) | .manifest |
   
     Además de los recursos especificados en la tabla de arriba, el compilador soporta los siguientes tipos de recursos que son detectados automáticamente por la extensión, o que puedes especificarse de forma explícita: `*tipo`.
+    
     | Tipo de recurso | Descripción  |
     | --- | --- |
     | .PNG | Imágenes PNG |
+    
   - **`;@Ahk2Exe-UseResourceLang`**`LangCode`
   Cambia el lenguaje de recursos utilizado por `@Ahk2Exe-AddResource`.
   `LangCode` Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693%28v=vs.85%29.aspx). Tenga en cuenta que los números hexadecimales deben tener un prefijo `0x`.
