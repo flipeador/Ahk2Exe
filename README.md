@@ -56,8 +56,8 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
     ;@Ahk2Exe-IgnoreEnd
     MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
     ```
-- **(SIN SOPORTE AÚN) Directivas que controlan los metadatos ejecutables**
-  - **`;@Ahk2Exe-SetProp`**`Value`
+- **Directivas que controlan los metadatos ejecutables**
+  - **`;@Ahk2Exe-SetProp`**`Value` **(SIN SOPORTE AÚN)**
   
     Cambia una propiedad en la información de versión del ejecutable compilado.
     `Prop` debe reemplazarse por el nombre de la propiedad a cambiar.
@@ -84,7 +84,9 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
   - **`;@Ahk2Exe-AddResource`**`FileName [, ResourceName]`
   
     Agrega un recurso al ejecutable compilado.
+    
     `FileName` Es el nombre del archivo del recurso para agregar. El tipo del recurso (como un entero o una cadena) se puede especificar explícitamente anteponiendo un asterisco a él: `*tipo Filename` o `*"nombre tipo" Filename` si el nombre del tipo contiene espacios.
+    
     `ResourceName` (opcional) Es el nombre que tendrá el recurso (puede ser una cadena o un número entero). Si se omite, el valor predeterminado es el nombre (sin ruta) del archivo, en mayúsculas (incluye la extensión).
   
     Aquí hay una lista de tipos de recursos estándar comunes y las extensiones que los desencadenan de forma predeterminada.
@@ -104,15 +106,16 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
     | 24 (RT_MANIFEST) | .manifest |
     
   
-    Además de los recursos especificados en la tabla de arriba, el compilador soporta los siguientes tipos de recursos que son detectados automáticamente por la extensión, o que puedes especificarse de forma explícita: `*tipo`.
+    Además de los recursos especificados en la tabla de arriba, el compilador soporta los siguientes tipos de recursos que son detectados automáticamente por la extensión, o que puede especificarse de forma explícita: `*tipo`.
     
-    | Tipo de recurso | Descripción  |
-    | --- | --- |
-    | .PNG | Imágenes PNG |
+    | Tipo de recurso | Descripción | Sección
+    | --- | --- | --- |
+    | .PNG | Imágenes PNG | RT_ICON |
     
   - **`;@Ahk2Exe-UseResourceLang`**`LangCode`
   
     Cambia el lenguaje de recursos utilizado por `@Ahk2Exe-AddResource`.
+    
     `LangCode` Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693%28v=vs.85%29.aspx). Tenga en cuenta que los números hexadecimales deben tener un prefijo `0x`.
 
 ⠀
