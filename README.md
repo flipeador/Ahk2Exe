@@ -40,7 +40,7 @@ Compilador no oficial para AutoHotkey v2 en español.
   - `infile.ahk` Es el archivo fuente AHK a compilar. Utiliza el directorio de trabajo del compilador. El archivo fuente es obligatorio.
   - `outfile.exe` Es el archivo EXE de salida compilado. Utiliza el directorio de trabajo de `infile.ahk` o el directorio del compilador si `infile.ahk` no se especificó antes. Si no se especifica, se establece por defecto a `infile.exe`.
   - `iconfile.ico` Es el icono principal del archivo compilado. Utiliza el directorio de trabajo de `infile.ahk` o el directorio del compilador si `infile.ahk` no se especificó antes. Si no se especifica, se mantiene el icono por defecto de AutoHotkey. El icono principal puede ser establecido por medio de la directiva del compilador `@Ahk2Exe-SetMainIcon`, en este caso el icono especificado se ignora.
-  - `binfile.bin` Es el archivo BIN de AutoHotkey. Utiliza el directorio de trabajo del compilador. Si no se especifica, se establece en el último archivo BIN utilizado. En caso de no haber una configuración válida guardada del último archivo BIN utiliza, se establece automáticamente dependiendo de la aqrquitectura del compilador `Unicode %8*A_PtrSize%-bit`. Por ejemplo, puede especificar `Unicode 64-bit` (la extensión no es necesaria).
+  - `binfile.bin` Es el archivo BIN de AutoHotkey. Utiliza el directorio de trabajo del compilador. Si no se especifica, se establece en el último archivo BIN utilizado. En caso de no haber una configuración válida guardada del último archivo BIN utilizado, se establece automáticamente dependiendo de la arquitectura del compilador `Unicode %8*A_PtrSize%-bit`. Por ejemplo, puede especificar `Unicode 64-bit` (la extensión no es necesaria).
   - `/upx` o `/mpress` Especifica el método de compresión del archivo EXE resultante. Estos archivos deben estar en el mismo directorio que el compilador.
 
 ⠀
@@ -59,8 +59,8 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
 - **(SIN SOPORTE AÚN) Directivas que controlan los metadatos ejecutables**
   - **`;@Ahk2Exe-SetProp`**`Value`
   Cambia una propiedad en la información de versión del ejecutable compilado.
-  • `Prop` debe reemplazarse por el nombre de la propiedad a cambiar.
-  • `Value` es el valor a establecer a la propiedad.
+  `Prop` debe reemplazarse por el nombre de la propiedad a cambiar.
+  `Value` es el valor a establecer a la propiedad.
   
     | Propiedad | Descripción |
     | --- | --- |
@@ -68,7 +68,7 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
     | Description | Cambia la descripción del archivo (`FileDescription`). |
     | Version | Cambia la versión del archivo (`FileVersion`) y la versión del producto (`ProductVersion`). Si esta propiedad no se modifica, se usa de forma predeterminada la versión de AutoHotkey utilizada para compilar el script. |
     | Copyright  | Cambia la información legal de copyright (derechos de autor). |
-    | OrigFilename | Cambia la información del nombre del archivo original. |
+    | OrigFilename | Cambia la información del nombre de archivo original. |
     | CompanyName | Cambia el nombre de la compañía. |
     
   - **`;@Ahk2Exe-SetMainIcon`**`[IcoFile]`
@@ -79,8 +79,8 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
   Cambia el subsistema ejecutable al modo consola. Cuando se ejecute el archivo compilado EXE, se abrirá una ventana de consola. Esto modifica el valor de `IMAGE_OPTIONAL_HEADER.Subsystem` a `IMAGE_SUBSYSTEM_WINDOWS_CUI`.
   - **`;@Ahk2Exe-AddResource`**`FileName [, ResourceName]`
   Agrega un recurso al ejecutable compilado.
-  • `FileName` Es el nombre del archivo del recurso para agregar. El tipo del recurso (como un entero o una cadena) se puede especificar explícitamente anteponiendo un asterisco a él: `*tipo Filename` o `*"nombre tipo" Filename` si el nombre del tipo contiene espacios.
-  • `ResourceName` (opcional) Es el nombre que tendrá el recurso (puede ser una cadena o un número entero). Si se omite, el valor predeterminado es el nombre (sin ruta) del archivo, en mayúsculas (incluye la extensión).
+  `FileName` Es el nombre del archivo del recurso para agregar. El tipo del recurso (como un entero o una cadena) se puede especificar explícitamente anteponiendo un asterisco a él: `*tipo Filename` o `*"nombre tipo" Filename` si el nombre del tipo contiene espacios.
+  `ResourceName` (opcional) Es el nombre que tendrá el recurso (puede ser una cadena o un número entero). Si se omite, el valor predeterminado es el nombre (sin ruta) del archivo, en mayúsculas (incluye la extensión).
   
     Aquí hay una lista de tipos de recursos estándar comunes y las extensiones que los desencadenan de forma predeterminada.
     
