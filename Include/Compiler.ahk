@@ -46,6 +46,7 @@
     ; comprobamos que el archivo icono principal sea un icono válido comprobando algunos datos del encabezado (ICONDIR structure) (esto no asegura nada)
     If (hIconFile && (hIconFile.ReadUShort() != 0 || hIconFile.ReadUShort() != 1))
     {
+        hIconFile.Close()
         Util_AddLog("ERROR", "El archivo icono principal no es un icono válido", IconFile,, Data.Script)
         Return Util_Error("El archivo icono principal no es un icono válido.", IconFile)
     }
@@ -102,7 +103,7 @@
         }
         ; procesamos y añadimos el icono
         ProcessIcon(hIconFile, IconID, GROUP_ICON, ICONS)
-        AddResource(hUpdate, RT_GROUP_ICON, 1, ObjGetAddress(GROUP_ICON, "Buffer"), GROUP_ICON.Size)
+        AddResource(hUpdate, RT_GROUP_ICON, 159, ObjGetAddress(GROUP_ICON, "Buffer"), GROUP_ICON.Size)
         Loop (ObjLength(ICONS))
             AddResource(hUpdate, RT_ICON, IconID++, ObjGetAddress(ICONS[A_Index], "Buffer"), ICONS[A_Index].Size)
         GROUP_ICON := "", ICONS := ""
@@ -256,7 +257,8 @@
 
 ResFileOpen(Data, FileName, ByRef Buffer := "", ByRef Size := 0)
 {
-    If (f := FileOpen(FileName, "r"))
+    Local f := FileOpen(FileName, "r")
+    If (f)
     {
         If (IsByRef(Buffer))
         {
