@@ -1,6 +1,6 @@
 ﻿PreprocessScript(Script, Tree := "", FileList := "", Directives := "")
 {
-    If (Tree == "")
+    If (FileList == "")
     {
         Util_AddLog("INFO", "Se ha iniciado el procesado del script", Script)
 
@@ -21,19 +21,26 @@
                       ,         Comments: ""
                       ,        Resources: [] }
     }
-    FileList.Push(Script)    ; incluimos este script a la lista de archivos incluidos
-    Util_AddLog("INCLUDE", "Se ha incluido un archivo", Script,, StrReplace(Tree, "`n", "|"))
+
+    ObjPush(FileList, Script)
+    Util_AddLog("INCLUDE", "Se ha incluido un archivo", Script)
 
 
     ; ======================================================================================================================================================
     ; Comprobación del archivo de código fuente AHK
     ; ======================================================================================================================================================
-    If (DirExist(Script) || !FileExist(Script))
+    If (!IS_FILE(Script))
     {
         Util_AddLog("ERROR", "No se ha encontrado el script", Script,, StrReplace(Tree, "`n", "|"))
-        Util_Error("El archivo de código fuente AHK no existe.", Script)
-        Return FALSE    ; terminamos pre-procesado debido a un error
+        Return Util_Error("El archivo de código fuente AHK no existe.", Script)
     }
+
+    If (!FileOpen(Script, "r"))    ; comprobamos permisos de lectura
+    {
+        Util_AddLog("ERROR", "No se ha podido abrir el Script para lectura", Script)
+        Return Util_Error("No se ha podido abrir el Script para lectura.", Script)
+    }
+
     Local WorkingDir := new TempWorkingDir(DirGetParent(Script))    ; establece temporalmente el directorio de trabajo actual al del script ha procesar
 
 
@@ -42,12 +49,10 @@
     ; ======================================================================================================================================================
     Local NewCode := ""    ; almacena el código procesado
         , LineTxt := ""       ; almacena el texto de la línea actual
-        , LineNum := 0        ; almacena el número de línea actual
         , foo := bar := ""    ; variables generales de uso temporal
         , IncludeAgain := FALSE    ; determina si se debe ignorar archivos ya incluidos
         ,    InComment := FALSE    ; determina si se está en un comentario en bloque
         ,  ContSection := FALSE    ; determina si se está en una continuación de una sección
-        ,      IgnoreQ := 0        ; 
         ,  IgnoreBegin := FALSE    ; determina si el código siguiente debe ser ignorado
 
     VarSetCapacity(NewCode, FileGetSize(Script))    ; establecemos la capacidad de la variable que amlacenará el nuevo código, para mejorar el rendimiento
@@ -56,14 +61,38 @@
     Loop Read, Script    ; abrimos el archivo para lectura y leemos línea por línea
     {
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        ; Directivas específicas del compilador
+        ; Ignoramos líneas en blanco y comentarios
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (IgnoreBegin)    ; ¿ignorar línea?
+        If (A_LoopReadLine ~= "^\s*$")    ; ¿línea en blanco?
+            Continue
+
+        If (InComment)    ; ¿comentario en bloque multilínea?
+        {
+            InComment := !(A_LoopReadLine ~= "^\s*\*/")
+            Continue
+        }
+
+        If (IgnoreBegin)    ; ignorar líneas especificadas entre @Ahk2Exe-IgnoreBegin y @Ahk2Exe-IgnoreEnd
         {
             IgnoreBegin := !(A_LoopReadLine ~= "i)^\s*;@Ahk2Exe-IgnoreEnd")    ; continua hasta que se encuentre ";@Ahk2Exe-IgnoreEnd"
             Continue
         }
-        If (A_LoopReadLine ~= "i)^\s*;@Ahk2Exe-")    ; ¿la línea empieza con ";@Ahk2Exe-"? (ignora espacios antes de ";")
+
+        
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        ; Detectamos comentarios en bloque
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        If (A_LoopReadLine ~= "^\s*/\*")
+        {
+            InComment := !(A_LoopReadLine ~= "\*/\s*$")    ; ¿el comentario en bloque termina en la misma línea o no? (/* comentario */)
+            Continue
+        }
+
+
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        ; Directivas específicas del compilador
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        If (A_LoopReadLine ~= "i)^\s*;@Ahk2Exe-")
         {
             LineTxt := SubStr(Trim(A_LoopReadLine), 11)    ; removemos espacios al principio y final de la línea, luego eliminamos ";@Ahk2Exe-" al principio
             foo := (bar := InStr(LineTxt, A_Space)) ? SubStr(LineTxt, 1, bar - 1) : LineTxt    ; recuperamos el nombre del comando
@@ -158,7 +187,15 @@
         {
             If (!(A_LoopReadLine ~= "^\s*\)(`"|')"))    ; ¿no termina la sección?    )" | )'
             {
-                NewCode .= A_LoopReadLine . "`n"
+                LineTxt := A_LoopReadLine
+
+                If (!InStr(ContSection.Options, "LTrim0"))
+                    LineTxt := LTrim(LineTxt)
+
+                If (!InStr(ContSection.Options, "RTrim0"))
+                    LineTxt := RTrim(LineTxt)
+
+                NewCode .= LineTxt . "`n"
                 Continue
             }
             ContSection := FALSE
@@ -167,72 +204,40 @@
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        ; Removemos espacios al inicio y final de la línea, ignoramos líneas en blanco y comentarios al inicio de la línea
+        ; Detectamos secciones de continuación
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If ((LineTxt := Trim(A_LoopReadLine)) == "" || SubStr(LineTxt, 1, 1) == ";")
-            Continue    ; continuamos con la próxima línea
-        LineNum := A_Index    ; línea actual
-        IncludeAgain := FALSE
-        ContSection := FALSE
-
-
-        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        ; Omitimos comentarios en bloque
-        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (InComment)    ; ¿estamos en un comentario en bloque multilínea?
+        If (ContSection)
         {
-            If (SubStr(LineTxt, 1, 2) == "*/")    ; ¿encontramos el cierre del comentario en bloque?
-                InComment := FALSE    ; hecho, terminamos la parte de comentarios
-            Continue
+            If (!(A_LoopReadLine ~= "^\s*\)(`"|')"))    ; ¿no termina la sección?    )" | )'
+            {
+                NewCode .= A_LoopReadLine . "`n"
+                Continue
+            }
+            ContSection := "END"
         }
-        If (SubStr(LineTxt, 1, 2) == "/*")    ; ¿es el comienzo de un comentario en bloque?
-        {
-            InComment := SubStr(LineTxt, -2) != "*/"    ; ¿el comentario en bloque termina en la misma línea o no? (/* comentario */)
-            Continue
-        }
-
-
-        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        ; Buscamos el inicio de secciones de continuación
-        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (SubStr(LineTxt, 1, 1) == "(" && !InStr(LineTxt, ")"))    ; ¿la línea empieza por "(" y no contiene ningún ")" en ella?
-            ContSection := TRUE
+        Else If (A_LoopReadLine ~= "^\s*\(.*" && !InStr(A_LoopReadLine, ")"))    ; ¿la línea empieza por "(" y no contiene ningún ")" en ella?
+            ContSection := { Options: Trim(SubStr(A_LoopReadLine, 2)) }
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Eliminamos comentarios en línea y espacios innecesarios de la línea actual
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        foo := "", bar := 0
-        Loop Parse, LineTxt    ; analizamos caracter por caracter, A_Index contiene la posición actual
+        If ((LineTxt := ProcessLine(A_LoopReadLine, {ContSection: ContSection})) == "")
+            Continue
+        If (Type(LineTxt) != "String")
         {
-            If (foo == "`"" || foo == "'")    ; ¿estamos dentro de una cadena?
-            {
-                If (IgnoreQ || A_LoopField == foo && Mod(bar, 2) == 0)    ; ¿aquí termina la cadena? ¿se trata de una comilla de cierre o una literal?
-                    IgnoreQ := FALSE, foo := ""    ; terminamos la cadena
-                ; si bar es múltiplo de 2, entonces "`" hace referencia a otro "`"; esto ayuda a diferenciar correctamente var:="cadena`"" de var:="cadena``"
-                bar := A_LoopField == "``" ? bar + 1 : 0    ; ¿es el caracter "`" o no?
-                Continue    ; continuamos con el próximo caracter
-            }
-
-            If (A_LoopField == ";" || (A_LoopField == "/" && foo == "*"))    ; ¿es el inicio de un comentario? (;[ comentario]) (/*[ comentario */]) 
-            {
-                bar := SubStr(LineTxt, A_Index-1, 1)    ; almacena el caracter anterior
-                If (bar != A_Space && bar != A_Tab)    ; ¿el anterior caracter no fue un espacio o una tabulación? (var:=1;comentario)
-                {
-                    Util_Error("Error de sintaxis.`nDebe dejar por lo menos un espacio entre un comentario y otros caracteres.`nLine #" . LineNum . ".", Script)
-                    Return FALSE
-                }
-                LineTxt := Trim(SubStr(LineTxt, 1, A_Index-2))    ; eliminamos el comentario de la línea
-                Break    ; terminamos el bucle Loop-parse
-            }
-
-            foo := A_LoopField    ; almacena el caracter actual (útil para detectar el comienzo de una cadena, objeto o cualquier otra cosa del estilo)
+            Util_AddLog("ERROR", "Error de sintaxis", Script, A_Index)
+            Return Util_Error("Error de sintaxis.", "[" . A_Index . "] " . Script)
         }
+
+        If (ContSection == "END")
+            ContSection := FALSE
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Procesamos los #Includes
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        IncludeAgain := FALSE
         If (SubStr(LineTxt, 1, 14) = "#IncludeAgain ")    ; ¿en esta línea hay un #IncludeAgain?
             LineTxt := StrReplace(LineTxt, "#IncludeAgain ", "#Include "), IncludeAgain := TRUE
         If (SubStr(LineTxt, 1, 9) = "#Include ")    ; ¿en esta línea hay un #Include?
@@ -250,47 +255,47 @@
 
 
             ; ##############################################################################################################################################
-            ; Buscamos en las carpetas "Lib", primero en el directorio de instalación de AHK, luego en Documentos del usuario actual
+            ; Buscamos en las carpetas de la biblioteca
             ; ##############################################################################################################################################
             If (SubStr(LineTxt, 1, 1) == "<")    ; ¿el archivo a incluir debe buscarse en la carpeta "Lib"?
             {
                 If ((LineTxt := SubStr(LineTxt, 2)) == ">" || !(bar := InStr(LineTxt, ">")))    ; ¿es la sintaxis inválida?
                 {
-                    Util_Error("Error de sintaxis.`n#Include <" . LineTxt . "`nLínea #" . LineNum . ".", Script)
+                    Util_Error("Error de sintaxis.`n#Include <" . LineTxt . "`nLínea #" . A_Index . ".", Script)
                     Return FALSE
                 }
                 LineTxt := Trim(SubStr(LineTxt, 1, bar-1))    ; removemos el caracter de cierre ">" y luego eliminamos espacios en blanco
-                LineTxt .= InStr(LineTxt, ".") ? "" : ".ahk"    ; añadimos la extensión ".ahk" si no se especificó una extensión
+                LineTxt .= Path(LineTxt).Ext == "" ? ".ahk" : ""    ; añadimos la extensión ".ahk" si no se especificó una extensión
 
-                bar := DirGetParent(FileList[1]) . "\Lib\"   ; recupera el directorio "Lib" ubicado en el directorio del script principal seleccionado para compilar
-                If (FileExist(bar . LineTxt))    ; ¿existe el archivo a incluir en la carpeta "Lib" del script principal?
+                ObjRawSet(g_data, "Included", FALSE)
+                                ; Biblioteca estándar
+                For foo, bar in [ DirGetParent(FileList[1]) . "\Lib\"
+                                ; Biblioteca de usuario
+                                , A_MyDocuments . "\AutoHotkey\Lib\"
+                                ; Biblioteca local
+                                , DirGetParent(Util_GetAhkPath()) . "\Lib\" ]
                 {
-                    If (!IsAlreadyIncluded(FileList, bar . LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
-                        NewCode .= PreprocessScript(bar . LineTxt, Tree . "`n" . Script, FileList, Directives) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
-                    If (ERROR)
-                        Return FALSE
+                    If (IS_FILE(bar . LineTxt))
+                    {
+                        If (!IsAlreadyIncluded(FileList, bar . LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
+                            NewCode .= PreprocessScript(bar . LineTxt, Tree . "`n" . Script, FileList, Directives) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
+                        If (ERROR)
+                            Return FALSE
+                        ObjRawSet(g_data, "Included", TRUE)
+                        Break
+                    }
                 }
-                Else If (AhkLib[1] != "" && FileExist(AhkLib[1] . "\" . LineTxt))    ; ¿existe el archivo a incluir en la carpeta "Lib" en el directorio de instalación de AHK?
+
+                If (!g_data.Included)
                 {
-                    If (!IsAlreadyIncluded(FileList, AhkLib[1] . "\" . LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
-                        NewCode .= PreprocessScript(AhkLib[1] . "\" . LineTxt, Tree . "`n" . Script, FileList, Directives) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
-                    If (ERROR)
-                        Return FALSE
+                    If (!foo)
+                    {
+                        Util_AddLog("ERROR", "No se a encontrado el archivo a incluir", Script, A_Index, "<" . LineTxt . ">")
+                        Return Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include <" . LineTxt . ">`nLínea #" . A_Index . ".", Script)
+                    }
+                    Else    ; omitir archivo inexistente
+                        Util_AddLog("INCLUDE", "Archivo a incluir omitido", Script, A_Index, "<" . LineTxt . ">")
                 }
-                Else If (AhkLib[2] != "")
-                {
-                    If (!IsAlreadyIncluded(FileList, AhkLib[2] . "\" . LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
-                        NewCode .= PreprocessScript(AhkLib[2] . "\" . LineTxt, Tree . "`n" . Script, FileList, Directives) . "`n"   ; procesa el script incluido y añadimos el resultado al nuevo código
-                    If (ERROR)
-                        Return FALSE
-                }
-                Else If (!foo)    ; ¿no se debe permitir omitir archivos inexistentes?
-                {
-                    Util_AddLog("ERROR", "No se a encontrado el archivo a incluir", Script, A_Index, "<" . LineTxt . ">")
-                    Return Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include <" . LineTxt . ">`nLínea #" . LineNum . ".", Script)
-                }
-                Else
-                    Util_AddLog("INCLUDE", "Archivo a incluir omitido", Script, A_Index, "<" . LineTxt . ">")
             }
 
 
@@ -305,7 +310,7 @@
                     If (!foo)
                     {
                         Util_AddLog("ERROR", "No se ha encontrado el archivo a incluir", Script, A_Index, LineTxt)
-                        Return Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . LineNum . ".", Script)
+                        Return Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . A_Index . ".", Script)
                     }
                     Else
                         Util_AddLog("INCLUDE", "Archivo a incluir omitido", Script, A_Index, LineTxt)
@@ -329,7 +334,7 @@
                 If (!DirExist(LineTxt))    ; ¿el directorio a incluir no existe?
                 {
                     Util_AddLog("INCLUDE", "Directorio a incluir no encontrado", Script, A_Index, "<" . LineTxt . ">")
-                    Return Util_Error("Error en directorio #Include. El directorio a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . LineNum . ".", Script)
+                    Return Util_Error("Error en directorio #Include. El directorio a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . A_Index . ".", Script)
 
                 }
                 A_WorkingDir := LineTxt    ; cambiamos el directorio de trabajo actual
@@ -343,14 +348,12 @@
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Buscamos por el comando FileInstall
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (LineTxt ~= "i)^FileInstall")    ; ¿la línea comienza con "FileInstall"?
+        If (LineTxt ~= "i)^FileInstall")
         {
-            ; evitamos trabajar con la variable original (LineTxt) ya que debe ser añadida al script compilado
-            foo := ParseFuncParams(SubStr(LineTxt, 12), Script)[1]    ; eliminamos "FileInstall" al principio de la línea y recuperamos el primer parámetro correctamente formateado
-            If (DirExist(foo) || !FileExist(foo))
+            If (!IS_FILE(foo := ParseFuncParams(SubStr(LineTxt, 12), Script)[1]))
             {
                     Util_AddLog("ERROR", "Archivo a incluir no encontrado", Script, A_Index, foo,, "FileInstall")
-                    Return Util_Error("Error en archivo FileInstall. El archivo a incluir no existe.`nLínea #" . LineNum . ".", Script)
+                    Return Util_Error("Error en archivo FileInstall. El archivo a incluir no existe.`nLínea #" . A_Index . ".", Script)
             }
             ObjPush(Directives.Resources, ParseResourceStr("*10 " . foo, A_Index, Script))    ; incluimos el archivo para ser añadido en RT_RCDATA
         }
@@ -377,6 +380,124 @@
     Return Trim(NewCode, "`t `r`n")
 }
 
+
+
+
+
+
+/*
+    Procesa una línea de texto. Se realizan las siguientes operaciones.
+    Se remueven los comentarios en-línea al final de la línea. Estos son los que comienzan con el caracter ';'.
+    Se remueven otros tipos de comentarios actualmente no soportados por AHK.
+    Se quita espacios innecesarios.
+    Se quitan los caracteres de escape '`' innecesarios en las cadenas, como por ejemplo '`x' --> 'x'. Los literales '``' son detectados correctamente.
+    Se reemplaza en las cadenas "`t" por A_Tab para ocupar solo 1 caracter.
+    Return:
+         String = El procesado se ha realizado con éxito y no ha ocurrido ningún error.
+        Integer = Error de sintaxis.
+    Por hacer:
+        Detectar A_PtrSize y optimizar el código removiendolo y dejando solo el valor dependiendo la versión de AHK que se va a compilar.
+        Remover por completo los espacios innecesarios.
+    Nota:
+        Gran parte del procesamiento aquí realizado es "experimental" y no se ha probado exaustivamente. Podría dejar el código con errores al compilar.
+        Este procesamiento relentiza considerablemente la compilación, aunque a costo de reducir el tamaño del archivo compilado, y en ciertos casos favorecer el rendimiento (lo más importante).
+*/
+ProcessLine(Txt, Data)
+{
+    Static EscSequ := ";``:nrbtsvaf`"'{}^!+#"    ; por algún motivo extraño (bug?) "``;" se transforma en ";" (imagino que tendra algo que ver con " ;" que debe especificarse "`;")
+           , ERROR := 1
+
+    Local     Escape := FALSE
+        ,       Char := ["", ""]
+        ,  InComment := FALSE
+        ,       Skip := 0
+
+    Txt := Trim(Txt)
+    Local NewTxt := ""
+    VarSetCapacity(NewTxt, StrLen(Txt) * 2)
+
+    Loop Parse, Txt
+    {
+        If (InStr(A_Tab, Skip) && !(Skip := 0))    ; Skip x1
+            Continue
+
+        If (Skip ~= "^R")    ; Skip \s{2,}
+        {
+            If (Skip ~= "=$" && A_LoopField == "=")
+            {
+                NewTxt .= "="
+                Continue
+            }
+            If (A_LoopField ~= "\s")
+                Continue
+            Skip := 0
+        }
+
+        If (Skip-- > 0)
+            Continue
+
+        Char[1] := SubStr(Txt, A_Index+1, 1), Char[2] := SubStr(Txt, A_Index+2, 1)    ; caracteres A_LoopField[A_Index+1] y A_LoopField[A_Index+2]
+
+        If (InComment)    ; foo/*comment*/bar
+        {
+            If (A_LoopField == "/" && SubStr(Txt, A_Index-1, 1) == "*")
+                InComment := FALSE
+            Continue
+        }
+
+        If (Char[0] == "`"" || Char[0] == "'")    ; foo "string" 'string' bar
+        {
+            If (Data.ContSection || (!Escape && A_LoopField == Char[0]))
+                Char[0] := "", Data.ContSection := FALSE
+            If (!Escape && A_LoopField == "``")
+                NewTxt .= InStr(EscSequ, Char[1]) ? (Char[1] == "t" ? Skip:=A_Tab : A_LoopField) : ""    ; "`x`n" --> "x`n"  ||  "`t" --> A_Tab
+            Else
+                NewTxt .= A_LoopField
+            Escape := !Escape && A_LoopField == "``" && Skip != A_Tab
+            Continue
+        }
+
+        If (A_LoopField == ";")    ; foo ;comment
+        {
+            If (A_Index != 1 && !(SubStr(Txt, A_Index-1, 1) ~= "\s"))    ; expr;comment  ||  "string";comment
+                Return ERROR
+            Break
+        }
+
+        If (A_LoopField == "/" && Char[1] == "*")    ; foo/*comment*/bar
+        {
+            InComment := TRUE
+            Continue
+        }
+
+        If (A_LoopField ~= "\s")
+        {
+            If (Char[1] ~= "\s")    ; omitimos más de un espacio en expresiones
+                Continue
+
+            If (Char[1] == "." && Char[2] ~= "\s")    ; expr . expr --> expr expr
+            {
+                Skip := 1
+                Continue
+            }
+        }
+
+        If (InStr(".~:", A_LoopField) && Char[1] == "=")    ; expr .= expr --> expr.=expr
+            NewTxt := RTrim(NewTxt), Skip := "R="
+
+        Else If (InStr("+-*/^&", A_LoopField))    ; expr + expr --> expr+expr
+        {
+            Char[3] := RTrim(SubStr(Txt, 1, A_Index-1))
+            If (RegExReplace(Char[3], "\w") != "" || Char[3] ~= "\s")    ; evita "Return -1" --> "Return-1" || "XXX -1" --> "XXX-1" al comienzo de la línea siendo X letras o números
+                NewTxt := RTrim(NewTxt), Skip := "R"
+        }
+
+        NewTxt .= A_LoopField, Escape := FALSE, Char[0] := A_LoopField
+    }
+
+    Return Trim(NewTxt)
+}
+ 
 
 
 
@@ -545,7 +666,7 @@ ParseResourceStr(String, LineNum, Script)    ;@Ahk2Exe-AddResource *[int/str typ
 {
     Static CommonResTypes := { bmp: 2, dib: 2              ; RT_BITMAP
                              , cur: 1                      ; RT_CURSOR
-                             , ico: 3                      ; RT_ICON
+                             , ico: 3                      ; RT_ICON (el nombre del recurso no debe ser 159 ya que es utilizado para el icono por defecto)
                              , htm: 23, html: 23, mht: 23  ; RT_HTML
                              , manifest: 24                ; RT_MANIFEST
                              ; otros
