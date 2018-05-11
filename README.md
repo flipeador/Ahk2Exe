@@ -61,6 +61,7 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
   Cambia una propiedad en la información de versión del ejecutable compilado.
   • `Prop` debe reemplazarse por el nombre de la propiedad a cambiar.
   • `Value` es el valor a establecer a la propiedad.
+  
     | Propiedad | Descripción |
     | --- | --- |
     | Name | Cambia el nombre del producto (`ProductName`) y el nombre interno (`InternalName`). |
@@ -69,6 +70,7 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
     | Copyright  | Cambia la información legal de copyright (derechos de autor). |
     | OrigFilename | Cambia la información del nombre del archivo original. |
     | CompanyName | Cambia el nombre de la compañía. |
+    
   - **`;@Ahk2Exe-SetMainIcon`**`[IcoFile]`
   Sobrescribe el ícono EXE personalizado utilizado para la compilación. Si utiliza esta directiva, antes de añadir el icono se eliminan todos los iconos por defecto de AHK, incluyendo los iconos de `Pausa` y `Suspensión`, quedando únicamente el icono por defecto especificado. El nombre del grupo en `RT_GROUP_ICON` es `159`, por lo que debe evitar añadir recursos iconos con este nombre mediante `AddResource`.
   - **`;@Ahk2Exe-PostExec`**`Comando`
@@ -81,6 +83,7 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
   • `ResourceName` (opcional) Es el nombre que tendrá el recurso (puede ser una cadena o un número entero). Si se omite, el valor predeterminado es el nombre (sin ruta) del archivo, en mayúsculas (incluye la extensión).
   
     Aquí hay una lista de tipos de recursos estándar comunes y las extensiones que los desencadenan de forma predeterminada.
+    
     |    Tipo de recurso   | Extensiones |
     | --- | --- |
     | 1 (RT_CURSOR) | .cur (cursores) |
@@ -94,6 +97,7 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
     | 11 (RT_MESSAGETABLE) | - |
     | 23 (RT_HTML)     | .htm; .html; .mht |
     | 24 (RT_MANIFEST) | .manifest |
+    
   
     Además de los recursos especificados en la tabla de arriba, el compilador soporta los siguientes tipos de recursos que son detectados automáticamente por la extensión, o que puedes especificarse de forma explícita: `*tipo`.
     
