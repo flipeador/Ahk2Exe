@@ -35,21 +35,26 @@ SetRegView 64
 ; =====================================================================================================================================================
 ; INCLUDES
 ; =====================================================================================================================================================
-#Include Lib\LinearGradient.ahk
-#Include Lib\ImageButton.ahk
-#Include Lib\ComboBox.ahk
-#Include Lib\RunAsAdmin.ahk
-#Include Lib\TaskDialog.ahk
-#Include Lib\DirGetParent.ahk
-#Include Lib\SaveFile.ahk
-#Include Lib\ChooseFile.ahk
-#Include Lib\GuiControlTips.ahk
-#Include Lib\GetFullPathName.ahk
+; Lib\
+#Include <LinearGradient>
+#Include <ImageButton>
+#Include <ComboBox>
+#Include <RunAsAdmin>
+#Include <TaskDialog>
+#Include <DirGetParent>
+#Include <SaveFile>
+#Include <ChooseFile>
+#Include <GuiControlTips>
+#Include <GetFullPathName>
+#Include <Gdiplus\Gdiplus>
 
-#Include Include\Compiler.ahk
-#Include Include\ScriptParser.ahk
-#Include Include\Resources.ahk
-#Include Include\CommandLine.ahk
+; Include\
+#Include Include
+#Include Compiler.ahk
+#Include ScriptParser.ahk
+#Include Resources.ahk
+#Include CommandLine.ahk
+#Include Std.ahk
 
 
 
@@ -62,7 +67,7 @@ A_ScriptName := "Ahk2Exe Compilador"
 global Title := "Ahk2Exe para AutoHotkey v" . A_AhkVersion . " | Script a EXE Conversor (" . (A_PtrSize==4?"32-Bit)":"64-Bit)")
 
 
-; comprobamos instancia (no permitir más de una instancia)
+; comprobamos SO (se requiere WIN_V en adelante) e instancia (no permitir más de una instancia)
 If (StrSplit(A_OSVersion, ".")[1] < 6)
     Util_Error("Sistema operativo no soportado.", A_OSVersion, 196)
 If (WinExist(Title))
@@ -71,14 +76,10 @@ If (WinExist(Title))
 
 ; variables super-globales
 global  g_data := {}
+      ,    g_k := 0, g_v := 0    ; for g_k, g_v in Obj
 global     Cfg := Util_LoadCfg()
 global VerInfo := Util_LoadVerInfo()    ; StringFileInfo BLOCK statement - https://msdn.microsoft.com/en-us/library/windows/desktop/aa381049(v=vs.85).aspx
 global    Gdip := new Gdiplus
-global AhkPath := RegRead("HKLM\SOFTWARE\AutoHotkey", "InstallDir")
-    AhkPath := ErrorLevel || !Path(AhkPath).IsFile ? RegRead("HKCU\SOFTWARE\AutoHotkey", "InstallDir") : AhkPath
-    global AhkDir := DirExist(DirGetParent(AhkPath)) ? DirGetParent(AhkPath) : DirGetParent(A_ScriptDir)
-    global AhkLib := [ DirExist(AhkDir . "\Lib") ? AhkDir . "\Lib" : ""
-                     , DirExist(A_MyDocuments . "\AutoHotkey\Lib") ? A_MyDocuments . "\AutoHotkey\Lib" : "" ]
 global ERROR := FALSE
 
 
@@ -402,9 +403,7 @@ Gui_DestButton()
         , File := SaveFile([Gui.Hwnd,"Ahk2Exe - Guardar como"], SubStr(File, -4) = ".ahk" ? SubStr(File, 1, -4) . ".exe" : File, {Ejecutables: "#*.exe"})
     If (File)
     {
-        Local Ext := ""
-        SplitPath(File,,, Ext)
-        If (Ext = "exe")
+        If (PATH(File).Ext = "exe")
             Gui.Control["edest"].Text := File
         Else
             Util_Error("El archivo destino debe ser un archivo ejecutable EXE.", File)
@@ -576,10 +575,10 @@ Util_CheckBinFile(Name)
 {
     Local BinFile := ""
     If (Name ~= "^v")
-        Return Path(BinFile := SubStr(Name, InStr(Name, A_Space)+1) . ".bin").IsFile ? BinFile : 0
+        Return IS_FILE(BinFile := SubStr(Name, InStr(Name, A_Space)+1) . ".bin") ? BinFile : 0
 
     Name .= Path(Name).Ext == "" ? ".bin" : ""
-    Return Path(Name).IsFile ? Name : 0 
+    Return IS_FILE(Name) ? Name : 0 
 }
 
 Util_LoadCompressionFiles(Default)
@@ -675,10 +674,21 @@ Util_EnableWater(Hwnd, hBitmap)
         SetTimer(wctrltimer := () => DllCall("waterctrl.dll\waterblob", "Int", Random(0, 690), "Int", Random(0, 110), "Int", Random(3, 12), "Int", Random(20, 75)), WATER_BLOB_INTERVAL)
 } ; https://autohotkey.com/boards/viewtopic.php?t=3302
 
-Path(Path, ByRef FN := "", ByRef Dir := "", ByRef Ext := "", ByRef FNNE := "", ByRef Drive := "", ByRef Attrib := "")
+Util_GetAhkPath()
 {
-    SplitPath(Path, FN, Dir, Ext, FNNE, Drive), Attrib := FileExist(Path)
-    Return {Path: Path, FN: FN, Dir: Dir, Ext: Ext, FNNE: FNNE, Drive: Drive, IsDir: InStr(Attrib, "D")?Attrib:0, IsFile: Attrib!=""&&Attrib&&!InStr(Attrib, "D")?Attrib:0, Exist: Attrib!=""&&Attrib}
+    Local AhkPath := DirGetParent(A_ScriptDir) . "\AutoHotkey.exe"
+    If (IS_FILE(AhkPath))
+        Return AhkPath
+
+    AhkPath := RegRead("HKLM\SOFTWARE\AutoHotkey", "InstallDir")
+    If (IS_FILE(AhkPath))
+        Return AhkPath
+
+    AhkPath := RegRead("HKCU\SOFTWARE\AutoHotkey", "InstallDir")
+    If (IS_FILE(AhkPath))
+        Return AhkPath
+
+    Return ""
 }
 
 
@@ -716,27 +726,5 @@ Class GuiDisable
         WinSetAlwaysOnTop(TRUE, "ahk_id" . Gui.Hwnd)
         WinSetAlwaysOnTop(FALSE, "ahk_id" . Gui.Hwnd)
         WinMoveTop("ahk_id" . Gui.Hwnd)
-    }
-}
-
-Class Gdiplus
-{
-    __New()
-    {
-        If (!(this.hModule := DllCall("Kernel32.dll\LoadLibraryW", "Str", "gdiplus.dll", "Ptr")))
-            Util_Error("LoadLibrary Gdiplus Error #" . A_LastError,, TRUE)
-
-        Local GdiplusStartupInput := "", pToken := 0
-        NumPut(VarSetCapacity(GdiplusStartupInput, 16, 0) * 0 + 1, &GdiplusStartupInput, "UInt")    ; GdiplusStartupInput.GdiplusVersion = 1
-        Local Ret := DllCall("Gdiplus.dll\GdiplusStartup", "UPtrP", pToken, "UPtr", &GdiplusStartupInput, "UPtr", 0, "UInt")
-        If (!pToken)
-            Util_Error("Gdiplus Error #" . Ret . ".",, TRUE)
-        this.pToken := pToken
-    }
-
-    __Delete()
-    {
-        DllCall("Gdiplus.dll\GdiplusShutdown", "UPtr", this.pToken)
-        DllCall("Kernel32.dll\FreeLibrary", "Ptr", this.hModule)
     }
 }
