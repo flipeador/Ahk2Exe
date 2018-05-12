@@ -4,6 +4,16 @@ Compilador no oficial para AutoHotkey v2 en español.
   <img src="https://github.com/flipeador/Ahk2Exe/raw/master/preview.jpg" alt="Ahk2Exe For AHKv2"/>
 </p>
 
+Durante el procesado del script, se tienen en cuenta los siguientes factores, ordenados en forma descendente de importancia.
+
+  - `Mejorar el rendimiento`, por más insignificante que éste sea. Este es el objetivo más importante, debido a la lentitud extrema de los lenguajes interpretados como lo es AHK.
+
+Debe tener en cuenta los siguientes puntos con respecto al compilador.
+
+  - La compilación no garantiza la protección del código fuente.
+  - La compilación no garantiza mejoras significativas de rendimiento.
+  - AutoHoykey es un lenguaje interpretado, por lo que realmente no posee un compilador **real**, `Ahk2Exe` no realiza ningún pasaje de código AHK a código máquina, realmente no compila nada, sino que procesa el script para reducir su tamaño y facilita la adición de recursos en el archivo destino EXE. Al momento de "Compilar" un script, lo que en realidad se esta haciendo, es copiar el archivo `BIN` al destino especificado con la extensión `EXE`, y luego se le añade el script como un recurso en `RT_RCDATA`.
+
 ⠀
 
 # Notas:
@@ -37,13 +47,14 @@ Compilador no oficial para AutoHotkey v2 en español.
 
 # Compilación por línea de comandos
 - Sintaxis
-  - **Ahk2Exe.exe** [/in] infile.ahk [/out outfile.exe] [/icon iconfile.ico] [/bin binfile.bin] [/upx] [/mpress]
+  - **Ahk2Exe.exe** [/in] infile.ahk [/out outfile.exe] [/icon iconfile.ico] [/bin binfile.bin] [/upx] [/mpress] [/quiet]
 - Descripción
   - `infile.ahk` Es el archivo fuente AHK a compilar. Utiliza el directorio de trabajo del compilador. El archivo fuente es obligatorio.
   - `outfile.exe` Es el archivo EXE de salida compilado. Utiliza el directorio de trabajo de `infile.ahk` o el directorio del compilador si `infile.ahk` no se especificó antes. Si no se especifica, se establece por defecto a `infile.exe`.
   - `iconfile.ico` Es el icono principal del archivo compilado. Utiliza el directorio de trabajo de `infile.ahk` o el directorio del compilador si `infile.ahk` no se especificó antes. Si no se especifica, se mantiene el icono por defecto de AutoHotkey. El icono principal puede ser establecido por medio de la directiva del compilador `@Ahk2Exe-SetMainIcon`, en este caso el icono especificado se ignora.
   - `binfile.bin` Es el archivo BIN de AutoHotkey. Utiliza el directorio de trabajo del compilador. Si no se especifica, se establece en el último archivo BIN utilizado. En caso de no haber una configuración válida guardada del último archivo BIN utilizado, se establece automáticamente dependiendo de la arquitectura del compilador `Unicode %8*A_PtrSize%-bit`. Por ejemplo, puede especificar `Unicode 64-bit` (la extensión no es necesaria).
   - `/upx` o `/mpress` Especifica el método de compresión del archivo EXE resultante. Estos archivos deben estar en el mismo directorio que el compilador.
+  - `/quiet` o `/q` Especifica que deben suprimirse todos los mensajes, diálogos y ventanas durante la compilación. Esta opción es útil si aprovecha el código de salida; que le permite identificar el error ocurrido, si lo hubo.
 
 ⠀
 
@@ -62,7 +73,9 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
   - **`;@Ahk2Exe-SetProp`**`Value` **(SIN SOPORTE AÚN)**
   
     Cambia una propiedad en la información de versión del ejecutable compilado.
+    
     `Prop` debe reemplazarse por el nombre de la propiedad a cambiar.
+    
     `Value` es el valor a establecer a la propiedad.
   
     | Propiedad | Descripción |
@@ -71,10 +84,12 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
     | Description | Cambia la descripción del archivo (`FileDescription`). |
     | Version | Cambia la versión del archivo (`FileVersion`) y la versión del producto (`ProductVersion`). Si esta propiedad no se modifica, se usa de forma predeterminada la versión de AutoHotkey utilizada para compilar el script. |
     | Copyright  | Cambia la información legal de copyright (derechos de autor). |
-    | OrigFilename | Cambia la información del nombre de archivo original. |
+    | OrigFilename | Cambia la información del nombre de archivo original (`OriginalFileName`). |
     | CompanyName | Cambia el nombre de la compañía. |
     
-  - **`;@Ahk2Exe-SetMainIcon`**`[IcoFile]`
+    Nota: puede utilizar las propiedades descritas entre parentesis aparte si no quiere que, por ejemeplo, `Name` modifique tanto `ProductName` como `InternalName`.
+    
+  - **`;@Ahk2Exe-SetMainIcon`**`IcoFile`
   
     Sobrescribe el ícono EXE personalizado utilizado para la compilación. Si utiliza esta directiva, antes de añadir el icono se eliminan todos los iconos por defecto de AHK, incluyendo los iconos de `Pausa` y `Suspensión`, quedando únicamente el icono por defecto especificado. El nombre del grupo en `RT_GROUP_ICON` es `159`, por lo que debe evitar añadir recursos iconos con este nombre mediante `AddResource`.
   - **`;@Ahk2Exe-PostExec`**`Comando`
@@ -110,9 +125,9 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
   
     Además de los recursos especificados en la tabla de arriba, el compilador soporta los siguientes tipos de recursos que son detectados automáticamente por la extensión, o que puede especificarse de forma explícita: `*tipo`.
     
-    | Tipo de recurso | Descripción | Sección |
-    | --- | --- | --- |
-    | .PNG | Imágenes PNG | RT_ICON |
+    | Tipo de recurso | Descripción
+    | --- | --- |
+    | .PNG (RT_ICON) | Imágenes PNG |
     
   - **`;@Ahk2Exe-UseResourceLang`**`LangCode`
   
