@@ -199,23 +199,13 @@
                 NewCode .= LineTxt . "`n"
                 Continue
             }
-            ContSection := FALSE
-            IgnoreQ := TRUE
+            ContSection := "END"
         }
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Detectamos secciones de continuación
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (ContSection)
-        {
-            If (!(A_LoopReadLine ~= "^\s*\)(`"|')"))    ; ¿no termina la sección?    )" | )'
-            {
-                NewCode .= A_LoopReadLine . "`n"
-                Continue
-            }
-            ContSection := "END"
-        }
         Else If (A_LoopReadLine ~= "^\s*\(.*" && !InStr(A_LoopReadLine, ")"))    ; ¿la línea empieza por "(" y no contiene ningún ")" en ella?
             ContSection := { Options: Trim(SubStr(A_LoopReadLine, 2)) }
 
@@ -383,11 +373,11 @@
     If (NewCode == "")    ; ¿este script no contiene datos?
         Util_AddLog("ADVERTENCIA", "El script no contiene datos", Script)
     If (Tree == "")    ; ¿estamos procesando el script principal que se va a compilar?
-        Return {       Code: "; <COMPILER: v" . A_AhkVersion . ">`n" . Trim(NewCode, "`t `r`n")
+        Return {       Code: "; <COMPILER: v" . A_AhkVersion . ">`n" . Trim(NewCode, "`t`s`r`n")
                , Directives: Directives
                ,     Script: Script }
 
-    Return Trim(NewCode, "`t `r`n")
+    Return Trim(NewCode, "`t`s`r`n")
 }
 
 
@@ -399,46 +389,54 @@
     Procesa una línea de texto. Se realizan las siguientes operaciones.
     Se remueven los comentarios en-línea al final de la línea. Estos son los que comienzan con el caracter ';'.
     Se remueven otros tipos de comentarios actualmente no soportados por AHK.
-    Se quita espacios innecesarios.
+    Se quita espacios innecesarios al inicio y final de la línea y entre operadores.
     Se quitan los caracteres de escape '`' innecesarios en las cadenas, como por ejemplo '`x' --> 'x'. Los literales '``' son detectados correctamente.
     Se reemplaza en las cadenas "`t" por A_Tab para ocupar solo 1 caracter.
+    Se reemplaza en las cadenas "`s" por A_Space para ocupar solo 1 caracter.
+    Se reemplaza "OR" y "AND" en expresiones por su equivalente "||" y "&&" respectivamente.
     Return:
          String = El procesado se ha realizado con éxito y no ha ocurrido ningún error.
-        Integer = Error de sintaxis.
+        Integer = Error de sintaxis. Actualmente este valor no tiene un significado, es siempre 1.
     Por hacer:
         Detectar A_PtrSize y optimizar el código removiendolo y dejando solo el valor dependiendo la versión de AHK que se va a compilar.
         Remover por completo los espacios innecesarios.
     Nota:
         Gran parte del procesamiento aquí realizado es "experimental" y no se ha probado exaustivamente. Podría dejar el código con errores al compilar.
         Este procesamiento relentiza considerablemente la compilación, aunque a costo de reducir el tamaño del archivo compilado, y en ciertos casos favorecer el rendimiento (lo más importante).
+          El tiempo de compilación en AHK no es demasiado importante, debido a que normalmente no es necesario compilar el código para probarlo. Una vez compilado, debería funcionar correctamente.
+        Durante el procesado, se tienen en cuenta los siguientes factores (en orden descentente de importancia):
+            1. Mejorar el rendimiento, por más insignificante que éste sea. Este es el objetivo más importante, debido a la lentitud extrema de los lenguajes interpretados como lo es AHK.
+            2. Lograr reducir al máximo el tamaño del código, quitando espacios y utilizando equivalentes más cortos en expresiones.
+            3. Ofuscar el código (hacerlo lo más confuso posible) sin perdidas de rendimiento ni aumento del tamaño del código en lo absoluto.
 */
+;MsgBox ProcessLine("Return -1 +  3 (1) . '`"X ' . /*Comment*/ expr1 OR expr2 AND expr3 `; Comment", {}) ; return -1+3 (1) '"X ' expr1||expr2&&expr3
+;MsgBox ProcessLine("expr, expr,  expr", {})    ; expr,expr,expr
 ProcessLine(Txt, Data)
 {
     Static EscSequ := ";``:nrbtsvaf`"'{}^!+#"    ; por algún motivo extraño (bug?) "``;" se transforma en ";" (imagino que tendra algo que ver con " ;" que debe especificarse "`;")
            , ERROR := 1
 
     Local     Escape := FALSE
-        ,       Char := ["", ""]
+        ,       Char := StrSplit(Txt := Trim(Txt))
         ,  InComment := FALSE
         ,       Skip := 0
 
-    Txt := Trim(Txt)
     Local NewTxt := ""
-    VarSetCapacity(NewTxt, StrLen(Txt) * 2)
+    VarSetCapacity(NewTxt, ObjLength(Char) * 2)
 
-    Loop Parse, Txt
+    Loop (ObjLength(Char))
     {
-        If (InStr(A_Tab, Skip) && !(Skip := 0))    ; Skip x1
+        If (InStr("`t`s", Skip) && !(Skip := 0))    ; Skip x1
             Continue
 
         If (Skip ~= "^R")    ; Skip \s{2,}
         {
-            If (Skip ~= "=$" && A_LoopField == "=")
+            If (Skip ~= "=$" && Char[A_Index] == "=")
             {
                 NewTxt .= "="
                 Continue
             }
-            If (A_LoopField ~= "\s")
+            If (Char[A_Index] ~= "\s")
                 Continue
             Skip := 0
         }
@@ -446,68 +444,96 @@ ProcessLine(Txt, Data)
         If (Skip-- > 0)
             Continue
 
-        Char[1] := SubStr(Txt, A_Index+1, 1), Char[2] := SubStr(Txt, A_Index+2, 1)    ; caracteres A_LoopField[A_Index+1] y A_LoopField[A_Index+2]
-
-        If (InComment)    ; foo/*comment*/bar
+        If (InComment)    ; expr/*comment*/expr
         {
-            If (A_LoopField == "/" && SubStr(Txt, A_Index-1, 1) == "*")
+            If (Char[A_Index] == "*" && Char[A_Index+1] == "/")
+            {
+                NewTxt := RTrim(NewTxt) . (Char[A_Index+2] ~= "\s" ? "" : A_Space)    ; corrige espacios en los casos "expr/*comment*/expr" y "expr /*comment*/ expr"
+                Skip := 1    ; omitir "/"
                 InComment := FALSE
+            }
             Continue
         }
 
-        If (Char[0] == "`"" || Char[0] == "'")    ; foo "string" 'string' bar
+        If (Char[0] == "`"" || Char[0] == "'")    ; expr "string" 'string' expr
         {
-            If (Data.ContSection || (!Escape && A_LoopField == Char[0]))
+            If (Data.ContSection || (!Escape && Char[A_Index] == Char[0]))
                 Char[0] := "", Data.ContSection := FALSE
-            If (!Escape && A_LoopField == "``")
-                NewTxt .= InStr(EscSequ, Char[1]) ? (Char[1] == "t" ? Skip:=A_Tab : A_LoopField) : ""    ; "`x`n" --> "x`n"  ||  "`t" --> A_Tab
+            If (!Escape && Char[A_Index] == "``")
+                NewTxt .= InStr(EscSequ, Char[A_Index+1], TRUE) ? (Char[A_Index+1] == "t" ? Skip:=A_Tab    ; "`x`n" --> "x`n"  ||  "`t" --> A_Tab  ||  "`s" --> A_Space
+                                                                                          : Char[A_Index+1] == "s" ? Skip:=A_Space 
+                                                                                                                   : Char[A_Index])
+                                                                : ""
             Else
-                NewTxt .= A_LoopField
-            Escape := !Escape && A_LoopField == "``" && Skip != A_Tab
+                NewTxt .= Char[A_Index]
+            Escape := !Escape && Char[A_Index] == "``" && Skip != A_Tab
             Continue
         }
 
-        If (A_LoopField == ";")    ; foo ;comment
+        Char[A_Index] := Format("{:L}", Char[A_Index])    ; transforma todos los caracteres a minúsculas
+
+        If (Char[A_Index] == ";")    ; foo ;comment
         {
             If (A_Index != 1 && !(SubStr(Txt, A_Index-1, 1) ~= "\s"))    ; expr;comment  ||  "string";comment
                 Return ERROR
             Break
         }
 
-        If (A_LoopField == "/" && Char[1] == "*")    ; foo/*comment*/bar
+        If (Char[A_Index] == "/" && Char[A_Index+1] == "*")    ; expr/*comment*/expr
         {
             InComment := TRUE
             Continue
         }
 
-        If (A_LoopField ~= "\s")
+        If (Char[A_Index] ~= "\s")
         {
-            If (Char[1] ~= "\s")    ; omitimos más de un espacio en expresiones
+            If (Char[A_Index+1] ~= "\s")    ; omitimos más de un espacio en expresiones  |  expr{space xn>1}expr --> expr{space x1}expr
                 Continue
 
-            If (Char[1] == "." && Char[2] ~= "\s")    ; expr . expr --> expr expr
+            Else If (Char[A_Index+1] == "." && Char[A_Index+2] ~= "\s")    ; expr . expr --> expr expr
             {
-                Skip := 1
+                NewTxt .= A_Space
+                Skip := 2    ; omitimos ". "
+                Continue
+            }
+
+            Else If (Char[A_Index+1] = "O" && Char[A_Index+2] = "R" && Char[A_Index+3] ~= "\s")    ; expr OR expr --> expr||expr
+            {
+                NewTxt .= "||"
+                Skip := 3    ; omitimos "OR "
+                Continue
+            }
+
+            Else If (Char[A_Index+1] = "A" && Char[A_Index+2] = "N" && Char[A_Index+3] = "D" && Char[A_Index+4] ~= "\s")    ; expr AND expr --> expr&&expr
+            {
+                NewTxt .= "&&"
+                Skip := 4    ; omitimos "AND "
                 Continue
             }
         }
 
-        If (InStr(".~:", A_LoopField) && Char[1] == "=")    ; expr .= expr --> expr.=expr
+        If (InStr(".~:=", Char[A_Index]) && Char[A_Index+1] == "=")    ; expr .= expr --> expr.=expr
             NewTxt := RTrim(NewTxt), Skip := "R="
 
-        Else If (InStr("+-*/^&", A_LoopField))    ; expr + expr --> expr+expr
+        Else If (InStr("+-*/^&|", Char[A_Index]))    ; expr + expr --> expr+expr
         {
-            Char[3] := RTrim(SubStr(Txt, 1, A_Index-1))
-            If (RegExReplace(Char[3], "\w") != "" || Char[3] ~= "\s")    ; evita "Return -1" --> "Return-1" || "XXX -1" --> "XXX-1" al comienzo de la línea siendo X letras o números
+            Char[-1] := RTrim(SubStr(Txt, 1, A_Index-1))
+            If (RegExReplace(Char[-1], "\w") != "" || Char[-1] ~= "\s")    ; evita "Return -1" --> "Return-1" || "XXX -1" --> "XXX-1" al comienzo de la línea siendo X letras o números (una función sin parentesis)
                 NewTxt := RTrim(NewTxt), Skip := "R"
         }
 
-        NewTxt .= A_LoopField, Escape := FALSE, Char[0] := A_LoopField
+        Else If (InStr(",", Char[A_Index]))
+        {
+            If (Char[A_Index+1] ~= "\s")    ; expr, expr --> expr,expr
+                Skip := "R"    ; expr,{space xn>0} --> expr,{no space}
+        }
+
+        NewTxt .= Char[Escape := 0] := Char[A_Index]
     }
 
     Return Trim(NewTxt)
 }
- 
+
 
 
 
