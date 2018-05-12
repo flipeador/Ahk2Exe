@@ -125,6 +125,7 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
 # Códigos de salida (exitcodes)
 Los códigos de salida indican el tipo de error que ocurrió durante la compilación. Esto le será útil cuando compila un script por medio de la línea de comandos.
   - **General**
+  
     | Código de salida | Constante | Descripción |
     | --- | --- | --- |
     | 0x00 | ERROR_SUCCESS | Todas las operaciones se han realizado con éxito |
@@ -133,6 +134,7 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
     | 0x03 | ERROR_INVALID_PARAMETER | Los parámetros pasados son inválidos |
   
   - **Apertura de archivos**
+  
     | Código de salida | Constante | Descripción |
     | 0x10 | ERROR_SOURCE_NO_SPECIFIED | El archivo fuente no se ha especificado |
     | 0x11 | ERROR_SOURCE_NOT_FOUND | El archivo fuente no existe |
@@ -148,11 +150,13 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
     | 0x21 | ERROR_RESOURCE_FILE_NOT_FOUND | El archivo de recurso a incluir no existe |
     
   - **Escritura de archivos**
+  
     | Código de salida | Constante | Descripción |
     | 0x30 | ERROR_CANNOT_COPY_BIN_FILE | No se ha podido copiar el archivo BIN al destino |
     | 0x31 | ERROR_CANNOT_OPEN_EXE_FILE | no se ha podido abrir el archivo destino EXE para escritura |
     
   - **Sintaxis**
+  
     | Código de salida | Constante | Descripción |
     | 0x50 | ERROR_INVALID_SYNTAX_DIRECTIVE | La sintaxis de la directiva es inválida |
     | 0x51 | ERROR_FILEINSTALL_INVALID_SYNTAX | La sintaxis de FileInstall es inválida |
