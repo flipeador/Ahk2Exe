@@ -130,7 +130,7 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
     | --- | --- | --- |
     | 0x00 | ERROR_SUCCESS | Todas las operaciones se han realizado con éxito |
     | 0x01 | UNKNOWN_ERROR | Error desconocido |
-    | 0x02 | ERROR_NOT_SUPPORTED | No soportado
+    | 0x02 | ERROR_NOT_SUPPORTED | No soportado |
     | 0x03 | ERROR_INVALID_PARAMETER | Los parámetros pasados son inválidos |
   
   - **Apertura de archivos**
