@@ -126,40 +126,40 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
 Los códigos de salida indican el tipo de error que ocurrió durante la compilación. Esto le será útil cuando compila un script por medio de la línea de comandos.
   - **General**
   
-   | Código de salida | Constante | Descripción |
-   | --- | --- | --- |
-   | 0x00 | ERROR_SUCCESS | Todas las operaciones se han realizado con éxito |
-   | 0x01 | UNKNOWN_ERROR | Error desconocido |
-   | 0x02 | ERROR_NOT_SUPPORTED | No soportado |
-   | 0x03 | ERROR_INVALID_PARAMETER | Los parámetros pasados son inválidos |
+     | Código de salida | Constante | Descripción |
+     | --- | --- | --- |
+     | 0x00 | ERROR_SUCCESS | Todas las operaciones se han realizado con éxito |
+     | 0x01 | UNKNOWN_ERROR | Error desconocido |
+     | 0x02 | ERROR_NOT_SUPPORTED | No soportado |
+     | 0x03 | ERROR_INVALID_PARAMETER | Los parámetros pasados son inválidos |
   
   - **Apertura de archivos**
   
-   | Código de salida | Constante | Descripción |
-   | 0x10 | ERROR_SOURCE_NO_SPECIFIED | El archivo fuente no se ha especificado |
-   | 0x11 | ERROR_SOURCE_NOT_FOUND | El archivo fuente no existe |
-   | 0x12 | ERROR_CANNOT_OPEN_SCRIPT | No se ha podido abrir el archivo fuente script (incluyendo includes) para lectura |
-   | 0x13 | ERROR_BIN_FILE_NOT_FOUND | El archivo BIN no existe |
-   | 0x14 | ERROR_BIN_FILE_CANNOT_OPEN | No se ha podido abrir el archio BIN para lectura |
-   | 0x15 | ERROR_MAIN_ICON_NOT_FOUND | El icono principal no existe |
-   | 0x16 | ERROR_MAIN_ICON_CANNOT_OPEN | No se ha podido abrir el icono principal para lectura |
-   | 0x17 | ERROR_INVALID_MAIN_ICON | El icono principal es inválido |
-   | 0x18 | ERROR_INCLUDE_FILE_NOT_FOUND | El archivo a incluir no existe |
-   | 0x19 | ERROR_INCLUDE_DIR_NOT_FOUND | El directorio a incluir no existe |
-   | 0x20 | ERROR_FILEINSTALL_NOT_FOUND | El archivo a incluir especificado en FileInstall no existe |
-   | 0x21 | ERROR_RESOURCE_FILE_NOT_FOUND | El archivo de recurso a incluir no existe |
+     | Código de salida | Constante | Descripción |
+     | 0x10 | ERROR_SOURCE_NO_SPECIFIED | El archivo fuente no se ha especificado |
+     | 0x11 | ERROR_SOURCE_NOT_FOUND | El archivo fuente no existe |
+     | 0x12 | ERROR_CANNOT_OPEN_SCRIPT | No se ha podido abrir el archivo fuente script (incluyendo includes) para lectura |
+     | 0x13 | ERROR_BIN_FILE_NOT_FOUND | El archivo BIN no existe |
+     | 0x14 | ERROR_BIN_FILE_CANNOT_OPEN | No se ha podido abrir el archio BIN para lectura |
+     | 0x15 | ERROR_MAIN_ICON_NOT_FOUND | El icono principal no existe |
+     | 0x16 | ERROR_MAIN_ICON_CANNOT_OPEN | No se ha podido abrir el icono principal para lectura |
+     | 0x17 | ERROR_INVALID_MAIN_ICON | El icono principal es inválido |
+     | 0x18 | ERROR_INCLUDE_FILE_NOT_FOUND | El archivo a incluir no existe |
+     | 0x19 | ERROR_INCLUDE_DIR_NOT_FOUND | El directorio a incluir no existe |
+     | 0x20 | ERROR_FILEINSTALL_NOT_FOUND | El archivo a incluir especificado en FileInstall no existe |
+     | 0x21 | ERROR_RESOURCE_FILE_NOT_FOUND | El archivo de recurso a incluir no existe |
     
   - **Escritura de archivos**
   
-   | Código de salida | Constante | Descripción |
-   | 0x30 | ERROR_CANNOT_COPY_BIN_FILE | No se ha podido copiar el archivo BIN al destino |
-   | 0x31 | ERROR_CANNOT_OPEN_EXE_FILE | no se ha podido abrir el archivo destino EXE para escritura |
+     | Código de salida | Constante | Descripción |
+     | 0x30 | ERROR_CANNOT_COPY_BIN_FILE | No se ha podido copiar el archivo BIN al destino |
+     | 0x31 | ERROR_CANNOT_OPEN_EXE_FILE | no se ha podido abrir el archivo destino EXE para escritura |
     
   - **Sintaxis**
   
-   | Código de salida | Constante | Descripción |
-   | 0x50 | ERROR_INVALID_SYNTAX_DIRECTIVE | La sintaxis de la directiva es inválida |
-   | 0x51 | ERROR_FILEINSTALL_INVALID_SYNTAX | La sintaxis de FileInstall es inválida |
+     | Código de salida | Constante | Descripción |
+     | 0x50 | ERROR_INVALID_SYNTAX_DIRECTIVE | La sintaxis de la directiva es inválida |
+     | 0x51 | ERROR_FILEINSTALL_INVALID_SYNTAX | La sintaxis de FileInstall es inválida |
 
 ⠀
 
