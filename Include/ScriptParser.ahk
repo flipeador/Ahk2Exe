@@ -23,6 +23,7 @@
     }
 
     ObjPush(FileList, Script)
+    Util_Status("Procesando.. [" . Script . "]")
     Util_AddLog("INCLUDE", "Se ha incluido un archivo", Script)
 
 
@@ -32,13 +33,13 @@
     If (!IS_FILE(Script))
     {
         Util_AddLog("ERROR", "No se ha encontrado el script", Script,, StrReplace(Tree, "`n", "|"))
-        Return Util_Error("El archivo de código fuente AHK no existe.", Script)
+        Return Util_Error("El archivo de código fuente AHK no existe.", Script, CMDLN ? ERROR_CANNOT_OPEN_SCRIPT : NO_EXIT)
     }
 
     If (!FileOpen(Script, "r"))    ; comprobamos permisos de lectura
     {
         Util_AddLog("ERROR", "No se ha podido abrir el Script para lectura", Script)
-        Return Util_Error("No se ha podido abrir el Script para lectura.", Script)
+        Return Util_Error("No se ha podido abrir el Script para lectura.", Script, CMDLN ? ERROR_CANNOT_OPEN_SCRIPT : NO_EXIT)
     }
 
     Local WorkingDir := new TempWorkingDir(DirGetParent(Script))    ; establece temporalmente el directorio de trabajo actual al del script ha procesar
@@ -107,9 +108,9 @@
                 If (foo = "SetMainIcon")    ; anula el ícono EXE personalizado utilizado para la compilación.
                 {
                     If (bar == "")    ; ¿no se especificó nada luego del comando?
-                        Util_Error("Uso inválido de la directiva @Ahk2Exe-SetMainIcon.`nDebe especificar un icono.`nLínea #" . A_Index . ".", Script)
+                        Util_Error("Uso inválido de la directiva @Ahk2Exe-SetMainIcon.`nDebe especificar un icono.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
                     Else If (DirExist(bar := GetFullPathName(bar)) || !FileExist(bar))
-                        Util_Error("Error en la directiva @Ahk2Exe-SetMainIcon.`nEl archivo icono especificado no existe.`n" . bar . "`nLínea #" . A_Index . ".", Script)
+                        Util_Error("Error en la directiva @Ahk2Exe-SetMainIcon.`nEl archivo icono especificado no existe.`n" . bar . "`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
                     Else
                         Directives.MainIcon := bar
                 }
@@ -120,9 +121,9 @@
                 Else If (foo = "UseResourceLang")    ; cambia el lenguaje de recursos utilizado por @Ahk2Exe-AddResource
                 {
                     If (bar == "")
-                        Util_Error("Uso inválido de la directiva @Ahk2Exe-UseResourceLang.`nDebe especificar un código de idioma.`nLínea #" . A_Index . ".", Script)
+                        Util_Error("Uso inválido de la directiva @Ahk2Exe-UseResourceLang.`nDebe especificar un código de idioma.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
                     Else If (!(bar is "Integer"))
-                        Util_Error("Error en la directiva @Ahk2Exe-UseResourceLang.`nEl valor de idioma especificado es inválido.`n" . bar . "`nLínea #" . A_Index . ".", Script)
+                        Util_Error("Error en la directiva @Ahk2Exe-UseResourceLang.`nEl valor de idioma especificado es inválido.`n" . bar . "`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
                     Else
                         Directives.ResourceLang := bar
                 }
@@ -130,7 +131,7 @@
                 Else If (foo = "PostExec")    ; especifica un comando que se ejecutará después de una compilación exitosa
                 {
                     If (bar == "")
-                        Util_Error("Uso inválido de la directiva @Ahk2Exe-PostExec.`nDebe especificar un comando ha ejecutar después de la compilación.`nLínea #" . A_Index . ".", Script)
+                        Util_Error("Uso inválido de la directiva @Ahk2Exe-PostExec.`nDebe especificar un comando ha ejecutar después de la compilación.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
                     Else
                         Directives.PostExec := bar
                 }
@@ -138,7 +139,7 @@
                 Else If (foo = "AddResource")
                 {
                     If (bar == "")
-                        Util_Error("Uso inválido de la directiva @Ahk2Exe-AddResource.`nDebe especificar un recurso ha añadir al archivo EXE resultante.`nLínea #" . A_Index . ".", Script)
+                        Util_Error("Uso inválido de la directiva @Ahk2Exe-AddResource.`nDebe especificar un recurso ha añadir al archivo EXE resultante.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
                     Else
                         ObjPush(Directives.Resources, ParseResourceStr(bar, A_Index, Script))
                 }
@@ -291,7 +292,7 @@
                     If (!foo)
                     {
                         Util_AddLog("ERROR", "No se a encontrado el archivo a incluir", Script, A_Index, "<" . LineTxt . ">")
-                        Return Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include <" . LineTxt . ">`nLínea #" . A_Index . ".", Script)
+                        Return Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include <" . LineTxt . ">`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INCLUDE_FILE_NOT_FOUND : NO_EXIT)
                     }
                     Else    ; omitir archivo inexistente
                         Util_AddLog("INCLUDE", "Archivo a incluir omitido", Script, A_Index, "<" . LineTxt . ">")
@@ -310,7 +311,7 @@
                     If (!foo)
                     {
                         Util_AddLog("ERROR", "No se ha encontrado el archivo a incluir", Script, A_Index, LineTxt)
-                        Return Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . A_Index . ".", Script)
+                        Return Util_Error("Error en archivo #Include. El archivo a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INCLUDE_FILE_NOT_FOUND : NO_EXIT)
                     }
                     Else
                         Util_AddLog("INCLUDE", "Archivo a incluir omitido", Script, A_Index, LineTxt)
@@ -334,7 +335,7 @@
                 If (!DirExist(LineTxt))    ; ¿el directorio a incluir no existe?
                 {
                     Util_AddLog("INCLUDE", "Directorio a incluir no encontrado", Script, A_Index, "<" . LineTxt . ">")
-                    Return Util_Error("Error en directorio #Include. El directorio a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . A_Index . ".", Script)
+                    Return Util_Error("Error en directorio #Include. El directorio a incluir no existe.`n#Include " . LineTxt . "`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INCLUDE_DIR_NOT_FOUND : NO_EXIT)
 
                 }
                 A_WorkingDir := LineTxt    ; cambiamos el directorio de trabajo actual
@@ -350,11 +351,20 @@
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         If (LineTxt ~= "i)^FileInstall")
         {
-            If (!IS_FILE(foo := ParseFuncParams(SubStr(LineTxt, 12), Script)[1]))
+            foo := ParseFuncParams(SubStr(LineTxt, 12), Script)[1]
+
+            If (ERROR)
+            {
+                Util_AddLog("ERROR", "Error de sintaxis en FileInstall", Script, A_Index,,, "FileInstall")
+                Return Util_Error("Error de sintaxis en FileInstall.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_FILEINSTALL_INVALID_SYNTAX : NO_EXIT)
+            }
+
+            If (!IS_FILE(foo))
             {
                     Util_AddLog("ERROR", "Archivo a incluir no encontrado", Script, A_Index, foo,, "FileInstall")
-                    Return Util_Error("Error en archivo FileInstall. El archivo a incluir no existe.`nLínea #" . A_Index . ".", Script)
+                    Return Util_Error("Error en archivo FileInstall. El archivo a incluir no existe.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_FILEINSTALL_NOT_FOUND : NO_EXIT)
             }
+
             ObjPush(Directives.Resources, ParseResourceStr("*10 " . foo, A_Index, Script))    ; incluimos el archivo para ser añadido en RT_RCDATA
         }
 
@@ -683,7 +693,7 @@ ParseResourceStr(String, LineNum, Script)    ;@Ahk2Exe-AddResource *[int/str typ
             If (!(foo := InStr(String, "`"",, 3)) || (Obj.ResType := SubStr(String, 3, foo - 3)) == "")
             {
                 Util_AddLog("ERROR", "La sintaxis es inválida", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
-                Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nLa sintaxis es inválida.`nLínea #" . LineNum . ".", Script)
+                Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nLa sintaxis es inválida.`nLínea #" . LineNum . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
             }
             String := LTrim(SubStr(String, foo + 1))
         }
@@ -692,7 +702,7 @@ ParseResourceStr(String, LineNum, Script)    ;@Ahk2Exe-AddResource *[int/str typ
             If (!(foo := InStr(String, A_Space,, 2)) || (Obj.ResType := SubStr(String, 2, foo - 2)) == "")
             {
                 Util_AddLog("ERROR", "La sintaxis es inválida", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
-                Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nLa sintaxis es inválida.`nLínea #" . LineNum . ".", Script)
+                Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nLa sintaxis es inválida.`nLínea #" . LineNum . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
             }
             String := LTrim(SubStr(String, foo + 1))
         }
@@ -714,7 +724,7 @@ ParseResourceStr(String, LineNum, Script)    ;@Ahk2Exe-AddResource *[int/str typ
     If (DirExist(Obj.File := String) || !FileExist(Obj.File))
     {
         Util_AddLog("ERROR", "El archivo especificado es inválido", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
-        Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nEl archivo especificado no existe.`nLínea #" . LineNum . ".", Script)
+        Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nEl archivo especificado no existe.`nLínea #" . LineNum . ".", Script, CMDLN ? ERROR_RESOURCE_FILE_NOT_FOUND : NO_EXIT)
     }
 
     Return Obj

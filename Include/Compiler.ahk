@@ -8,11 +8,19 @@
     ; ======================================================================================================================================================
     ; Comprobar archivos
     ; ======================================================================================================================================================
+    Util_Status("Compilando.. Comprobando archivos.")
+
     Local BinFile := Util_CheckBinFile(CMDLN ? g_data.BinFile : CB_GetText(Gui.Control["ddlbin"]))
     If (!BinFile)    ; ¿el archivo BIN no existe?
     {
         Util_AddLog("ERROR", "El archivo BIN no se ha encontrado", BinFile,, Data.Script)
-        Return Util_Error("El archivo BIN no existe.", BinFile)
+        Return Util_Error("El archivo BIN no existe.", BinFile, CMDLN ? ERROR_BIN_FILE_NOT_FOUND : NO_EXIT)
+    }
+
+    If (!FileOpen(BinFile, "r"))
+    {
+        Util_AddLog("ERROR", "El archivo BIN no se ha podido abrir para lectura", BinFile,, Data.Script)
+        Return Util_Error("El archivo BIN no se ha podido abrir para lectura.", BinFile, CMDLN ? ERROR_BIN_FILE_CANNOT_OPEN : NO_EXIT)
     }
 
     Local ExeFile := CMDLN ? g_data.ExeFile : Gui.Control["edest"].Text
@@ -30,48 +38,49 @@
     }
 
     Local IconFile := CMDLN ? g_data.IcoFile : CB_GetText(Gui.Control["ddlico"])
-    If (IconFile != "" && (DirExist(IconFile) || !FileExist(IconFile)))
+    If (IconFile != "" && !IS_FILE(IconFile))
     {
-        Util_AddLog("ERROR", "No se ha encontrado el icono principal", IconFile,, Data.Script)
-        Return Util_Error("El icono principal a establecer no existe.", IconFile)
+        Util_AddLog("ERROR", "El icono principal no se ha encontrado", IconFile,, Data.Script)
+        Return Util_Error("El icono principal no se ha encontrado.", IconFile, CMDLN ? ERROR_MAIN_ICON_NOT_FOUND : NO_EXIT)
     }
 
     Local hIconFile := 0
     If (IconFile != "" && !(hIconFile := FileOpen(IconFile, "r")))
     {
-        Util_AddLog("ERROR", "No se ha podido abrir el icono principal para lectura", IconFile,, Data.Script)
-        Return Util_Error("No se ha podido abrir el icono principar para lectura.", IconFile)
+        Util_AddLog("ERROR", "El icono principal no se ha podido abrir para lectura", IconFile,, Data.Script)
+        Return Util_Error("El icono principal no se ha podido abrir para lectura.", IconFile, CMDLN ? ERROR_MAIN_ICON_CANNOT_OPEN : NO_EXIT)
     }
 
     ; comprobamos que el archivo icono principal sea un icono válido comprobando algunos datos del encabezado (ICONDIR structure) (esto no asegura nada)
     If (hIconFile && (hIconFile.ReadUShort() != 0 || hIconFile.ReadUShort() != 1))
     {
         hIconFile.Close()
-        Util_AddLog("ERROR", "El archivo icono principal no es un icono válido", IconFile,, Data.Script)
-        Return Util_Error("El archivo icono principal no es un icono válido.", IconFile)
+        Util_AddLog("ERROR", "El icono principal no es un icono válido", IconFile,, Data.Script)
+        Return Util_Error("El icono principal no es un icono válido.", IconFile, CMDLN ? ERROR_INVALID_MAIN_ICON : NO_EXIT)
     }
 
     FileSetAttrib("N", ExeFile)    ; evita errores bajo ciertas condiciones
     If (!FileCopy(BinFile, ExeFile, TRUE))    ; ¿no se pudo copiar el archivo BIN al destino?
     {
-        Util_AddLog("ERROR", "No ha sido posible copiar el arcivo BIN al destino", ExeFile,, Data.Script)
-        Return Util_Error("No se ha podido copiar el archivo BIN al destino.`n" . BinFile, ExeFile)
+        Util_AddLog("ERROR", "No se ha podido copiar el archivo BIN al destino", ExeFile,, Data.Script)
+        Return Util_Error("No se ha podido copiar el archivo BIN al destino.`n" . BinFile, ExeFile, CMDLN ? ERROR_CANNOT_COPY_BIN_FILE : NO_EXIT)
     }
 
 
     ; ======================================================================================================================================================
     ; Iniciar compilación
     ; ======================================================================================================================================================
+    Util_Status("Compilando.. Añadiendo recursos.")
+
     ; abrimos el archivo destino para eliminar/añadir/modificar los recursos en él
     Local hUpdate := BeginUpdateResource(ExeFile)
     If (!hUpdate)
     {
         FileDelete(ExeFile)    ; eliminamos el archivo destino, la compilación no ha terminado correctamente
         Util_AddLog("ERROR", "No se ha podido abrir el archivo destino para su edición", ExeFile,, Data.Script, A_LastError)
-        Return Util_Error("Ha ocurrido un error al abrir el archivo destino.`nError #" . A_LastError . ".", ExeFile)
+        Return Util_Error("No se ha podido abrir el archivo destino para su edición.`nError #" . A_LastError . ".", ExeFile, CMDLN ? ERROR_CANNOT_OPEN_EXE_FILE : NO_EXIT)
     }
 
-    FileSetAttrib("N", ExeFile)
     FileSetAttrib("H", ExeFile)    ; ocultamos el archivo para evitar que sea "tocado" por el usuario durante la compilación
 
     ; cargamos el archivo destino para lectura
@@ -179,7 +188,7 @@
         }
 
         ; añadimos cualquier otro tipo de recurso no reconocido o no soportado actualmente por el compilador (se incluye el archivo entero debido a que desconocemos sus datos)
-        ; esto es muy raro, normalmente los recursos que no tengan un nombre de tipo de recurso reconocido irán a RT_RCDATA
+        ; normalmente los recursos que no tengan un nombre de tipo de recurso reconocido irán a RT_RCDATA
         Else
         {
             If (ResFileOpen(Data, foo.File, Buffer, Size))
@@ -209,44 +218,63 @@
     ; Iniciar compresión
     ; ======================================================================================================================================================
     Local CompressionMode := CMDLN ? g_data.Compression : CB_GetSelection(Gui.Control["ddlcomp"])
-    If (CompressionMode == UPX)
+
+    If (CompressionMode != NO_COMPRESSION)
     {
+        Util_Status("Comprimiendo ..")
         Util_AddLog("INFO", "Iniciando compresión del archivo destino", ExeFile)
-        If (Util_CheckCompressionFile("upx.exe"))
-        {
-            RunWait A_ComSpec . " /c upx.exe -f --ultra-brute --8086 --8mib-ram `"" . ExeFile . "`""
-            Util_AddLog("INFO", "Compresión con UPX finalizada", ExeFile)
-        }
-        Else
-            TaskDialog(WARNING_ICON, [Gui.Title,"Compresión.."], "No se ha encontrado UPX."), Util_AddLog("ADVERTENCIA", "No se ha encontrado UPX")
-    }
-    Else If (CompressionMode == MPRESS)
-    {
-        Util_AddLog("INFO", "Iniciando compresión del archivo destino", ExeFile)
-        If (Util_CheckCompressionFile("mpress.exe"))
-        {
-            RunWait A_ComSpec . " /c mpress.exe -s `"" . ExeFile . "`""
-            Util_AddLog("INFO", "Compresión con MPRESS finalizada", ExeFile)
-        }
-        Else
-            TaskDialog(WARNING_ICON, [Gui.Title,"Compresión.."], "No se ha encontrado MPRESS."), Util_AddLog("ADVERTENCIA", "No se ha encontrado MPRESS")
     }
     Else
         Util_AddLog("INFO", "No se ha seleccionado ningún método de compresión", ExeFile)
+
+    If (CompressionMode == UPX)
+    {
+        If (IS_FILE("upx.exe"))
+        {
+            RunWait("upx.exe -f --ultra-brute --8086 --8mib-ram `"" . ExeFile . "`"",, BE_QUIET ? "Hide" : "")
+            Util_AddLog("INFO", "Compresión con UPX finalizada", ExeFile)
+        }
+        Else
+        {
+            Util_AddLog("ADVERTENCIA", "No se ha encontrado UPX")
+            If (!BE_QUIET)
+                TaskDialog(WARNING_ICON, [Gui.Title,"Compresión.."], "No se ha encontrado UPX.")
+        }
+    }
+    
+    If (CompressionMode == MPRESS)
+    {
+        If (IS_FILE("mpress.exe"))
+        {
+            RunWait("mpress.exe -s `"" . ExeFile . "`"",, BE_QUIET ? "Hide" : "")
+            Util_AddLog("INFO", "Compresión con MPRESS finalizada", ExeFile)
+        }
+        Else
+        {
+            Util_AddLog("ADVERTENCIA", "No se ha encontrado MPRESS")
+            If (!BE_QUIET)
+                TaskDialog(WARNING_ICON, [Gui.Title,"Compresión.."], "No se ha encontrado MPRESS.")
+        }
+    }
 
 
     ; ======================================================================================================================================================
     ; Finalizar
     ; ======================================================================================================================================================
+    Util_Status("Compilando.. Terminando.")
     If (Data.Directives.PostExec != "")
+    {
+        Util_AddLog("INFO", "Se ha especificado un comando de post-ejecución", Data.Directives.PostExec)
         Run(Data.Directives.PostExec)
+    }
 
 
     ; ======================================================================================================================================================
     ; ÉXITO! | TERMINAMOS
     ; ======================================================================================================================================================
     FileSetAttrib("N", ExeFile)    ; ya podemos hacer visible el archivo destino
-    TaskDialog(INFO_ICON, [Title,"Compilación.."], ["La compilación a finalizado con éxito!",ExeFile])
+    If (!BE_QUIET)
+        TaskDialog(INFO_ICON, [Title,"Compilación.."], ["La compilación a finalizado con éxito!",ExeFile])
 
     Return TRUE
 }

@@ -81,6 +81,7 @@ global     Cfg := Util_LoadCfg()
 global VerInfo := Util_LoadVerInfo()    ; StringFileInfo BLOCK statement - https://msdn.microsoft.com/en-us/library/windows/desktop/aa381049(v=vs.85).aspx
 global    Gdip := new Gdiplus
 global ERROR := FALSE
+global BE_QUIET := FALSE
 
 
 ; constantes
@@ -106,8 +107,9 @@ global       RT_CURSOR := 1    ; Resource-Definition Statements - https://msdn.m
      ,         RT_HTML := 23
      ,     RT_MANIFEST := 24
 
-global    UPX := 1
-     , MPRESS := 2
+global NO_COMPRESSION := 0
+     ,            UPX := 1
+     ,         MPRESS := 2
 
 global SUBLANG_ENGLISH_US := 0x0409    ; https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693(v=vs.85).aspx
 
@@ -118,6 +120,34 @@ global       TD_ERROR_ICON := 0xFFFE,   ERROR_ICON := [0, TD_ERROR_ICON]
 
 global IMAGE_SUBSYSTEM_WINDOWS_GUI := 2
     ,  IMAGE_SUBSYSTEM_WINDOWS_CUI := 3
+
+; Exit Codes
+     ; ---- GENERAL ----
+global           ERROR_SUCCESS := 0x00    ; todas las operaciones se han realizado con éxito
+     ,           UNKNOWN_ERROR := 0x01    ; error desconocido
+     ,     ERROR_NOT_SUPPORTED := 0x02    ; no soportado
+     , ERROR_INVALID_PARAMETER := 0x03    ; los parámetros pasados son inválidos
+     ; ---- APERTURA DE ARCHIVOS ----
+     ,     ERROR_SOURCE_NO_SPECIFIED := 0x10    ; el archivo fuente no se ha especificado
+     ,        ERROR_SOURCE_NOT_FOUND := 0x11    ; el archivo fuente no existe
+     ,      ERROR_CANNOT_OPEN_SCRIPT := 0x12    ; no se ha podido abrir el archivo fuente script (incluyendo includes) para lectura
+     ,      ERROR_BIN_FILE_NOT_FOUND := 0x13    ; el archivo BIN no existe
+     ,    ERROR_BIN_FILE_CANNOT_OPEN := 0x14    ; no se ha podido abrir el archio BIN para lectura
+     ,     ERROR_MAIN_ICON_NOT_FOUND := 0x15    ; el icono principal no existe
+     ,   ERROR_MAIN_ICON_CANNOT_OPEN := 0x16    ; no se ha podido abrir el icono principal para lectura
+     ,       ERROR_INVALID_MAIN_ICON := 0x17    ; el icono principal es inválido
+     ,  ERROR_INCLUDE_FILE_NOT_FOUND := 0x18    ; el archivo a incluir no existe
+     ,   ERROR_INCLUDE_DIR_NOT_FOUND := 0x19    ; el directorio a incluir no existe
+     ,   ERROR_FILEINSTALL_NOT_FOUND := 0x20    ; el archivo a incluir especificado en FileInstall no existe
+     , ERROR_RESOURCE_FILE_NOT_FOUND := 0x21    ; el archivo de recurso a incluir no existe
+     ; ---- ESCRITURA DE ARCHIVOS ----
+     , ERROR_CANNOT_COPY_BIN_FILE := 0x30    ; no se ha podido copiar el archivo BIN al destino
+     , ERROR_CANNOT_OPEN_EXE_FILE := 0x31    ; no se ha podido abrir el archivo destino EXE para escritura
+     ; ---- SINTAXIS ----
+     ,   ERROR_INVALID_SYNTAX_DIRECTIVE := 0x50    ; la sintaxis de la directiva es inválida
+     , ERROR_FILEINSTALL_INVALID_SYNTAX := 0x51    ; la sintaxis de FileInstall es inválida
+     ; ---- OTROS ----
+     , NO_EXIT := 0x00
 
 
 ; determina si se pasaron parámetros al compilador
@@ -145,6 +175,9 @@ global WIN_MINIMIZED := -1
 
 global VK_F1 := 0x70    ; https://msdn.microsoft.com/en-us/library/windows/desktop/dd375731(v=vs.85).aspx
 
+global COLOR_3DFACE := DllCall("User32.dll\GetSysColor", "Int", 15, "UInt")    ; color por defecto de las ventanas GUI
+       COLOR_3DFACE := (COLOR_3DFACE & 255) << 16 | (COLOR_3DFACE & 65280) | (COLOR_3DFACE >> 16)
+
 
 ; comprobamos permisos
 If (!FileOpen("~tmp", "w"))
@@ -161,7 +194,7 @@ Gui := GuiCreate("-DPIScale -Resize -MaximizeBox +MinSize690x481 +E0x00000400", 
     GCT.SetFont("Italic", "Segoe UI")
 Gui.SetFont("s9", "Segoe UI")
 
-If (A_PtrSize == 4)
+If (A_PtrSize == 4)    ; solo la versión de 32-Bit soporta waterctrl
     Gui.AddText("x0 y0 w690 h110 vlogo"), Util_LoadWaterCtrl(), Util_EnableWater(Gui.Control["logo"].Hwnd, Util_LoadLogo())
 Else
     Gui.AddPic("x0 y0 w690 h110 vlogo", "HBITMAP:" . Util_LoadLogo())
@@ -274,7 +307,7 @@ Gui.AddLink("x210 y429 w200 h22 BackgroundFFFFFF vlnk", "<a href=`"https://autoh
     GCT.Attach(Gui.Control["lnk"], "Ir a la página oficial de AutoHotkey")
 Gui.AddStatusBar("vsb +0x100", "Listo")
     GCT.Attach(Gui.Control["sb"], "Muestra información del estado actual")
-    ;WinSetTransColor("F0F0F0", "ahk_id" . Gui.Control["sb"].Hwnd)
+    WinSetTransColor(Format("{:06X}", COLOR_3DFACE), "ahk_id" . Gui.Control["sb"].Hwnd)
 
 Gui.Show("w690 h481")
     Gui.OnEvent("Close", "ExitApp")
@@ -414,23 +447,21 @@ Gui_CompileButton()
 {
     ERROR := FALSE
     Util_ClearLog()
-    Local foo := new GuiDisable("Compilando..")
-        , Script := CB_GetText(Gui.Control["ddlsrc"])
+
+    Local Script := CB_GetText(Gui.Control["ddlsrc"])
         ,   Data := PreprocessScript(Script)
 
     If (Data)
     {
         If (AhkCompile(Data))
-        {
             Util_AddLog("OK", "La compilación a finalizado con éxito", Script)
-
-            ; EJECUCIONES AL COMPILAR CON ÉXITO ... {}
-        }
         Else
             Util_AddLog("ERROR", "Ha ocurrido un error durante la compilación", Script)
     }
     Else
         Util_AddLog("ERROR", "Ha ocurrido un error durante el procesado del script", Script)
+
+    Util_Status("Listo")
 }
 
 
@@ -492,7 +523,9 @@ _OnExit(ExitReason, ExitCode)
 Util_Error(Message, ExpandedInfo := "", ExitCode := FALSE)
 {
     ERROR := TRUE
-    TaskDialog(ERROR_ICON, [Title,"Ha ocurrido un error y las operaciónes an sido abortadas."], ExpandedInfo == "" ? Message : [Message,ExpandedInfo])
+    Util_Status("Ha ocurrido un error y las operaciónes an sido abortadas.")
+    If (!BE_QUIET)
+        TaskDialog(ERROR_ICON, [Title,"Ha ocurrido un error y las operaciónes an sido abortadas."], ExpandedInfo == "" ? Message : [Message,ExpandedInfo])
     If (ExitCode)
         ExitApp ExitCode
     Return FALSE
@@ -689,6 +722,12 @@ Util_GetAhkPath()
         Return AhkPath
 
     Return ""
+}
+
+Util_Status(Info)
+{
+    If (!CMDLN)
+        Gui.Control["sb"].SetText(Info)
 }
 
 
