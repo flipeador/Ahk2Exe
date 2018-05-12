@@ -7,6 +7,8 @@ Compilador no oficial para AutoHotkey v2 en español.
 Durante el procesado del script, se tienen en cuenta los siguientes factores, ordenados en forma descendente de importancia.
 
   - `Mejorar el rendimiento`, por más insignificante que éste sea. Este es el objetivo más importante, debido a la lentitud extrema de los lenguajes interpretados como lo es AHK.
+  - Lograr `reducir al máximo el tamaño del código`, quitando espacios y utilizando equivalentes más cortos en expresiones.
+  - `Ofuscar el código` (hacerlo lo más confuso posible) sin perdidas de rendimiento ni aumento del tamaño del código en lo absoluto.
 
 Debe tener en cuenta los siguientes puntos con respecto al compilador.
 
