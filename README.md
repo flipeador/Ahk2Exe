@@ -136,6 +136,7 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
   - **Apertura de archivos**
   
      | Código de salida | Constante | Descripción |
+     | --- | --- | --- |
      | 0x10 | ERROR_SOURCE_NO_SPECIFIED | El archivo fuente no se ha especificado |
      | 0x11 | ERROR_SOURCE_NOT_FOUND | El archivo fuente no existe |
      | 0x12 | ERROR_CANNOT_OPEN_SCRIPT | No se ha podido abrir el archivo fuente script (incluyendo includes) para lectura |
@@ -152,12 +153,14 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
   - **Escritura de archivos**
   
      | Código de salida | Constante | Descripción |
+     | --- | --- | --- |
      | 0x30 | ERROR_CANNOT_COPY_BIN_FILE | No se ha podido copiar el archivo BIN al destino |
      | 0x31 | ERROR_CANNOT_OPEN_EXE_FILE | no se ha podido abrir el archivo destino EXE para escritura |
     
   - **Sintaxis**
   
      | Código de salida | Constante | Descripción |
+     | --- | --- | --- |
      | 0x50 | ERROR_INVALID_SYNTAX_DIRECTIVE | La sintaxis de la directiva es inválida |
      | 0x51 | ERROR_FILEINSTALL_INVALID_SYNTAX | La sintaxis de FileInstall es inválida |
 
