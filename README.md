@@ -10,6 +10,8 @@ Compilador no oficial para AutoHotkey v2 en español.
 - Los archivos `Ahk2Exe.exe` y `Ahk2Exe64.exe` son totalmente independientes, no requieren de ningún otro archivo para su funcionamiento, aunque para poder compilar los scripts es necesario tener los archivos `BIN` en el mismo directorio que `Ahk2Exe.exe`.
 - Para poder comprimir el archivo `EXE` resultante, es necesario tener `UPX` y/o `MPRESS` en el mismo directorio que `Ahk2Exe.exe`.
 - La versión de 64-bit (`Ahk2Exe64.exe`) no soporta el efecto de agua en el logo `AHK`. La funcionalidad es exactamente la misma que en la de 32-bit.
+- Por lo general, la compilación no mejora el rendimiento de un script.
+- En el caso de una falla, `Ahk2Exe` tiene códigos de salida que indican el tipo de error que ocurrió.
 
 ⠀
 
@@ -20,7 +22,7 @@ Compilador no oficial para AutoHotkey v2 en español.
 - [x] Detectar y remover comentarios en el script.
 - [x] Detectar y remover espacios innecesarios al inicio, final y otras partes en cada línea.
 - [x] Detectar y optimizar secciones de continuación.
-- [x] Soporte para compilar por medio de la línea de comandos.
+- [x] Soporte para compilar por medio de la línea de comandos + códigos de errores.
 - [x] Soporte para cambiar el icono principal.
 - [x] Soporte para añadir cualquier tipo de iconos y cursores.
 - [x] Soporte variado para añadir recursos en el ejecutable y crear nuevos tipos.
@@ -108,7 +110,7 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
   
     Además de los recursos especificados en la tabla de arriba, el compilador soporta los siguientes tipos de recursos que son detectados automáticamente por la extensión, o que puede especificarse de forma explícita: `*tipo`.
     
-    | Tipo de recurso | Descripción | Sección
+    | Tipo de recurso | Descripción | Sección |
     | --- | --- | --- |
     | .PNG | Imágenes PNG | RT_ICON |
     
@@ -122,7 +124,38 @@ El compilador de scripts acepta ciertas directivas que le permiten personalizar 
 
 # Códigos de salida (exitcodes)
 Los códigos de salida indican el tipo de error que ocurrió durante la compilación. Esto le será útil cuando compila un script por medio de la línea de comandos.
-**SIN SOPORTE AÚN**
+  - **General**
+    | Código de salida | Constante | Descripción |
+    | --- | --- | --- |
+    | 0x00 | ERROR_SUCCESS | Todas las operaciones se han realizado con éxito |
+    | 0x01 | UNKNOWN_ERROR | Error desconocido |
+    | 0x02 | ERROR_NOT_SUPPORTED | No soportado
+    | 0x03 | ERROR_INVALID_PARAMETER | Los parámetros pasados son inválidos |
+  
+  - **Apertura de archivos**
+    | Código de salida | Constante | Descripción |
+    | 0x10 | ERROR_SOURCE_NO_SPECIFIED | El archivo fuente no se ha especificado |
+    | 0x11 | ERROR_SOURCE_NOT_FOUND | El archivo fuente no existe |
+    | 0x12 | ERROR_CANNOT_OPEN_SCRIPT | No se ha podido abrir el archivo fuente script (incluyendo includes) para lectura |
+    | 0x13 | ERROR_BIN_FILE_NOT_FOUND | El archivo BIN no existe |
+    | 0x14 | ERROR_BIN_FILE_CANNOT_OPEN | No se ha podido abrir el archio BIN para lectura |
+    | 0x15 | ERROR_MAIN_ICON_NOT_FOUND | El icono principal no existe |
+    | 0x16 | ERROR_MAIN_ICON_CANNOT_OPEN | No se ha podido abrir el icono principal para lectura |
+    | 0x17 | ERROR_INVALID_MAIN_ICON | El icono principal es inválido |
+    | 0x18 | ERROR_INCLUDE_FILE_NOT_FOUND | El archivo a incluir no existe |
+    | 0x19 | ERROR_INCLUDE_DIR_NOT_FOUND | El directorio a incluir no existe |
+    | 0x20 | ERROR_FILEINSTALL_NOT_FOUND | El archivo a incluir especificado en FileInstall no existe |
+    | 0x21 | ERROR_RESOURCE_FILE_NOT_FOUND | El archivo de recurso a incluir no existe |
+    
+  - **Escritura de archivos**
+    | Código de salida | Constante | Descripción |
+    | 0x30 | ERROR_CANNOT_COPY_BIN_FILE | No se ha podido copiar el archivo BIN al destino |
+    | 0x31 | ERROR_CANNOT_OPEN_EXE_FILE | no se ha podido abrir el archivo destino EXE para escritura |
+    
+  - **Sintaxis**
+    | Código de salida | Constante | Descripción |
+    | 0x50 | ERROR_INVALID_SYNTAX_DIRECTIVE | La sintaxis de la directiva es inválida |
+    | 0x51 | ERROR_FILEINSTALL_INVALID_SYNTAX | La sintaxis de FileInstall es inválida |
 
 ⠀
 
