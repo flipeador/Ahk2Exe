@@ -261,7 +261,7 @@
     ; ======================================================================================================================================================
     ; Finalizar
     ; ======================================================================================================================================================
-    Util_Status("Compilando.. Terminando.")
+    Util_Status("La compilación a finalizado.")
     If (Data.Directives.PostExec != "")
     {
         Util_AddLog("INFO", "Se ha especificado un comando de post-ejecución", Data.Directives.PostExec)

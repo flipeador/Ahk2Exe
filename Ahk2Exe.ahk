@@ -20,8 +20,6 @@
 #Warn
 #NoTrayIcon
 #SingleInstance Off
-#InstallKeybdHook
-#UseHook
 #KeyHistory 0
 
 ListLines FALSE
@@ -158,7 +156,6 @@ If (CMDLN)
 
 ; variables super-globales necesarias cuando se muestra la interfaz GUI
 global Gui := 0        ; almacena el objeto GUI de la ventana principal
-global Log := ""       ; almacena una serie de registros de una operación en contreto separados por "`n"
 global wctrltimer := 0
 global ButtonStyle := [[3, 0xFEF5BF, 0xFEE88A, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [3, 0xFEDF63, 0xFED025, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [5, 0xFEDF63, 0xFED025, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [0, 0xFEF5BF, "Black", 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [3, 0xFEF5BF, 0xFEE88A, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 2], [0, 0xFEF5BF, "Black", 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1]]
 global ButtonStyle2 := [[0, 0xE1E1E1, "Black", 0x151515, 5, 0xFFFFFF, 0xADADAD, 1], [0, 0xE5F1FB, "Black", 0x151515, 5, 0xFFFFFF, 0x007CE1, 1], [0, 0xCCE4F7, "Black", 0x151515, 5, 0xFFFFFF, 0x005499, 1], [0, 0xE1E1E1, "Black", 0x808080, 5, 0xFFFFFF, 0xADADAD, 1], [0, 0xE1E1E1, "Black", 0x151515, 5, 0xFFFFFF, 0x007CE1, 2], [0, 0xE5F1FB, "Black", 0x151515, 1, 0xFFFFFF, 0x007CE1, 1]]
@@ -170,8 +167,8 @@ global     MAX_ICOITEMLIST := 10
 global WATER_BLOB_INTERVAL := 2500
 
 global WIN_MINIMIZED := -1
-     ,    WIN_NORMAL := 0
-     , WIN_MAXIMIZED := 1
+     ,    WIN_NORMAL :=  0
+     , WIN_MAXIMIZED :=  1
 
 global VK_F1 := 0x70    ; https://msdn.microsoft.com/en-us/library/windows/desktop/dd375731(v=vs.85).aspx
 
@@ -305,7 +302,7 @@ Gui.AddButton("x110 y426 w90 h22 vbabout", "Acerca de (F1)")
 Gui.AddLink("x210 y429 w200 h22 BackgroundFFFFFF vlnk", "<a href=`"https://autohotkey.com/`">https://autohotkey.com/</a>")
     WinSetTransColor("FFFFFF", "ahk_id" . Gui.Control["lnk"].Hwnd)
     GCT.Attach(Gui.Control["lnk"], "Ir a la página oficial de AutoHotkey")
-Gui.AddStatusBar("vsb +0x100", "Listo")
+Gui.AddStatusBar("vsb +0x100", "Inicializando ..")
     GCT.Attach(Gui.Control["sb"], "Muestra información del estado actual")
     WinSetTransColor(Format("{:06X}", COLOR_3DFACE), "ahk_id" . Gui.Control["sb"].Hwnd)
 
@@ -320,6 +317,8 @@ Gui.Show("w690 h481")
 OnMessage(0x100, "WM_KEYDOWN")    ; cuando se presiona una tecla que no sea del sistema (alt).
 OnMessage(0x200, "WM_MOUSEMOVE")  ; cuando se mueve el cursor en la ventana
 OnExit("_OnExit")    ; al terminar
+
+Util_Status()
 Return
 
 
@@ -461,7 +460,7 @@ Gui_CompileButton()
     Else
         Util_AddLog("ERROR", "Ha ocurrido un error durante el procesado del script", Script)
 
-    Util_Status("Listo")
+    Util_Status()
 }
 
 
@@ -503,7 +502,7 @@ WM_MOUSEMOVE(VKCode, Coords)
 
 _OnExit(ExitReason, ExitCode)
 {
-    global wctrltimer
+    Util_Status("Adios ...  =D")
     If (wctrltimer)
         SetTimer(wctrltimer, "Delete")
     DllCall("User32.dll\AnimateWindow", "Ptr", Gui.HWnd, "UInt", 350, "UInt", 0x00080000|0x00010000)
@@ -626,7 +625,7 @@ Util_LoadCompressionFiles(Default)
 Util_CheckCompressionFile(Name)
 {
     Name := InStr(Name, "upx") ? "upx.exe" : InStr(Name, "mpress ") ? "mpress.exe" : Name
-    Return FileExist(Name) ? "v" . FileGetVersion(Name) . A_Space : ""
+    Return IS_FILE(Name) ? "v" . FileGetVersion(Name) . A_Space : ""
 }
 
 Util_UpdateSrc()
@@ -668,7 +667,7 @@ Util_ClearLog()
 
 Util_LoadLogo()
 {
-    Local hBitmap := LoadImage(A_IsCompiled ? -1 : 0, "LOGO.BMP")
+    Local hBitmap := LoadImage(-1, "LOGO.BMP")
 
     If (A_PtrSize == 4)
     {
@@ -692,6 +691,9 @@ Util_LoadWaterCtrl()
 
     If (FileExist(A_Temp . "\waterctrl.dll"))
         Return LoadLibrary(A_Temp . "\waterctrl.dll")
+
+    If (FileExist(A_ScriptDir . "\waterctrl.dll"))
+        Return LoadLibrary(A_ScriptDir . "\waterctrl.dll")
 
     Local hExe := LoadLibrary(A_ScriptFullPath, 2), Size := 0
     FileOpen(A_Temp . "\waterctrl.dll", "w").RawWrite(LoadResource3(hExe, RT_RCDATA, "WATERCTRL.DLL", Size), Size)
@@ -724,7 +726,7 @@ Util_GetAhkPath()
     Return ""
 }
 
-Util_Status(Info)
+Util_Status(Info := "Listo. [posiciona el cursor sobre un control para ver información]")
 {
     If (!CMDLN)
         Gui.Control["sb"].SetText(Info)
@@ -746,7 +748,7 @@ Class Status
 
     __Delete()
     {
-        try Gui.Control["sb"].SetText("Listo")
+        Util_Status()
     }
 }
 

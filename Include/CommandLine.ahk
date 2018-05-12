@@ -58,7 +58,7 @@ ProcessCmdLine()
         Return ERROR_CANNOT_OPEN_SCRIPT
 
     If (ExeFile == "")
-        ExeFile := DirGetParent(AhkFile) . "\" . Path(AhkFile).FNNE . ".exe"
+        ExeFile := DirGetParent(AhkFile) . "\" . PATH(AhkFile).FNNE . ".exe"
     
     ObjRawSet(g_data, "IcoFile", IcoFile)
     Local Data := PreprocessScript(AhkFile)

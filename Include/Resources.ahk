@@ -132,7 +132,7 @@ LoadImage(hInstance, Name, Type := 0, W := 0, H := 0, Flags := "")
 {
     Local hExe := 0
     If (hInstance == -1)
-        hInstance := hExe := LoadLibrary(A_ScriptFullPath, 2)
+        hInstance := A_IsCompiled ? hExe := LoadLibrary(A_ScriptFullPath, 2) : 0
     Flags := Flags == "" ? (hInstance ? 0 : 0x10) : Flags
     Local hImage := DllCall("User32.dll\LoadImageW", "Ptr", hInstance, "UPtr", Type(Name) == "Integer" ? Name : &Name, "UInt", Type, "Int", W, "Int", H, "UInt", Flags, "Ptr")
     FreeLibrary(hExe)
