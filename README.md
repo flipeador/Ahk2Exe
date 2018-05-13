@@ -14,7 +14,7 @@
 
   - La compilación no garantiza la protección del código fuente.
   - La compilación no garantiza mejoras significativas de rendimiento.
-  - AutoHoykey es un lenguaje interpretado, por lo que realmente no posee un compilador **real**, `Ahk2Exe` no realiza ningún pasaje de código AHK a código máquina, realmente no compila nada, sino que procesa el script para reducir su tamaño y facilita la adición de recursos en el archivo destino EXE. Al momento de "Compilar" un script, lo que en realidad se esta haciendo, es copiar el archivo `BIN` al destino especificado con la extensión `EXE`, y luego se le añade el script como un recurso en `RT_RCDATA`.
+  - AutoHotkey es un lenguaje interpretado, por lo que realmente no posee un compilador **real**, `Ahk2Exe` no realiza ningún pasaje de código AHK a código máquina, realmente no compila nada, sino que procesa el script para reducir su tamaño y facilita la adición de recursos en el archivo destino EXE. Al momento de "Compilar" un script, lo que en realidad se esta haciendo, es copiar el archivo `BIN` al destino especificado con la extensión `EXE`, y luego se le añade el script como un recurso en `RT_RCDATA`.
 
 
 
@@ -23,7 +23,7 @@
 * * *
 
 
-
+<br><br>
 
 
 # Notas:
@@ -41,7 +41,7 @@
 * * *
 
 
-
+<br><br>
 
 
 # Características:
@@ -70,7 +70,7 @@
 * * *
 
 
-
+<br><br>
 
 
 # Compilación por línea de comandos
@@ -78,15 +78,15 @@ Aquí se detalla la sintaxis para poder compilar por medio de la línea de coman
 
 El orden de los parámetros especificados importa, por ejemplo, si especifica primero `iconfile.ahk` sin una ruta absoluta, se tendra en cuenta el directorio del compilador; por el contrario, si especifica `infile.ahk` antes, se tendra en cuenta el directorio de `infile.ahk`.
 
-##### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Sintaxis
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ```Ahk2Exe.exe [/in] infile.ahk [/out outfile.exe] [/icon iconfile.ico] [/bin binfile.bin] [/upx] [/mpress] [/quiet]```
+- ##### Sintaxis
+```Ahk2Exe.exe [/in] infile.ahk [/out outfile.exe] [/icon iconfile.ico] [/bin binfile.bin] [/upx] [/mpress] [/quiet]```
 
-##### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Descripción
+- ##### Descripción
 | Parámetro  | Descripción | Directorio de trabajo |
 | ---------- | ----------- | --------------------- |
 | infile.ahk | Archivo fuente AHK (script) que se va a compilar (obligatorio). | Compilador |
 | outfile.exe | Archivo destino EXE compilado. Si no se especifica, se establece en `infile.exe`. Si se especifica un directorio se establece en `\infile.exe`. Si no se especifica la extensión se añade automáticamente `.exe`; puede especificar cualquier extensión. Si el archivo ya existe, lo intenta sobreescribir. | infile.ahk o compilador |
-| iconfile.ico | Icono principal del archivo compilado. Si no se especifica se mantiee el icono por defecto de AutoHotkey. El icono principal puede ser establecido por medio de la directiva del compilador `@Ahk2Exe-SetMainIcon`. Tenga en cuenta que establecer un icono elimina todos los iconos por defecto de AHK, incluyendo iconos de _pausa_ (pause) y _suspensión_ (suspend). | infile.ahk o compilador |
+| iconfile.ico | Icono principal del archivo compilado. Si no se especifica se mantiene el icono por defecto de AutoHotkey. El icono principal puede ser establecido por medio de la directiva del compilador `@Ahk2Exe-SetMainIcon`. Tenga en cuenta que establecer un icono elimina todos los iconos por defecto de AHK, incluyendo iconos de _pausa_ (pause) y _suspensión_ (suspend). | infile.ahk o compilador |
 | binfile.bin | Archivo BIN AutoHotkey. Si no se especifica utiliza el último archivo BIN utilizado. En caso de no haber una configuración válida guardada se establece dependiendo de la arquitectura del compilador `Unicode %8*A_PtrSize%-bit`. Por ejemplo: `Unicode 64-bit` (la extensión es opcional) | Compilador |
 | /upx o /mpress | Especifica el método de compresión del archivo EXE resultante. Los archivos `upx.exe` y `mpress.exe` deben estar en el directorio junto al compilador. | Compilador |
 | /quiet o /q | Especifica que deben suprimirse todos los mensajes, diálogos y ventanas durante la compilación. Esta opción es útil si se aprovecha el código de salida, que le permite identificar el error ocurrido, si lo hubo. | - |
@@ -98,12 +98,14 @@ El orden de los parámetros especificados importa, por ejemplo, si especifica pr
 * * *
 
 
-
+<br><br>
 
 
 # Directivas específicas del compilador
 El compilador acepta ciertas directivas que le permiten personalizar aún más el script compilado `.exe`.
-##### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Directivas que controlan el comportamiento del script
+
+##### ++Directivas que controlan el comportamiento del script++
+
   - **`;@Ahk2Exe-IgnoreBegin`**`[Opción]`
 
     Es posible eliminar secciones de código del script compilado al encerrarlas en las directivas `@Ahk2Exe-IgnoreBegin` y `@Ahk2Exe-IgnoreEnd` como si fueran comentarios multilinea en bloque `/**/`.
@@ -136,7 +138,10 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
     MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
     ```
 
-##### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Directivas que controlan los metadatos ejecutables
+<br><br>
+
+##### ++Directivas que controlan los metadatos ejecutables++
+
   - **`;@Ahk2Exe-SetProp`**`Valor`    **(SIN SOPORTE AÚN)**
 
     Cambia una propiedad en la información de versión del ejecutable compilado. En la tabla siguiente se describen las propiedades disponibles y su descripción. Puede utilizar las propiedades descritas entre parentesis para evitar utilizar, por ejemplo, la propiedad `Name`, que cambia tanto el nombre del producto como el nombre interno.
@@ -209,7 +214,7 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
 * * *
 
 
-
+<br><br>
 
 
 # Códigos de salida (exitcodes)
@@ -262,7 +267,7 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
 * * *
 
 
-
+<br><br>
 
 
 # Pensamientos para futuras actualizaciones
