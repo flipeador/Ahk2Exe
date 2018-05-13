@@ -104,7 +104,7 @@ El orden de los parámetros especificados importa, por ejemplo, si especifica pr
 # Directivas específicas del compilador
 El compilador acepta ciertas directivas que le permiten personalizar aún más el script compilado `.exe`.
 
-##### <u>Directivas que controlan el comportamiento del script</u>
+- ##### Directivas que controlan el comportamiento del script
 
   - **`;@Ahk2Exe-IgnoreBegin`**`[Opción]`
 
@@ -140,7 +140,7 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
 
 <br><br>
 
-##### <u>Directivas que controlan los metadatos ejecutables</u>
+- ##### Directivas que controlan los metadatos ejecutables
 
   - **`;@Ahk2Exe-SetProp`**`Valor`    **(SIN SOPORTE AÚN)**
 
