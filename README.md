@@ -6,9 +6,9 @@
 
 ##### Durante el procesado del script, se tienen en cuenta los siguientes factores, ordenados en forma descendente de importancia.
 
-  1. ==Mejorar el rendimiento==, por más insignificante que éste sea. Este es el objetivo más importante, debido a la lentitud extrema de los lenguajes interpretados como lo es AHK.
-  2. Lograr ==reducir al máximo el tamaño del código==, quitando espacios y utilizando equivalentes más cortos en expresiones.
-  3. ==Ofuscar el código== (hacerlo lo más confuso posible) sin perdidas de rendimiento ni aumento del tamaño del código en lo absoluto.
+  1. `Mejorar el rendimiento`, por más insignificante que éste sea. Este es el objetivo más importante, debido a la lentitud extrema de los lenguajes interpretados como lo es AHK.
+  2. Lograr `reducir al máximo el tamaño del código`, quitando espacios y utilizando equivalentes más cortos en expresiones.
+  3. `Ofuscar el código` (hacerlo lo más confuso posible) sin perdidas de rendimiento ni aumento del tamaño del código en lo absoluto.
 
 ##### Debe tener en cuenta los siguientes puntos con respecto al compilador.
 
@@ -60,7 +60,7 @@
 - [ ] Soporte para cambiar la información de la versión. **[PRÓXIMAMENTE TOTALMENTE NATIVO EN AHK]**
 - [x] Soporte para cambiar el sub-sistema del ejecutable a modo consola.
 - [x] Soporte completo para las directivas `#Include` y `#IncludeAgain`. Soporte para variables (debe encerrarlas entre `%`).
-- [x] Soporte **==parcial==** para la función `FileInstall`. Evite los parentesis, expresiones (que no sean variables) y escriba la función en una línea completamente dedicada a ella. Soporte para variables.
+- [x] Soporte **parcial** para la función `FileInstall`. Evite los parentesis, expresiones (que no sean variables) y escriba la función en una línea completamente dedicada a ella. Soporte para variables.
 - [x] Soporte para compresión del archivo compilado con `UPX` y `MPRESS`.
 
 
@@ -86,7 +86,7 @@ El orden de los parámetros especificados importa, por ejemplo, si especifica pr
 | ---------- | ----------- | --------------------- |
 | infile.ahk | Archivo fuente AHK (script) que se va a compilar (obligatorio). | Compilador |
 | outfile.exe | Archivo destino EXE compilado. Si no se especifica, se establece en `infile.exe`. Si se especifica un directorio se establece en `\infile.exe`. Si no se especifica la extensión se añade automáticamente `.exe`; puede especificar cualquier extensión. Si el archivo ya existe, lo intenta sobreescribir. | infile.ahk o compilador |
-| iconfile.ico | Icono principal del archivo compilado. Si no se especifica se mantiee el icono por defecto de AutoHotkey. El icono principal puede ser establecido por medio de la directiva del compilador `@Ahk2Exe-SetMainIcon`. Tenga en cuenta que establecer un icono elimina todos los iconos por defecto de AHK, incluyendo iconos de ==pausa== (pause) y ==suspensión== (suspend). | infile.ahk o compilador |
+| iconfile.ico | Icono principal del archivo compilado. Si no se especifica se mantiee el icono por defecto de AutoHotkey. El icono principal puede ser establecido por medio de la directiva del compilador `@Ahk2Exe-SetMainIcon`. Tenga en cuenta que establecer un icono elimina todos los iconos por defecto de AHK, incluyendo iconos de _pausa_ (pause) y _suspensión_ (suspend). | infile.ahk o compilador |
 | binfile.bin | Archivo BIN AutoHotkey. Si no se especifica utiliza el último archivo BIN utilizado. En caso de no haber una configuración válida guardada se establece dependiendo de la arquitectura del compilador `Unicode %8*A_PtrSize%-bit`. Por ejemplo: `Unicode 64-bit` (la extensión es opcional) | Compilador |
 | /upx o /mpress | Especifica el método de compresión del archivo EXE resultante. Los archivos `upx.exe` y `mpress.exe` deben estar en el directorio junto al compilador. | Compilador |
 | /quiet o /q | Especifica que deben suprimirse todos los mensajes, diálogos y ventanas durante la compilación. Esta opción es útil si se aprovecha el código de salida, que le permite identificar el error ocurrido, si lo hubo. | - |
