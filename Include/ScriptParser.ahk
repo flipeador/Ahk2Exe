@@ -55,10 +55,12 @@
         ,    InComment := FALSE    ; determina si se está en un comentario en bloque
         ,  ContSection := FALSE    ; determina si se está en una continuación de una sección
         ,  IgnoreBegin := FALSE    ; determina si el código siguiente debe ser ignorado
+        ,         Keep := FALSE    ; determina si el comentario en bloque debe añadirse en el script compilado (no como comentario)
 
     VarSetCapacity(NewCode, FileGetSize(Script))    ; establecemos la capacidad de la variable que amlacenará el nuevo código, para mejorar el rendimiento
     VarSetCapacity(LineTxt, 65534 * 2)    ; capacidad de la variable que almacenará el texto de la línea actual
 
+    ; caracteres especiales regex \.*?+[{|()^$
     Loop Read, Script    ; abrimos el archivo para lectura y leemos línea por línea
     {
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -70,7 +72,8 @@
         If (InComment)    ; ¿comentario en bloque multilínea?
         {
             InComment := !(A_LoopReadLine ~= "^\s*\*/")
-            Continue
+            If (!InComment || !Keep)
+                Continue
         }
 
         If (IgnoreBegin)    ; ignorar líneas especificadas entre @Ahk2Exe-IgnoreBegin y @Ahk2Exe-IgnoreEnd
@@ -86,6 +89,7 @@
         If (A_LoopReadLine ~= "^\s*/\*")
         {
             InComment := !(A_LoopReadLine ~= "\*/\s*$")    ; ¿el comentario en bloque termina en la misma línea o no? (/* comentario */)
+            Keep := SubStr(A_LoopReadLine, 3, 13) = "@Ahk2Exe-Keep"
             Continue
         }
 
@@ -100,51 +104,57 @@
             bar := bar ? LTrim(SubStr(LineTxt, bar)) : ""    ; recupera el valor
 
 
-            If (Tree == "")    ; ¿estamos en el script principal?
+            ; ##############################################################################################################################################
+            ; Directivas que controlan los metadatos ejecutables que se añadirán al archivo EXE resultante
+            ; ##############################################################################################################################################
+            If (foo = "ConsoleApp")
+                Directives.Subsystem := IMAGE_SUBSYSTEM_WINDOWS_CUI
+
+            Else If (foo = "UseResourceLang")
             {
-                ; ##############################################################################################################################################
-                ; Directivas que controlan los metadatos ejecutables que se añadirán al archivo EXE resultante
-                ; ##############################################################################################################################################
-                If (foo = "SetMainIcon")    ; anula el ícono EXE personalizado utilizado para la compilación.
+                If (bar == "")
+                    Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-UseResourceLang", Script, A_Index)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-UseResourceLang.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                Else If (!(bar is "Integer"))
+                    Util_AddLog("ERROR", "El valor de idioma en @Ahk2Exe-UseResourceLang es inválido", Script, A_Index)
+                  , Util_Error("El valor de idioma en @Ahk2Exe-UseResourceLang es inválido.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                Else
+                    Directives.ResourceLang := bar
+            }
+
+            Else If (foo = "PostExec")
+            {
+                If (bar == "")
+                    Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-PostExec", Script, A_Index)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-PostExec.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                Else
+                    Directives.PostExec := bar
+            }
+
+            Else If (foo = "AddResource")
+            {
+                If (bar == "")
+                    Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-AddResource", Script, A_Index)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-AddResource.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                Else
+                    ObjPush(Directives.Resources, ParseResourceStr(bar, A_Index, Script))
+            }
+
+            Else If (foo ~= "i)^Set")
+            {
+                If (foo = "SetMainIcon")
                 {
-                    If (bar == "")    ; ¿no se especificó nada luego del comando?
-                        Util_Error("Uso inválido de la directiva @Ahk2Exe-SetMainIcon.`nDebe especificar un icono.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
-                    Else If (DirExist(bar := GetFullPathName(bar)) || !FileExist(bar))
-                        Util_Error("Error en la directiva @Ahk2Exe-SetMainIcon.`nEl archivo icono especificado no existe.`n" . bar . "`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                    If (bar == "")
+                        Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-SetMainIcon", Script, A_Index)
+                      , Util_Error("Uso inválido de la directiva @Ahk2Exe-SetMainIcon.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                    Else If (!IS_FILE(bar := GetFullPathName(bar)))
+                        Util_AddLog("ERROR", "El icono especificado en @Ahk2Exe-SetMainIcon no existe", Script, A_Index)
+                      , Util_Error("El icono especificado en @Ahk2Exe-SetMainIcon no existe.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
                     Else
                         Directives.MainIcon := bar
                 }
 
-                Else If (foo = "ConsoleApp")    ; cambia el subsistema ejecutable al modo consola
-                    Directives.Subsystem := IMAGE_SUBSYSTEM_WINDOWS_CUI
-
-                Else If (foo = "UseResourceLang")    ; cambia el lenguaje de recursos utilizado por @Ahk2Exe-AddResource
-                {
-                    If (bar == "")
-                        Util_Error("Uso inválido de la directiva @Ahk2Exe-UseResourceLang.`nDebe especificar un código de idioma.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
-                    Else If (!(bar is "Integer"))
-                        Util_Error("Error en la directiva @Ahk2Exe-UseResourceLang.`nEl valor de idioma especificado es inválido.`n" . bar . "`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
-                    Else
-                        Directives.ResourceLang := bar
-                }
-
-                Else If (foo = "PostExec")    ; especifica un comando que se ejecutará después de una compilación exitosa
-                {
-                    If (bar == "")
-                        Util_Error("Uso inválido de la directiva @Ahk2Exe-PostExec.`nDebe especificar un comando ha ejecutar después de la compilación.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
-                    Else
-                        Directives.PostExec := bar
-                }
-
-                Else If (foo = "AddResource")
-                {
-                    If (bar == "")
-                        Util_Error("Uso inválido de la directiva @Ahk2Exe-AddResource.`nDebe especificar un recurso ha añadir al archivo EXE resultante.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
-                    Else
-                        ObjPush(Directives.Resources, ParseResourceStr(bar, A_Index, Script))
-                }
-
-                Else    ; información de la versión
+                Else
                 {
                     If (foo = "SetCompanyName")
                         Directives.CompanyName := bar
@@ -171,14 +181,34 @@
             ; ##############################################################################################################################################
             ; Directivas que controlan el comportamiento del script
             ; ##############################################################################################################################################
-            If (foo = "IgnoreBegin")    ; ¿ignorar todas las líneas entre IgnoreBegin y IgnoreEnd?
-                IgnoreBegin := TRUE
+            Else If (foo = "IgnoreBegin")
+            {
+                If (bar == "")
+                    IgnoreBegin := TRUE
+                Else If (bar == "32")
+                    IgnoreBegin := !g_data.Compile64
+                Else If (bar == "64")
+                    IgnoreBegin := g_data.Compile64
+                Else
+                    Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-IgnoreBegin", Script, A_Index)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-IgnoreBegin.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)   
+            }
+
+            Else If (foo = "IgnoreEnd")
+                Continue
+
+            Else
+                Util_AddLog("ERROR", "El comando de directiva @Ahk2Exe especificado es inválido", Script, A_Index)
+              , Util_Error("El comando de directiva @Ahk2Exe especificado es inválido.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_UNKNOWN_DIRECTIVE_COMMAND : NO_EXIT)
 
 
             If (ERROR)
                 Return FALSE
             Continue
         }
+
+        If (A_LoopReadLine ~= "i)^\s*/\*@Ahk2Exe-Keep")
+            Keep := TRUE
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -409,7 +439,7 @@
             2. Lograr reducir al máximo el tamaño del código, quitando espacios y utilizando equivalentes más cortos en expresiones.
             3. Ofuscar el código (hacerlo lo más confuso posible) sin perdidas de rendimiento ni aumento del tamaño del código en lo absoluto.
 */
-;MsgBox ProcessLine("Return -1 +  3 (1) . '`"X ' . /*Comment*/ expr1 OR expr2 AND expr3 `; Comment", {}) ; return -1+3 (1) '"X ' expr1||expr2&&expr3
+;MsgBox ProcessLine("Return -1 +  3 (1) . '`"X ' . /*Comment*/ expr1 OR expr2 AND expr3 `; Comment", {})   ; return -1+3 (1) '"X ' expr1||expr2&&expr3
 ;MsgBox ProcessLine("expr, expr,  expr", {})    ; expr,expr,expr
 ProcessLine(Txt, Data)
 {
@@ -455,6 +485,7 @@ ProcessLine(Txt, Data)
             Continue
         }
 
+        ; aquí se procesan las cadenas de caracteres
         If (Char[0] == "`"" || Char[0] == "'")    ; expr "string" 'string' expr
         {
             If (Data.ContSection || (!Escape && Char[A_Index] == Char[0]))
@@ -470,6 +501,7 @@ ProcessLine(Txt, Data)
             Continue
         }
 
+        ; todo aquí abajo procesa las expresiones
         Char[A_Index] := Format("{:L}", Char[A_Index])    ; transforma todos los caracteres a minúsculas
 
         If (Char[A_Index] == ";")    ; foo ;comment
@@ -519,6 +551,8 @@ ProcessLine(Txt, Data)
         {
             Char[-1] := RTrim(SubStr(Txt, 1, A_Index-1))
             If (RegExReplace(Char[-1], "\w") != "" || Char[-1] ~= "\s")    ; evita "Return -1" --> "Return-1" || "XXX -1" --> "XXX-1" al comienzo de la línea siendo X letras o números (una función sin parentesis)
+                                                                           ; esto tiene una limitante, y es que si se utiliza una función sin parentesis que contiene por lo menos una letra que no sea del alfabeto
+                                                                           ; inglés generará un código con errores; Como por ejemplo "FuncionÑ -1" --> "FuncionÑ-1" que es inválido
                 NewTxt := RTrim(NewTxt), Skip := "R"
         }
 
@@ -558,7 +592,7 @@ class TempWorkingDir
         ; nota 1: diferencias entre A_ScriptDir, A_WorkingDir y A_InitialWorkingDir
         ;   A_ScriptDir siempre es el directorio del script (compilado o no)
         ;   A_WorkingDir es el directorio de trabajo actual del script, por defecto al iniciar un script es el mismo que A_ScriptDir
-        ;   A_InitialWorkingDir es el directorio de trabajo especificado por la aplicación que inició nuestro script (no nos interesa)
+        ;   A_InitialWorkingDir es el directorio de trabajo "especificado por/de la" la aplicación que inició nuestro script
         ; nota 2: el directorio de trabajo es aquel directorio que se utilizará cuando se especifique una ruta no absoluta en cualquier función que espere una ruta de archivo/carpeta
         ObjRawSet(this, "OldWorkingDir", A_WorkingDir)
         A_WorkingDir := WorkingDir

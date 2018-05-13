@@ -25,6 +25,7 @@
 ListLines FALSE
 DetectHiddenWIndows "On"
 SetRegView 64
+FileEncoding "UTF-8"    ; unicode
 
 
 
@@ -44,6 +45,7 @@ SetRegView 64
 #Include <ChooseFile>
 #Include <GuiControlTips>
 #Include <GetFullPathName>
+#Include <GetBinaryType>
 #Include <Gdiplus\Gdiplus>
 
 ; Include\
@@ -143,9 +145,19 @@ global           ERROR_SUCCESS := 0x00    ; todas las operaciones se han realiza
      , ERROR_CANNOT_OPEN_EXE_FILE := 0x31    ; no se ha podido abrir el archivo destino EXE para escritura
      ; ---- SINTAXIS ----
      ,   ERROR_INVALID_SYNTAX_DIRECTIVE := 0x50    ; la sintaxis de la directiva es inválida
-     , ERROR_FILEINSTALL_INVALID_SYNTAX := 0x51    ; la sintaxis de FileInstall es inválida
+     ,  ERROR_UNKNOWN_DIRECTIVE_COMMAND := 0x51    ; la directiva especificada es desconocida
+     , ERROR_FILEINSTALL_INVALID_SYNTAX := 0x52    ; la sintaxis de FileInstall es inválida
      ; ---- OTROS ----
      , NO_EXIT := 0x00
+
+; https://msdn.microsoft.com/en-us/library/aa364819(VS.85).aspx
+global SCS_32BIT_BINARY := 0    ; A 32-bit Windows-based application
+     ,   SCS_DOS_BINARY := 1    ; An MS-DOS – based application
+     ,   SCS_WOW_BINARY := 2    ; A 16-bit Windows-based application
+     ,   SCS_PIF_BINARY := 3    ; A PIF file that executes an MS-DOS – based application
+     , SCS_POSIX_BINARY := 4    ; A POSIX – based application
+     , SCS_OS216_BINARY := 5    ; A 16-bit OS/2-based application
+     , SCS_64BIT_BINARY := 6    ; A 64-bit Windows-based application
 
 
 ; determina si se pasaron parámetros al compilador
@@ -191,9 +203,11 @@ Gui := GuiCreate("-DPIScale -Resize -MaximizeBox +MinSize690x481 +E0x00000400", 
     GCT.SetFont("Italic", "Segoe UI")
 Gui.SetFont("s9", "Segoe UI")
 
+;@Ahk2Exe-IgnoreBegin 64
 If (A_PtrSize == 4)    ; solo la versión de 32-Bit soporta waterctrl
     Gui.AddText("x0 y0 w690 h110 vlogo"), Util_LoadWaterCtrl(), Util_EnableWater(Gui.Control["logo"].Hwnd, Util_LoadLogo())
 Else
+;@Ahk2Exe-IgnoreEnd
     Gui.AddPic("x0 y0 w690 h110 vlogo", "HBITMAP:" . Util_LoadLogo())
 Gui.AddButton("x318 y4 w368 h100 vinfo Left", "  ©2004-2009 Chris Mallet`n  ©2008-2011 Steve Gray (Lexikos)`n  ©2011-2018 fincs`n  ©2018-2018 Flipeador`n`n  Nota: La compilación no garantiza la protección del código fuente.")
     DllCall("User32.dll\SetParent", "Ptr", Gui.Control["info"].Hwnd, "Ptr", Gui.Control["logo"].Hwnd)
@@ -447,13 +461,19 @@ Gui_CompileButton()
     ERROR := FALSE
     Util_ClearLog()
 
+    Local BinaryType := 0
+    ObjRawSet(g_data, "BinFile", Util_CheckBinFile(CB_GetText(Gui.Control["ddlbin"]), BinaryType))
+    ObjRawSet(g_data, "Compile64", BinaryType == SCS_64BIT_BINARY)
+    If (!g_data.BinFile)
+        Return Util_Error("El archivo BIN no existe.", g_data.BinFile)
+
     Local Script := CB_GetText(Gui.Control["ddlsrc"])
         ,   Data := PreprocessScript(Script)
 
     If (Data)
     {
         If (AhkCompile(Data))
-            Util_AddLog("OK", "La compilación a finalizado con éxito", Script)
+            Util_AddLog("OK", "La compilación a finalizado con éxito", DirGetParent(Script) . "\" . PATH(Script).FNNE . ".exe")
         Else
             Util_AddLog("ERROR", "Ha ocurrido un error durante la compilación", Script)
     }
@@ -474,7 +494,7 @@ WM_KEYDOWN(VKCode, lParam)
 {
     If (VKCode == VK_F1)
     {
-        Gui.Control["sb"].SetText("Mostrando Acerca de.. (F1)")
+        Util_Status("Mostrando Acerca de.. (F1)")
         TaskDialog(INFO_ICON, [Gui.Title,"Acerca de.."], ["Ahk2Exe - Script to EXE Converter`n-----------------------------------`n`n"
                                                         . "Original version:`n"
                                                         . "Copyright ©1999-2003 Jonathan Bennett & AutoIt Team`n"
@@ -484,7 +504,7 @@ WM_KEYDOWN(VKCode, lParam)
                                                         . "Copyright ©2011-2018 fincs`n"
                                                         . "Copyright ©2018-2018 Flipeador"
                                                         , "flipeador@gmail.com"] )
-        Gui.Control["sb"].SetText("Listo")
+        Util_Status()
     }
 } ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms646280(v=vs.85).aspx
 
@@ -603,14 +623,14 @@ Util_LoadBinFiles(Default)
     CB_SetSelection(Gui.Control["ddlbin"], CB_FindString(Gui.Control["ddlbin"], SubStr(Default, 1, -4),, 2))
 }
 
-Util_CheckBinFile(Name)
+Util_CheckBinFile(Name, ByRef BinaryType := "")
 {
-    Local BinFile := ""
-    If (Name ~= "^v")
-        Return IS_FILE(BinFile := SubStr(Name, InStr(Name, A_Space)+1) . ".bin") ? BinFile : 0
+    Local BinFile := RegExReplace(Name, "v(\d\.?)+\s*")    ; remueve la versión del archivo al inicio "v2.0.0.0 XXX..." --> "XXX..."
+    If (PATH(BinFile).Ext == "")
+        BinFile .= ".bin"
 
-    Name .= Path(Name).Ext == "" ? ".bin" : ""
-    Return IS_FILE(Name) ? Name : 0 
+    BinaryType := GetBinaryType(BinFile)
+    Return BinaryType == SCS_32BIT_BINARY || BinaryType == SCS_64BIT_BINARY ? BinFile : FALSE
 }
 
 Util_LoadCompressionFiles(Default)
@@ -669,6 +689,7 @@ Util_LoadLogo()
 {
     Local hBitmap := LoadImage(-1, "LOGO.BMP")
 
+    ;@Ahk2Exe-IgnoreBegin 64
     If (A_PtrSize == 4)
     {
         ; necesario rotar la imagen para la correcta visualización con waterctrl
@@ -680,6 +701,7 @@ Util_LoadLogo()
         DllCall("Gdiplus.dll\GdipCreateHBITMAPFromBitmap", "UPtr", pBitmap, "PtrP", hBitmap, "Int", 0xFFFFFFFF)
         DllCall("Gdiplus.dll\GdipDisposeImage", "UPtr", pBitmap)
     }
+    ;@Ahk2Exe-IgnoreEnd
 
     Return hBitmap
 }

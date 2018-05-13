@@ -6,12 +6,21 @@
                 [/upx]                                     | compiler WorkingDir\upx.exe
                 [/mpress]                                  | compiler WorkingDir\mpress.exe
                 [/q] | [/quiet]                            | no muestra ningún mensaje
+    Ejemplos:
+        Compila el archivo "Script.ahk" en el mismo directorio que el compilador, suprime mensajes y el archivo destino es d:\Script.exe.
+            Ahk2Exe.exe Script.ahk /out d: /q
+        Compila el archivo "C:\Script.ahk", suprime mensajes, establece el icono "ICO.ico" y el archivo destino es "D:\ScriptC.exe"
+            Ahk2Exe.exe C:\Script.ahk /q /icon ICO.ico /out D:\ScriptC
+        Compila el archivo "Script.ahk" y el archivo destino es "XXX.bin"
+            Ahk2Exe.exe Script.ahk /out XXX.bin
+        Compila el archivo "Script.ahk" y el archivo destino es "Script.exe" comprimido con MPRESS
+            Ahk2Exe.exe Script.ahk /mpress
 */
 ProcessCmdLine()
 {
     Local           n := 1
         , Compression := Cfg.Compression
-        ,     BinFile := IS_FILE(Cfg.LastBinFile) ? Cfg.LastBinFile : "Unicode " . 8*A_PtrSize . "-bit"
+        ,     BinFile := Util_CheckBinFile(Cfg.LastBinFile) ? Cfg.LastBinFile : "Unicode " . 8*A_PtrSize . "-bit"
         ,     AhkFile := ""
         ,     ExeFile := ""
         ,     IcoFile := ""
@@ -59,7 +68,16 @@ ProcessCmdLine()
 
     If (ExeFile == "")
         ExeFile := DirGetParent(AhkFile) . "\" . PATH(AhkFile).FNNE . ".exe"
+    Else If (DirExist(ExeFile))
+        ExeFile := RTrim(ExeFile, "\") . "\" . PATH(AhkFile).FNNE . ".exe"
+    Else If (PATH(ExeFile).Ext == "")
+        ExeFile .= ".exe"
     
+    Local BinaryType := 0
+    If (!Util_CheckBinFile(BinFile, BinaryType))
+        Return ERROR_BIN_FILE_NOT_FOUND
+    ObjRawSet(g_data, "Compile64", BinaryType == SCS_64BIT_BINARY)
+
     ObjRawSet(g_data, "IcoFile", IcoFile)
     Local Data := PreprocessScript(AhkFile)
     If (!Data)

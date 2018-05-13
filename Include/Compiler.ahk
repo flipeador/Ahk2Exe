@@ -10,17 +10,16 @@
     ; ======================================================================================================================================================
     Util_Status("Compilando.. Comprobando archivos.")
 
-    Local BinFile := Util_CheckBinFile(CMDLN ? g_data.BinFile : CB_GetText(Gui.Control["ddlbin"]))
-    If (!BinFile)    ; ¿el archivo BIN no existe?
+    If (!Util_CheckBinFile(g_data.BinFile))
     {
-        Util_AddLog("ERROR", "El archivo BIN no se ha encontrado", BinFile,, Data.Script)
-        Return Util_Error("El archivo BIN no existe.", BinFile, CMDLN ? ERROR_BIN_FILE_NOT_FOUND : NO_EXIT)
+        Util_AddLog("ERROR", "El archivo BIN no se ha encontrado", g_data.BinFile,, Data.Script)
+        Return Util_Error("El archivo BIN no existe.", g_data.BinFile, CMDLN ? ERROR_BIN_FILE_NOT_FOUND : NO_EXIT)
     }
 
-    If (!FileOpen(BinFile, "r"))
+    If (!FileOpen(g_data.BinFile, "r"))
     {
-        Util_AddLog("ERROR", "El archivo BIN no se ha podido abrir para lectura", BinFile,, Data.Script)
-        Return Util_Error("El archivo BIN no se ha podido abrir para lectura.", BinFile, CMDLN ? ERROR_BIN_FILE_CANNOT_OPEN : NO_EXIT)
+        Util_AddLog("ERROR", "El archivo BIN no se ha podido abrir para lectura", g_data.BinFile,, Data.Script)
+        Return Util_Error("El archivo BIN no se ha podido abrir para lectura.", g_data.BinFile, CMDLN ? ERROR_BIN_FILE_CANNOT_OPEN : NO_EXIT)
     }
 
     Local ExeFile := CMDLN ? g_data.ExeFile : Gui.Control["edest"].Text
@@ -60,10 +59,10 @@
     }
 
     FileSetAttrib("N", ExeFile)    ; evita errores bajo ciertas condiciones
-    If (!FileCopy(BinFile, ExeFile, TRUE))    ; ¿no se pudo copiar el archivo BIN al destino?
+    If (!FileCopy(g_data.BinFile, ExeFile, TRUE))    ; ¿no se pudo copiar el archivo BIN al destino?
     {
         Util_AddLog("ERROR", "No se ha podido copiar el archivo BIN al destino", ExeFile,, Data.Script)
-        Return Util_Error("No se ha podido copiar el archivo BIN al destino.`n" . BinFile, ExeFile, CMDLN ? ERROR_CANNOT_COPY_BIN_FILE : NO_EXIT)
+        Return Util_Error("No se ha podido copiar el archivo BIN al destino.`n" . g_data.BinFile, ExeFile, CMDLN ? ERROR_CANNOT_COPY_BIN_FILE : NO_EXIT)
     }
 
 
