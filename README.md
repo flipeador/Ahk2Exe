@@ -274,7 +274,24 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
 
 
 # Pensamientos para futuras actualizaciones
-- Mejorar el procesado del Script para reducir al máximo el tamaño del archivo compilado y, si es posible, mejorar el rendimiento.
-- Mejorar el soporte para incluir recursos.
-- Mejorar soporte de la función `FileInstall`.
-- Implementar más opciones en la interfaz.
+  - Mejorar el procesado del Script para reducir al máximo el tamaño del archivo compilado y, si es posible, mejorar el rendimiento.
+  - Mejorar el soporte para incluir recursos.
+  - Mejorar soporte de la función `FileInstall`.
+  - Implementar más opciones en la interfaz.
+
+
+
+
+
+* * *
+
+
+<br><br>
+
+
+# Agradecimientos
+  - ##### [Chris Mallet](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=2) - Por el fantástico AutoHotkey.
+  - ##### [lexikos](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=77) - Por AutoHotkey v2.
+  - ##### [fincs](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=100)   - Este compilador esta basado en [Ahk2Exe de fincs](https://autohotkey.com/boards/viewtopic.php?f=24&t=521). Fue de mucha ayuda su clase **VersionInfo**, gracias a ella este compilador soporta modificación nativa en AHK para la información de la versión.
+  - ##### [just me](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=148) - Por sus increibles funciones [ImageButton](https://autohotkey.com/boards/viewtopic.php?f=6&t=1103) y [LinearGradient](https://autohotkey.com/boards/viewtopic.php?f=6&t=3593&p=18573).
+  - ##### Toda la comunidad de [AutoHotkey.com](https://autohotkey.com/).
