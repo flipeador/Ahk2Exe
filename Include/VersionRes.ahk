@@ -1,4 +1,24 @@
-﻿Class VersionRes
+﻿/*
+    Referencias:
+        VS_VERSIONINFO structure
+        https://msdn.microsoft.com/en-us/library/windows/desktop/ms647001(v=vs.85).aspx
+
+        StringFileInfo structure
+        https://msdn.microsoft.com/en-us/library/windows/desktop/ms646989(v=vs.85).aspx
+
+        StringTable structure
+        https://msdn.microsoft.com/en-us/library/windows/desktop/ms646992(v=vs.85).aspx
+
+        String structure
+        https://msdn.microsoft.com/en-us/library/windows/desktop/ms646987(v=vs.85).aspx
+
+        VarFileInfo structure
+        https://msdn.microsoft.com/en-us/library/windows/desktop/ms646995(v=vs.85).aspx
+
+        Var structure
+        https://msdn.microsoft.com/en-us/library/windows/desktop/ms646994(v=vs.85).aspx
+*/
+Class VersionRes
 {
     ; ===================================================================================================================
     ; INSTANCE VARIABLES

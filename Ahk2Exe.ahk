@@ -1,11 +1,12 @@
-﻿;@Ahk2Exe-SetDescription     AutoHotkey Script Compilador
-;@Ahk2Exe-SetFileVersion     1.0.0.0
-;@Ahk2Exe-SetProductVersion  2.0.0.0
-;@Ahk2Exe-SetName            Ahk2Exe
-;@Ahk2Exe-SetCopyright       Copyright (c) 2004
-;@Ahk2Exe-SetCompanyName     AutoHotkey
-;@Ahk2Exe-SetOrigFilename    Ahk2Exe.ahk
-;@Ahk2Exe-SetMainIcon        Ahk2Exe.ico
+﻿;@Ahk2Exe-SetDescription      AutoHotkey Script Compilador
+;@Ahk2Exe-SetFileVersion      1.0.0.0
+;@Ahk2Exe-SetProductVersion   2.0.0.0
+;@Ahk2Exe-SetName             Ahk2Exe
+;@Ahk2Exe-SetCopyright        Copyright (c) 2004
+;@Ahk2Exe-SetCompanyName      AutoHotkey
+;;@Ahk2Exe-SetOrigFilename    Ahk2Exe.ahk
+
+;@Ahk2Exe-SetMainIcon         Ahk2Exe.ico
 
 ;@Ahk2Exe-AddResource logo.bmp
 ;@Ahk2Exe-AddResource waterctrl.dll
