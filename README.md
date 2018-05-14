@@ -275,7 +275,6 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
 
 # Pensamientos para futuras actualizaciones
 - Mejorar el procesado del Script para reducir al máximo el tamaño del archivo compilado y, si es posible, mejorar el rendimiento.
-- Añadir soporte para modificar la información de la versión.
 - Mejorar el soporte para incluir recursos.
 - Mejorar soporte de la función `FileInstall`.
 - Implementar más opciones en la interfaz.
