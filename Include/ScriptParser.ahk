@@ -500,7 +500,7 @@ ProcessLine(Txt, Data)
         }
 
         ; todo aquí abajo procesa las expresiones
-        Char[A_Index] := Format("{:L}", Char[A_Index])    ; transforma todos los caracteres a minúsculas
+        ;Char[A_Index] := Format("{:L}", Char[A_Index])    ; transforma todos los caracteres a minúsculas
 
         If (Char[A_Index] == ";")    ; foo ;comment
         {
