@@ -90,7 +90,7 @@ LoadResource2(hExe, hResInfo)
     Return LockResource(LoadResource(hExe, hResInfo))
 }
 
-LoadResource3(hExe, ResType, ResName, ByRef Size, LangID := "")
+LoadResource3(hExe, ResType, ResName, ByRef Size := "", LangID := "")
 {
     Local hResInfo := FindResource(hExe, ResType, ResName, LangID)
     Size := SizeofResource(hExe, hResInfo)

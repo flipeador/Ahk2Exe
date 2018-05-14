@@ -47,6 +47,7 @@ FileEncoding "UTF-8"    ; unicode
 #Include <GuiControlTips>
 #Include <GetFullPathName>
 #Include <GetBinaryType>
+#Include <Language>
 #Include <Gdiplus\Gdiplus>
 
 ; Include\

@@ -194,24 +194,21 @@
                 AddResource(hUpdate, foo.ResType, foo.ResName, &Buffer, Size, Data)    ; si es necesario, se crea el nuevo tipo de recurso con el nombre en foo.ResType
         }
 
-        hIconFile := 0
-        VarSetCapacity(Buffer, 0)
+        hIconFile := 0, VarSetCapacity(Buffer, 0)
     }
     
     ; establecemos la información de la versión
-    
-    Local pVS_VERSIONINFO := LoadResource3(hExe, RT_VERSION, 1, Size, SUBLANG_ENGLISH_US)
+    Local pVS_VERSIONINFO := LoadResource3(hExe, RT_VERSION, 1)
         ,          VerRes := new VersionRes(pVS_VERSIONINFO)
         ,         VerInfo := VerRes.GetChild("StringFileInfo").GetChild("040904B0")
     
-    VerInfo.DeleteAll()
-    For g_k, g_v in Data.Directives.VersionInfo
-        VerInfo.AddChild(VerInfo.CreateChild(1, g_k, g_v))
+    VerInfo.DeleteAll()    ; eliminamos todas las propiedades
+    For g_k, g_v in Data.Directives.VersionInfo    ; añadimos las nuevas propiedades
+        VerInfo.AddChild(VerInfo.CreateChild(1, g_k, g_v))    ; 1 = TEXT | g_k = Prop | g_v = Value
     
-    VarSetCapacity(Buffer, VerRes.GetSize())
-    AddResource(hUpdate, RT_VERSION, 1, &Buffer, VerRes.Save(&Buffer), SUBLANG_ENGLISH_US)
-    Buffer := VerRes := VerInfo := ""
-
+    VarSetCapacity(Buffer, VerRes.GetSize())    ; Buffer es la nueva estructura VS_VERSIONINFO
+    AddResource(hUpdate, RT_VERSION, 1, &Buffer, VerRes.Save(&Buffer))
+    Buffer := VerRes := VerInfo := "", VarSetCapacity(Buffer, 0)
 
     ; cerramos el archivo destino
     FreeLibrary(hExe), EndUpdateResource(hUpdate)
