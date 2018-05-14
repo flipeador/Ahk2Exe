@@ -107,11 +107,11 @@
                 If (bar == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-UseResourceLang", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-UseResourceLang.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
-                Else If (!(bar is "Integer"))
+                Else If (!(bar is "Integer") || !LCIDToLocaleName(bar))
                     Util_AddLog("ERROR", "El valor de idioma en @Ahk2Exe-UseResourceLang es inválido", Script, A_Index)
                   , Util_Error("El valor de idioma en @Ahk2Exe-UseResourceLang es inválido.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
                 Else
-                    ObjRawSet(Directives, "ResourceLang", bar)
+                    ObjRawSet(Directives, "ResourceLang", Integer(bar))
             }
 
             Else If (foo = "PostExec")
@@ -171,7 +171,7 @@
                     Else If (foo = "SetComments")
                         ObjRawSet(Directives.VersionInfo, "Comments", bar)
                     Else
-                        ObjRawSet(Directives.VersionInfo, SubStr(foo, 4), bar)
+                        ObjRawSet(Directives.VersionInfo, SubStr(foo, 4), bar)    ; SetXXX
                 }
             }
 
