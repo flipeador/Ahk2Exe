@@ -55,6 +55,7 @@ FileEncoding "UTF-8"    ; unicode
 #Include Resources.ahk
 #Include CommandLine.ahk
 #Include Std.ahk
+#Include VersionRes.ahk
 
 
 
@@ -144,9 +145,9 @@ global           ERROR_SUCCESS := 0x00    ; todas las operaciones se han realiza
      , ERROR_CANNOT_COPY_BIN_FILE := 0x30    ; no se ha podido copiar el archivo BIN al destino
      , ERROR_CANNOT_OPEN_EXE_FILE := 0x31    ; no se ha podido abrir el archivo destino EXE para escritura
      ; ---- SINTAXIS ----
-     ,   ERROR_INVALID_SYNTAX_DIRECTIVE := 0x50    ; la sintaxis de la directiva es inválida
+     ,   ERROR_INVALID_DIRECTIVE_SYNTAX := 0x50    ; la sintaxis de la directiva es inválida
      ,  ERROR_UNKNOWN_DIRECTIVE_COMMAND := 0x51    ; la directiva especificada es desconocida
-     , ERROR_FILEINSTALL_INVALID_SYNTAX := 0x52    ; la sintaxis de FileInstall es inválida
+     , ERROR_INVALID_FILEINSTALL_SYNTAX := 0x52    ; la sintaxis de FileInstall es inválida
      ; ---- OTROS ----
      , NO_EXIT := 0x00
 

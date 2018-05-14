@@ -199,7 +199,16 @@
     }
     
     ; establecemos la información de la versión
-    ; ...
+    Local pVS_VERSIONINFO := LoadResource3(hExe, RT_VERSION, 1, Size, SUBLANG_ENGLISH_US)
+        ,          VerRes := new VersionRes(pVS_VERSIONINFO)
+        ,         VerInfo := VerRes.GetChild("StringFileInfo").GetChild("040904B0")
+    
+    VerInfo.DeleteAll()
+    For g_k, g_v in Data.Directives.VersionInfo
+        VerInfo.AddChild(VerInfo.CreateChild(1, g_k, g_v))
+
+    VarSetCapacity(Buffer, VerInfo.GetSize())
+    AddResource(hUpdate, RT_VERSION, 1, &Buffer, VerRes.Save(&Buffer), SUBLANG_ENGLISH_US)
 
     ; cerramos el archivo destino
     FreeLibrary(hExe), EndUpdateResource(hUpdate)

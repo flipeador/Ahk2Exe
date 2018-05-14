@@ -57,7 +57,7 @@
 - [x] Soporte para añadir cualquier tipo de iconos y cursores.
 - [x] Soporte variado para añadir recursos en el ejecutable y crear nuevos tipos.
 - [x] Soporte para establecer el lenguaje de los recursos añadidos
-- [ ] Soporte para cambiar la información de la versión. **[PRÓXIMAMENTE TOTALMENTE NATIVO EN AHK]**
+- [x] Soporte para cambiar la información de la versión.
 - [x] Soporte para cambiar el sub-sistema del ejecutable a modo consola.
 - [x] Soporte completo para las directivas `#Include` y `#IncludeAgain`. Soporte para variables (debe encerrarlas entre `%`).
 - [x] Soporte **parcial** para la función `FileInstall`. Evite los parentesis, expresiones (que no sean variables) y escriba la función en una línea completamente dedicada a ella. Soporte para variables.
@@ -79,7 +79,8 @@ Aquí se detalla la sintaxis para poder compilar por medio de la línea de coman
 El orden de los parámetros especificados importa, por ejemplo, si especifica primero `iconfile.ahk` sin una ruta absoluta, se tendra en cuenta el directorio del compilador; por el contrario, si especifica `infile.ahk` antes, se tendra en cuenta el directorio de `infile.ahk`.
 
 - ##### Sintaxis
-```Ahk2Exe.exe [/in] infile.ahk [/out outfile.exe] [/icon iconfile.ico] [/bin binfile.bin] [/upx] [/mpress] [/quiet]```
+
+  ```Ahk2Exe.exe [/in] infile.ahk [/out outfile.exe] [/icon iconfile.ico] [/bin binfile.bin] [/upx] [/mpress] [/quiet]```
 
 - ##### Descripción
 | Parámetro  | Descripción | Directorio de trabajo |
@@ -142,13 +143,13 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
 
 - ##### Directivas que controlan los metadatos ejecutables
 
-  - **`;@Ahk2Exe-SetProp`**`Valor`    **(SIN SOPORTE AÚN)**
+  - **`;@Ahk2Exe-SetProp`**`Valor`
 
     Cambia una propiedad en la información de versión del ejecutable compilado. En la tabla siguiente se describen las propiedades disponibles y su descripción. Puede utilizar las propiedades descritas entre parentesis para evitar utilizar, por ejemplo, la propiedad `Name`, que cambia tanto el nombre del producto como el nombre interno.
 
-    `Prop` Debe reemplazarse por el nombre de la propiedad a cambiar. Debe ser una de las descritas en la tabla de abajo.
+    `Prop` Debe reemplazarse por el nombre de la propiedad a cambiar. Puede ser cualquier cadena/texto que no contenga espacios.
 
-    `Value` Es el valor a establecer a la propiedad. Puede ver la descripción de este valor en la tabla de abajo.
+    `Value` Es el valor a establecer a la propiedad. Puede ser cualquier cadena/texto con cualquier caracter, incluido espacios.
 
     | Propiedad | Descripción |
     | --------- | ----------- |
@@ -158,6 +159,8 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
     | Copyright  | Cambia la información legal de copyright (derechos de autor). |
     | OrigFilename | Cambia la información del nombre de archivo original (`OriginalFileName`). |
     | CompanyName | Cambia el nombre de la compañía. |
+	| Comments | Contiene cualquier información adicional que se debe mostrar con fines de diagnóstico |
+	| XXX | `XXX` es cualquier otro nombre que no sea los comunes de arriba. [Aquí](https://goo.gl/DtVHA5) puede ver los nombres de propiedad más comunes para la información de la versión. Puede especificar cualquier nombre excepto `MainIcon` que es otra directiva. |
 
   - **`;@Ahk2Exe-SetMainIcon`**`IcoFile`
 
@@ -256,9 +259,9 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
 
      | Código de salida | Constante | Descripción |
      | ---------------- | --------- | ----------- |
-     | 0x50 | ERROR_INVALID_SYNTAX_DIRECTIVE | La sintaxis de la directiva es inválida |
+     | 0x50 | ERROR_INVALID_DIRECTIVE_SYNTAX | La sintaxis de la directiva es inválida |
      | 0x51 | ERROR_UNKNOWN_DIRECTIVE_COMMAND | Comando de directiva desconocido |
-     | 0x52 | ERROR_FILEINSTALL_INVALID_SYNTAX | La sintaxis de FileInstall es inválida |
+     | 0x52 | ERROR_INVALID_FILEINSTALL_SYNTAX | La sintaxis de FileInstall es inválida |
 
 
 

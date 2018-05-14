@@ -10,15 +10,7 @@
                       ,        Subsystem: IMAGE_SUBSYSTEM_WINDOWS_GUI
                       ,     ResourceLang: SUBLANG_ENGLISH_US
                       ,         PostExec: ""
-                      ,      CompanyName: ""
-                      ,  FileDescription: ""
-                      ,      FileVersion: A_AhkVersion
-                      ,   ProductVersion: A_AhkVersion
-                      ,   LegalCopyright: ""
-                      , OriginalFilename: SubStr(Script, InStr(Script, "\",, -1)+1)
-                      ,     InternalName: ""
-                      ,      ProductName: ""
-                      ,         Comments: ""
+                      ,      VersionInfo: { FileVersion: A_AhkVersion, ProductVersion: A_AhkVersion, OriginalFilename: SubStr(Script, InStr(Script, "\",, -1)+1) }
                       ,        Resources: [] }
     }
 
@@ -108,72 +100,78 @@
             ; Directivas que controlan los metadatos ejecutables que se añadirán al archivo EXE resultante
             ; ##############################################################################################################################################
             If (foo = "ConsoleApp")
-                Directives.Subsystem := IMAGE_SUBSYSTEM_WINDOWS_CUI
+                ObjRawSet(Directives, "Subsystem", IMAGE_SUBSYSTEM_WINDOWS_CUI)
 
             Else If (foo = "UseResourceLang")
             {
                 If (bar == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-UseResourceLang", Script, A_Index)
-                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-UseResourceLang.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-UseResourceLang.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
                 Else If (!(bar is "Integer"))
                     Util_AddLog("ERROR", "El valor de idioma en @Ahk2Exe-UseResourceLang es inválido", Script, A_Index)
-                  , Util_Error("El valor de idioma en @Ahk2Exe-UseResourceLang es inválido.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                  , Util_Error("El valor de idioma en @Ahk2Exe-UseResourceLang es inválido.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
                 Else
-                    Directives.ResourceLang := bar
+                    ObjRawSet(Directives, "ResourceLang", bar)
             }
 
             Else If (foo = "PostExec")
             {
                 If (bar == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-PostExec", Script, A_Index)
-                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-PostExec.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-PostExec.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
                 Else
-                    Directives.PostExec := bar
+                    ObjRawSet(Directives, "PostExec", bar)
             }
 
             Else If (foo = "AddResource")
             {
                 If (bar == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-AddResource", Script, A_Index)
-                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-AddResource.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-AddResource.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
                 Else
                     ObjPush(Directives.Resources, ParseResourceStr(bar, A_Index, Script))
             }
 
+            Else If (foo = "SetMainIcon")
+            {
+                If (bar == "")
+                    Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-SetMainIcon", Script, A_Index)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-SetMainIcon.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
+                Else If (!IS_FILE(bar := GetFullPathName(bar)))
+                    Util_AddLog("ERROR", "El icono especificado en @Ahk2Exe-SetMainIcon no existe", Script, A_Index)
+                  , Util_Error("El icono especificado en @Ahk2Exe-SetMainIcon no existe.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
+                Else
+                    ObjRawSet(Directives, "MainIcon", bar)
+            }
+
             Else If (foo ~= "i)^Set")
             {
-                If (foo = "SetMainIcon")
-                {
-                    If (bar == "")
-                        Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-SetMainIcon", Script, A_Index)
-                      , Util_Error("Uso inválido de la directiva @Ahk2Exe-SetMainIcon.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
-                    Else If (!IS_FILE(bar := GetFullPathName(bar)))
-                        Util_AddLog("ERROR", "El icono especificado en @Ahk2Exe-SetMainIcon no existe", Script, A_Index)
-                      , Util_Error("El icono especificado en @Ahk2Exe-SetMainIcon no existe.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
-                    Else
-                        Directives.MainIcon := bar
-                }
+                If ( !StrLen(SubStr(foo, 4)) )
+                    Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-Set", Script, A_Index)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-Set.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
 
                 Else
                 {
                     If (foo = "SetCompanyName")
-                        Directives.CompanyName := bar
+                        ObjRawSet(Directives.VersionInfo, "CompanyName", bar)
                     If (foo = "SetFileDescription" || foo = "SetDescription")
-                        Directives.FileDescription := bar
+                        ObjRawSet(Directives.VersionInfo, "FileDescription", bar)
                     If (foo = "SetFileVersion" || foo = "SetVersion")
-                        Directives.FileVersion := bar
+                        ObjRawSet(Directives.VersionInfo, "FileVersion", bar)
                     If (foo = "SetProductVersion" || foo = "SetVersion")
-                        Directives.ProductVersion := bar
+                        ObjRawSet(Directives.VersionInfo, "ProductVersion", bar)
                     If (foo = "SetLegalCopyright" || foo = "SetCopyright")
-                        Directives.LegalCopyright := bar
+                        ObjRawSet(Directives.VersionInfo, "LegalCopyright", bar)
                     If (foo = "SetOriginalFilename" || foo = "OrigFilename")
-                        Directives.OriginalFilename := bar
+                        ObjRawSet(Directives.VersionInfo, "OriginalFilename", bar)
                     If (foo = "SetInternalName" || foo = "SetName")
-                        Directives.InternalName := bar
+                        ObjRawSet(Directives.VersionInfo, "InternalName", bar)
                     If (foo = "SetProductName" || foo = "SetName")
-                        Directives.ProductName := bar
+                        ObjRawSet(Directives.VersionInfo, "ProductName", bar)
                     If (foo = "SetComments")
-                        Directives.Comments := bar
+                        ObjRawSet(Directives.VersionInfo, "Comments", bar)
+                    Else
+                        ObjRawSet(Directives.VersionInfo, SubStr(foo, 4), bar)
                 }
             }
 
@@ -191,7 +189,7 @@
                     IgnoreBegin := g_data.Compile64
                 Else
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-IgnoreBegin", Script, A_Index)
-                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-IgnoreBegin.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)   
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-IgnoreBegin.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)   
             }
 
             Else If (foo = "IgnoreEnd")
@@ -376,7 +374,7 @@
             If (ERROR)
             {
                 Util_AddLog("ERROR", "Error de sintaxis en FileInstall", Script, A_Index,,, "FileInstall")
-                Return Util_Error("Error de sintaxis en FileInstall.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_FILEINSTALL_INVALID_SYNTAX : NO_EXIT)
+                Return Util_Error("Error de sintaxis en FileInstall.`nLínea #" . A_Index . ".", Script, CMDLN ? ERROR_INVALID_FILEINSTALL_SYNTAX : NO_EXIT)
             }
 
             If (!IS_FILE(foo))
@@ -753,7 +751,7 @@ ParseResourceStr(String, LineNum, Script)    ;@Ahk2Exe-AddResource *[int/str typ
             If (!(foo := InStr(String, "`"",, 3)) || (Obj.ResType := SubStr(String, 3, foo - 3)) == "")
             {
                 Util_AddLog("ERROR", "La sintaxis es inválida", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
-                Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nLa sintaxis es inválida.`nLínea #" . LineNum . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nLa sintaxis es inválida.`nLínea #" . LineNum . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
             }
             String := LTrim(SubStr(String, foo + 1))
         }
@@ -762,7 +760,7 @@ ParseResourceStr(String, LineNum, Script)    ;@Ahk2Exe-AddResource *[int/str typ
             If (!(foo := InStr(String, A_Space,, 2)) || (Obj.ResType := SubStr(String, 2, foo - 2)) == "")
             {
                 Util_AddLog("ERROR", "La sintaxis es inválida", Script, LineNum, "@Ahk2Exe-AddResource",, Obj.File)
-                Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nLa sintaxis es inválida.`nLínea #" . LineNum . ".", Script, CMDLN ? ERROR_INVALID_SYNTAX_DIRECTIVE : NO_EXIT)
+                Return Util_Error("Error en la directiva @Ahk2Exe-AddResource.`nLa sintaxis es inválida.`nLínea #" . LineNum . ".", Script, CMDLN ? ERROR_INVALID_DIRECTIVE_SYNTAX : NO_EXIT)
             }
             String := LTrim(SubStr(String, foo + 1))
         }
