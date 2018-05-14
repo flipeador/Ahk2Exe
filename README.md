@@ -174,11 +174,13 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
 
     Cambia el subsistema ejecutable al modo consola. Cuando se ejecute el archivo compilado EXE, se abrirá una ventana de consola. Esto modifica el valor de `IMAGE_OPTIONAL_HEADER.Subsystem` a `IMAGE_SUBSYSTEM_WINDOWS_CUI`.
 
-  - **`;@Ahk2Exe-AddResource`**`FileName [, ResourceName]`
+  - **`;@Ahk2Exe-AddResource`**`[*Type] FileName [, ResourceName]`
 
     Agrega un recurso al ejecutable compilado.
 
-    `FileName` Es el nombre del archivo del recurso para agregar. El tipo del recurso (como un entero o una cadena) se puede especificar explícitamente anteponiendo un asterisco a él: `*tipo Filename` o `*"nombre tipo" Filename` si el nombre del tipo contiene espacios.
+    `Type` (opcional) Es el tipo de recurso (como un entero o una cadena). Ahk2Exe detecta automáticamente ciertos tipos dependiendo de la extensión del archivo especificado. Se puede especificar explícitamente anteponiendo un asterisco a él: `*16 FileName, ResourceName`. En caso de que el tipo contenga espacios, debe ponerlo entre comillas: `*"type x" FileName`.
+
+    `FileName` Es el nombre del archivo del recurso para agregar (como un entero o una cadena).
 
     `ResourceName` (opcional) Es el nombre que tendrá el recurso (puede ser una cadena o un número entero). Si se omite, el valor predeterminado es el nombre (sin ruta) del archivo, en mayúsculas (incluye la extensión).
 
@@ -208,7 +210,7 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
 
     Cambia el lenguaje de recursos utilizado por `@Ahk2Exe-AddResource`.
 
-    `LangCode` Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693%28v=vs.85%29.aspx). Tenga en cuenta que los números hexadecimales deben tener un prefijo `0x`.
+    `LangCode` Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693%28v=vs.85%29.aspx). Tenga en cuenta que los números hexadecimales deben tener un prefijo `0x`. Si se especifica un código de idioma inválido/desconocido ocurrirá un error; Se utiliza la función [LCIDToLocaleName](https://goo.gl/pTQtjp) para comprobar que el código sea válido.
 
 
 
@@ -291,7 +293,25 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
 
 # Agradecimientos
   - ##### [Chris Mallet](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=2) - Por el fantástico AutoHotkey.
-  - ##### [lexikos](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=77) - Por AutoHotkey v2.
+  - ##### [lexikos](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=77) - Por continuar dando soporte a AutoHotkey, especialmente por la versión 2.
   - ##### [fincs](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=100)   - Este compilador esta basado en [Ahk2Exe de fincs](https://autohotkey.com/boards/viewtopic.php?f=24&t=521). Fue de mucha ayuda su clase **VersionInfo**, gracias a ella este compilador soporta modificación nativa en AHK para la información de la versión.
   - ##### [just me](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=148) - Por sus increibles funciones [ImageButton](https://autohotkey.com/boards/viewtopic.php?f=6&t=1103) y [LinearGradient](https://autohotkey.com/boards/viewtopic.php?f=6&t=3593&p=18573).
-  - ##### Toda la comunidad de [AutoHotkey.com](https://autohotkey.com/).
+  - ##### [tmplinshi](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=133) - Por su aporte sobre `waterctrl.dll` ([enlace](https://autohotkey.com/boards/viewtopic.php?f=22&t=3302&p=16261)). [Sitio oficial](http://restools.hanzify.org/article.asp?id=80).
+  - ##### Toda la comunidad de [AutoHotkey.com](https://autohotkey.com/). [AutoHotkey.com/logos](https://autohotkey.com/logos/) por el logo.
+
+
+
+
+
+* * *
+
+
+<br><br>
+
+
+# Archivos de terceros utilizados durante el desarrollo y otros útiles para la compilación.
+  - ##### [Visual Studio Community](https://www.visualstudio.com/es/vs/community/) - Para las constantes y comprobaciones de tamaño de ciertas estructuras.
+  - ##### [Cool Pix Bar](https://toolslib.net/downloads/viewdownload/157-cool-pix-bar/) - Para la selección de colores RGB.
+  - ##### [FastStone Capture](http://www.faststone.org/FSCaptureDetail.htm) - Exelente capturador de imagenes, de gran ayuda con el LOGO y colores.
+  - ##### [UPX](https://upx.github.io/) - Compresor de archivos ejecutables.
+  - ##### [MPRESS](http://www.matcode.com/mpress.htm) - Empaquetador ejecutable de alto rendimiento.
