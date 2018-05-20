@@ -234,6 +234,10 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
 
     `LangCode` Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693%28v=vs.85%29.aspx). Tenga en cuenta que los números hexadecimales deben tener un prefijo `0x`. Si se especifica un código de idioma inválido/desconocido ocurrirá un error; Se utiliza la función [LCIDToLocaleName](https://goo.gl/pTQtjp) para comprobar que el código sea válido.
 
+  - **`;@Ahk2Exe-Bin`**`BinFile`
+
+    Especifica el archivo BIN a utilizar durante la compilación.
+
 
 
 
