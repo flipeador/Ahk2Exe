@@ -16,6 +16,12 @@
   - La compilación no garantiza mejoras significativas de rendimiento.
   - AutoHotkey es un lenguaje interpretado, por lo que realmente no posee un compilador **real**, `Ahk2Exe` no realiza ningún pasaje de código AHK a código máquina, realmente no compila nada, sino que procesa el script para reducir su tamaño y facilita la adición de recursos en el archivo destino EXE. Al momento de "Compilar" un script, lo que en realidad se esta haciendo, es copiar el archivo `BIN` al destino especificado con la extensión `EXE`, y luego se le añade el script como un recurso en `RT_RCDATA`.
 
+##### Compatibilidad / Requisitos
+
+  - Microsoft **Windows Vista** en adeltante.
+  - El compilador es únicamente para **AutoHotkey versión 2**.
+  - La interfaz gráfica de usuario (GUI) no ha sido probada en pantallas con un DPI ([PPP](https://es.wikipedia.org/wiki/P%C3%ADxeles_por_pulgada)) alto (mayor a 96).
+
 
 
 
@@ -111,7 +117,7 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
 
     Es posible eliminar secciones de código del script compilado al encerrarlas en las directivas `@Ahk2Exe-IgnoreBegin` y `@Ahk2Exe-IgnoreEnd` como si fueran comentarios multilinea en bloque `/**/`.
 
-    `Lines` Es la cantidad de líneas a ignorar a partir de `IgnoreBegin`. Las líneas en blanco y comentarios no se tienen en cuenta (no cuentan como una línea). Si no se especifica, se ignora todo el código hasta encontrar un `IgnoreEnd`.
+    `Lines` Es la cantidad de líneas a ignorar a partir de `IgnoreBegin`. Las líneas en blanco y comentarios no se tienen en cuenta (no cuentan como una línea). Si no se especifica, se ignora todo el código hasta encontrar un `IgnoreEnd`. Si se encuentra un `IgnoreEnd` antes de terminar el conteo de líneas especificadas, se terminará en ese punto y las líneas faltantes se incluirán en la compilación.
 
     `IgnoreBegin32` y `IgnoreBegin64`En el primer caso, indica que el código no debe incluirse en la compilación de `32-bit`. En el segundo caso, indica que el código no debe incluirse en la compilación de `64-bit`. La directiva de cierre es `IgnoreEnd32` y `IgnoreEnd64` respectivamente.
 
@@ -340,4 +346,6 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
   - ##### [Cool Pix Bar](https://toolslib.net/downloads/viewdownload/157-cool-pix-bar/) - Para la selección de colores RGB.
   - ##### [FastStone Capture](http://www.faststone.org/FSCaptureDetail.htm) - Exelente capturador de imagenes, de gran ayuda con el LOGO y colores.
   - ##### [UPX](https://upx.github.io/) - Compresor de archivos ejecutables.
-  - ##### [MPRESS](http://www.matcode.com/mpress.htm) - Empaquetador ejecutable de alto rendimiento.
+  - ##### [MPRESS](http://www.matcode.com/mpress.htm) - Empaquetador ejecutable de alto rendimiento. Utilizado para comprimir `Ahk2Exe.exe` y `Ahk2Exe64.exe`.
+  - ##### [SublimeText](https://www.sublimetext.com/) - Para la edición de los scripts ([IDE](https://es.wikipedia.org/wiki/Entorno_de_desarrollo_integrado)).
+  - ##### [AutoGUI](https://autohotkey.com/boards/viewforum.php?f=64) - Para la creación de la interfaz gráfica de usuario ([GUI](https://es.wikipedia.org/wiki/Interfaz_gr%C3%A1fica_de_usuario)).
