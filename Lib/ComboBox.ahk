@@ -170,9 +170,9 @@ CB_GetSelection(CB)
 */
 CB_SetSelection(CB, Item, Mode := -1)
 {
-    If (Mode != -1)
-        Item := CB_FindString(CB, Item,, Mode)
-
+    If (Mode != -1 && (Item := CB_FindString(CB, Item,, Mode)) < 0)
+        Return -1
+    
     ; CB_SETCURSEL message
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775899(v=vs.85).aspx
     Return DllCall("User32.dll\SendMessageW", "Ptr", CB.Hwnd, "UInt", 0x014E, "Ptr", Item, "Ptr", 0, "Ptr")
