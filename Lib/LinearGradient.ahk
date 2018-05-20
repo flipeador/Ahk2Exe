@@ -24,10 +24,10 @@
 LinearGradient(Pic, Colors, Positions := "", Direction := 0, GammaCorrection := FALSE, BrushWidth := 0, BrushHeight := 0)
 {
     If (!IsObject(Pic) || SubStr(Type(Pic), 1, 3) != "Gui" || Pic.Type != "Pic")
-        Throw Exception("Function LinearGradient invalid parameter #1.",, IsObject(Pic) ? "Type " . Type(Pic) : "!Object")
+        Throw Exception("Function LinearGradient invalid parameter #1.", -1, IsObject(Pic) ? "Type " . Type(Pic) : "!Object")
 
     If (!IsObject(Colors) || ObjLength(Colors) == 0)
-        Throw Exception("Function LinearGradient invalid parameter #2",, IsObject(Colors) ? "!ObjLength" : "!Object")
+        Throw Exception("Function LinearGradient invalid parameter #2", -1, IsObject(Colors) ? "!ObjLength" : "!Object")
 
     If (!IsObject(Positions))
     {
@@ -37,10 +37,10 @@ LinearGradient(Pic, Colors, Positions := "", Direction := 0, GammaCorrection := 
         Positions.Push(1.0)
     }
     If (ObjLength(Colors) != ObjLength(Positions))
-        Throw Exception("Function LinearGradient invalid parameter #3",, "ObjLen#1(" . ObjLength(Colors) . ")!=ObjLen#2(" . ObjLength(Positions) . ")")
+        Throw Exception("Function LinearGradient invalid parameter #3", -1, "ObjLen#1(" . ObjLength(Colors) . ")!=ObjLen#2(" . ObjLength(Positions) . ")")
 
     If (Direction != 0 && Direction != 1 && Direction != 2 && Direction != 3)
-        Throw Exception("Function LinearGradient invalid parameter #4",, SubStr(Direction, 1, 50))
+        Throw Exception("Function LinearGradient invalid parameter #4", -1, SubStr(Direction, 1, 50))
 
     Local hGdiplus := 0, SI := "", pToken := 0
     If (!DllCall("Kernel32.dll\GetModuleHandleW", "Str", "Gdiplus.dll", "Ptr"))
@@ -62,11 +62,11 @@ LinearGradient(Pic, Colors, Positions := "", Direction := 0, GammaCorrection := 
     DllCall("Gdiplus.dll\GdipSetLineGammaCorrection", "Ptr", pBrush, "Int", GammaCorrection)
 
     Local _COLORS := ""
-    Loop (VarSetCapacity(_COLORS, ObjLength(Colors) * 4, 0) // 4)
+    Loop ( VarSetCapacity(_COLORS, ObjLength(Colors) * 4, 0) * 0 + ObjLength(Colors) )
         NumPut(Colors[A_Index] | 0xFF000000, &_COLORS + 4 * (A_Index - 1), "UInt")
 
     Local _POSITIONS := ""
-    Loop (VarSetCapacity(_POSITIONS, ObjLength(Positions) * 4, 0) // 4)
+    Loop ( VarSetCapacity(_POSITIONS, ObjLength(Positions) * 4, 0) * 0 + ObjLength(Positions) )
         NumPut(Positions[A_Index], &_POSITIONS + 4 * (A_Index - 1), "Float")
 
     DllCall("Gdiplus.dll\GdipSetLinePresetBlend", "Ptr", pBrush, "UPtr", &_COLORS, "UPtr", &_POSITIONS, "Int", ObjLength(Colors))
