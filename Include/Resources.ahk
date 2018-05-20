@@ -3,6 +3,10 @@
     Return DllCall("Kernel32.dll\BeginUpdateResourceW", "UPtr", &FileName, "Int", DeleteExistingResources, "Ptr")
 } ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms648030(v=vs.85).aspx
 
+
+
+
+
 EndUpdateResource(hUpdate, Discard := FALSE)
 {
     Return DllCall("Kernel32.dll\EndUpdateResourceW", "Ptr", hUpdate, "Int", Discard)
@@ -12,12 +16,12 @@ EndUpdateResource(hUpdate, Discard := FALSE)
 
 
 
-EnumResourceNames(hExe, ResType, LangId := "", Flags := 0)
+EnumResourceNames(hExe, ResType, Flags := 0, LangID := 0x0409)
 {
     Local EnumResNameProc := CallbackCreate("EnumResNameProc", "&", 4)
         ,           Data  := []
 
-    DllCall("Kernel32.dll\EnumResourceNamesExW", "Ptr", hExe, "UPtr", RES_TYPE(ResType), "UPtr", EnumResNameProc, "UPtr", 0, "UInt", Flags, "UShort", RES_LANG(LangID))
+    DllCall("Kernel32.dll\EnumResourceNamesExW", "Ptr", hExe, "UPtr", RES_TYPE(ResType), "UPtr", EnumResNameProc, "UPtr", 0, "UInt", Flags, "UShort", LangID)
     CallbackFree(EnumResNameProc)
     Return Data
 
@@ -31,7 +35,7 @@ EnumResourceNames(hExe, ResType, LangId := "", Flags := 0)
         ObjPush(Data, {  hModule: hModule
                       ,     Type: IS_INTRESOURCE(lpszType) ? lpszType : StrGet(lpszType, "UTF-16")
                       ,     Name: IS_INTRESOURCE(lpszName) ? lpszName : StrGet(lpszName, "UTF-16")
-                      ,   LangId: LangId })
+                      ,   LangID: LangID })
 
         Return TRUE    ; continuar enumeración
     } ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms648034(v=vs.85).aspx
@@ -41,30 +45,23 @@ EnumResourceNames(hExe, ResType, LangId := "", Flags := 0)
 
 
 
-DeleteResource(hUpdate, ResType, ResName, LangID := "")
+UpdateResource(hUpdate, ResType, ResName, LangID := 0x0409, pData := 0, Size := 0)
 {
-    Return DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", RES_LANG(LangID), "UPtr", 0, "UInt", 0)
+    If (Type(pData) != "Integer" || (pData && pData < 0x10000))
+        Throw Exception("Function UpdateResource invalid parameter #5", -1, "Invalid address")
+    If (Type(Size) != "Integer" || Size < 0)
+        Throw Exception("Function UpdateResource invalid parameter #6", -1, "Invalid size")
+
+    Return DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", LangID, "UPtr", pData, "UInt", Size)
 }
 
 
 
 
 
-AddResource(hUpdate, ResType, ResName, pData, Size, LangID := "")
+FindResource(hExe, ResType, ResName, LangID := 0x0409)
 {
-    If (!IS_ADDRESSORSIZE(pData) || !IS_ADDRESSORSIZE(Size))    ; ayuda a detectar errores (no esperamos una cadena en estos parámetros o un valor < 1)
-        Return FALSE
-    Return DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", RES_LANG(LangID), "UPtr", pData, "UInt", Size)
-}
-
-
-
-
-
-
-FindResource(hExe, ResType, ResName, LangID := "")
-{
-    Return DllCall("Kernel32.dll\FindResourceExW", "Ptr", hExe, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", RES_LANG(LangID), "Ptr")
+    Return DllCall("Kernel32.dll\FindResourceExW", "Ptr", hExe, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", LangID, "Ptr")
 }
 
 
@@ -90,7 +87,7 @@ LoadResource2(hExe, hResInfo)
     Return LockResource(LoadResource(hExe, hResInfo))
 }
 
-LoadResource3(hExe, ResType, ResName, ByRef Size := "", LangID := "")
+LoadResource3(hExe, ResType, ResName, ByRef Size := "", LangID := 0x0409)
 {
     Local hResInfo := FindResource(hExe, ResType, ResName, LangID)
     Size := SizeofResource(hExe, hResInfo)
@@ -144,9 +141,9 @@ LoadImage(hInstance, Name, Type := 0, W := 0, H := 0, Flags := "")
 
 
 
-EnumResourceIcons(hExe, IconGroupName, LangId := "")
+EnumResourceIcons(hExe, IconGroupName, LangId := 0x0409)
 {
-    Local hResInfo := FindResource(hExe, RT_GROUP_ICON, IconGroupName, LangId)
+    Local hResInfo := FindResource(hExe, 14, IconGroupName, LangId)    ; 14 = RT_GROUP_ICON
     If (!hResInfo)
         Return FALSE
 
@@ -233,28 +230,20 @@ IS_INTRESOURCE(ByRef r)    ; IS_INTRESOURCE(_r) ((((ULONG_PTR)(_r)) >> 16) == 0)
     Return (r:=Integer(r)) >> 16 == 0    ; r < 0x10000
 }
 
-; determina si «n» es un número y es mayor que cero, si el valor es de tipo float, se quita la parte decimal
-; devuelve un ERROR si «n» no es un número válido
-IS_ADDRESSORSIZE(ByRef n)
-{
-    Return (n:=Integer(n)) > 0 ? n : FALSE
-}
-
-; corrige el nombre del recurso y devuelve siempre un entero
-; si «s» no es un entero positivo comprendido entre 1 y 65535 inclusive devuelve la dirección de memoria de una cadena (caracteres en mayúscula), caso contrario devuelve un número
+; si se especifica un entero comprendido entre 0 y 65535 inclusive, devuelve el mismo número; caso contrario devuelve un puntero a una cadena.
 RES_NAME(ByRef s)
 {
-    Return s is "Float" || !(s is "Integer") || StrLen(s) > 7 || s >= 0x10000 || s < 0 ? &(s:=Format("{:U}", String(s))) : Integer(s)
+    Return Type(s) == "Integer" && s >= 0 && s < 0x10000 ? s : &(s := Format("{:U}", s))
 }
 
-; corrige el nombre del tipo del recurso y devuelve siempre un entero
-; si «s» no es un entero positivo comprendido entre 1 y 65535 inclusive devuelve la dirección de memoria de una cadena (caracteres en mayúscula), caso contrario devuelve un número
+; si se especifica un entero comprendido entre 0 y 65535 inclusive, devuelve el mismo número; caso contrario devuelve un puntero a una cadena.
 RES_TYPE(ByRef s)
 {
-    Return s is "Float" || !(s is "Integer") || StrLen(s) > 7 || s >= 0x10000 || s < 0 ? &(s:=Format("{:U}", String(s))) : Integer(s)
+    Return Type(s) == "Integer" && s >= 0 && s < 0x10000 ? s : &(s := Format("{:U}", s))
 }
 
-RES_LANG(l)
+; corrige el tipo de datos dependiendo del valor especificado
+RES_CTYPE(s)
 {
-    Return IsObject(l) ? l.Directives.ResourceLang : (l == "" ? SUBLANG_ENGLISH_US : l)
+    Return s is "Float" || !(s is "Integer") || StrLen(s) > 7 || s >= 0x10000 || s < 0 ? String(s) : Integer(s)
 }

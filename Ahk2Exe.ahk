@@ -1,10 +1,10 @@
-﻿;@Ahk2Exe-SetDescription      AutoHotkey Script Compilador
-;@Ahk2Exe-SetFileVersion      1.0.0.0
-;@Ahk2Exe-SetProductVersion   2.0.0.0
-;@Ahk2Exe-SetName             Ahk2Exe
-;@Ahk2Exe-SetCopyright        Copyright (c) 2004
+﻿;@Ahk2Exe-SetName             Ahk2Exe
+;@Ahk2Exe-SetOrigFilename     Ahk2Exe.exe
+;@Ahk2Exe-SetDescription      Compilador de scripts para AutoHotkey v2 en español
+;@Ahk2Exe-SetFileVersion      1.0.0.1
 ;@Ahk2Exe-SetCompanyName      AutoHotkey
-;;@Ahk2Exe-SetOrigFilename    Ahk2Exe.ahk
+;@Ahk2Exe-SetCopyright        Copyright (c) 2004-2018
+;@Ahk2Exe-SetComments         https://github.com/flipeador/Ahk2Exe
 
 ;@Ahk2Exe-SetMainIcon         Ahk2Exe.ico
 
@@ -25,6 +25,7 @@
 
 ListLines FALSE
 DetectHiddenWIndows "On"
+;@Ahk2Exe-IgnoreBegin64 1    // el comando SetRegView no es necesario en compilaciones x64
 SetRegView 64
 FileEncoding "UTF-8"    ; unicode
 
@@ -36,28 +37,29 @@ FileEncoding "UTF-8"    ; unicode
 ; INCLUDES
 ; =====================================================================================================================================================
 ; Lib\
+#Include <Gdiplus\Gdiplus>
 #Include <LinearGradient>
 #Include <ImageButton>
 #Include <ComboBox>
 #Include <RunAsAdmin>
-#Include <TaskDialog>
+#Include <TaskDialog>           ; diálogo de tareas (un MsgBox más completo)
 #Include <DirGetParent>
-#Include <SaveFile>
-#Include <ChooseFile>
-#Include <GuiControlTips>
-#Include <GetFullPathName>
-#Include <GetBinaryType>
-#Include <Language>
-#Include <Gdiplus\Gdiplus>
+#Include <SaveFile>             ; diálogo para guardar archivos
+#Include <ChooseFile>           ; diálogo para seleccionar archivos
+#Include <GuiControlTips>       ; para añadir ToolTips cuando se posiciona le cursor en un control
+#Include <GetFullPathName>      ; función para recuperar la ruta absoluta teniendo en cuenta el directorio de trabajo actual
+#Include <GetBinaryType>        ; para recuperar el tipo de archivo binario
+#Include <Language>             ; algunas funciones de idiomas
+#Include <DefaultBaseObject>    ; para poder utilizar cadenas como objetos (array) y acceder a caracteres mediante indices
 
 ; Include\
 #Include Include
-#Include Compiler.ahk
-#Include ScriptParser.ahk
-#Include Resources.ahk
-#Include CommandLine.ahk
-#Include Std.ahk
-#Include VersionRes.ahk
+#Include Compiler.ahk          ; para compilar el script
+#Include ScriptParser.ahk      ; para analizar y procesar el script
+#Include Resources.ahk         ; para leer y modificar recursos en el ejecutable
+#Include CommandLine.ahk       ; para procesar la línea de comandos
+#Include Std.ahk               ; funciones varias
+#Include VersionRes.ahk        ; para crear/modificar la estructura VS_VERSIONINFO (recurso de versión)
 
 
 
@@ -66,22 +68,18 @@ FileEncoding "UTF-8"    ; unicode
 ; =====================================================================================================================================================
 ; INICIO
 ; =====================================================================================================================================================
-A_ScriptName := "Ahk2Exe Compilador"
-global Title := "Ahk2Exe para AutoHotkey v" . A_AhkVersion . " | Script a EXE Conversor (" . (A_PtrSize==4?"32-Bit)":"64-Bit)")
-
-
-; comprobamos SO (se requiere WIN_V en adelante) e instancia (no permitir más de una instancia)
+; comprobamos sistema operativo (necesario WIN_V+)
 If (StrSplit(A_OSVersion, ".")[1] < 6)
     Util_Error("Sistema operativo no soportado.", A_OSVersion, 196)
-If (WinExist(Title))
-    WinShow(Title), WinActivate(Title), ExitApp()
+
+A_ScriptName := "Ahk2Exe Compilador"
+global Title := "Ahk2Exe para AutoHotkey v" . A_AhkVersion . " | Script a EXE Conversor (" . (A_PtrSize==4?"32-Bit)":"64-Bit)")
 
 
 ; variables super-globales
 global  g_data := {}
       ,    g_k := 0, g_v := 0    ; for g_k, g_v in Obj
 global     Cfg := Util_LoadCfg()
-global VerInfo := Util_LoadVerInfo()    ; StringFileInfo BLOCK statement - https://msdn.microsoft.com/en-us/library/windows/desktop/aa381049(v=vs.85).aspx
 global    Gdip := new Gdiplus
 global ERROR := FALSE
 global BE_QUIET := FALSE
@@ -131,17 +129,17 @@ global           ERROR_SUCCESS := 0x00    ; todas las operaciones se han realiza
      ,     ERROR_NOT_SUPPORTED := 0x02    ; no soportado
      , ERROR_INVALID_PARAMETER := 0x03    ; los parámetros pasados son inválidos
      ; ---- APERTURA DE ARCHIVOS ----
-     ,     ERROR_SOURCE_NO_SPECIFIED := 0x10    ; el archivo fuente no se ha especificado
-     ,        ERROR_SOURCE_NOT_FOUND := 0x11    ; el archivo fuente no existe
-     ,      ERROR_CANNOT_OPEN_SCRIPT := 0x12    ; no se ha podido abrir el archivo fuente script (incluyendo includes) para lectura
-     ,      ERROR_BIN_FILE_NOT_FOUND := 0x13    ; el archivo BIN no existe
-     ,    ERROR_BIN_FILE_CANNOT_OPEN := 0x14    ; no se ha podido abrir el archio BIN para lectura
-     ,     ERROR_MAIN_ICON_NOT_FOUND := 0x15    ; el icono principal no existe
-     ,   ERROR_MAIN_ICON_CANNOT_OPEN := 0x16    ; no se ha podido abrir el icono principal para lectura
-     ,       ERROR_INVALID_MAIN_ICON := 0x17    ; el icono principal es inválido
-     ,  ERROR_INCLUDE_FILE_NOT_FOUND := 0x18    ; el archivo a incluir no existe
-     ,   ERROR_INCLUDE_DIR_NOT_FOUND := 0x19    ; el directorio a incluir no existe
-     ,   ERROR_FILEINSTALL_NOT_FOUND := 0x20    ; el archivo a incluir especificado en FileInstall no existe
+     ,        ERROR_SOURCE_NO_SPECIFIED := 0x10    ; el archivo fuente no se ha especificado
+     ,           ERROR_SOURCE_NOT_FOUND := 0x11    ; el archivo fuente no existe
+     ,         ERROR_CANNOT_OPEN_SCRIPT := 0x12    ; no se ha podido abrir el archivo fuente script (incluyendo includes) para lectura
+     ,         ERROR_BIN_FILE_NOT_FOUND := 0x13    ; el archivo BIN no existe
+     ,       ERROR_BIN_FILE_CANNOT_OPEN := 0x14    ; no se ha podido abrir el archivo BIN para lectura
+     ,        ERROR_MAIN_ICON_NOT_FOUND := 0x15    ; el icono principal no existe
+     ,      ERROR_MAIN_ICON_CANNOT_OPEN := 0x16    ; no se ha podido abrir el icono principal para lectura
+     ,          ERROR_INVALID_MAIN_ICON := 0x17    ; el icono principal es inválido
+     ,     ERROR_INCLUDE_FILE_NOT_FOUND := 0x18    ; el archivo a incluir no existe
+     ,      ERROR_INCLUDE_DIR_NOT_FOUND := 0x19    ; el directorio a incluir no existe
+     , ERROR_FILEINSTALL_FILE_NOT_FOUND := 0x20    ; el archivo a incluir especificado en FileInstall no existe
      , ERROR_RESOURCE_FILE_NOT_FOUND := 0x21    ; el archivo de recurso a incluir no existe
      ; ---- ESCRITURA DE ARCHIVOS ----
      , ERROR_CANNOT_COPY_BIN_FILE := 0x30    ; no se ha podido copiar el archivo BIN al destino
@@ -167,6 +165,11 @@ global SCS_32BIT_BINARY := 0    ; A 32-bit Windows-based application
 global CMDLN := ObjLength(A_Args)
 If (CMDLN)
     ExitApp ProcessCmdLine()
+
+
+; comprobamos instancia (no permitir más de una instancia de la interfaz gráfica GUI)
+If (WinExist(Title))
+    WinShow(Title), WinActivate(Title), WinMoveBottom(Title), ExitApp()
 
 
 ; variables super-globales necesarias cuando se muestra la interfaz GUI
@@ -206,94 +209,87 @@ Gui := GuiCreate("-DPIScale -Resize -MaximizeBox +MinSize690x481 +E0x00000400", 
     GCT.SetFont("Italic", "Segoe UI")
 Gui.SetFont("s9", "Segoe UI")
 
-;@Ahk2Exe-IgnoreBegin 64
+;@Ahk2Exe-IgnoreBegin32 1    :: Ignora la línea "If (A_PtrSize..." en la compilación de 32-bit
+;@Ahk2Exe-IgnoreBegin64 3    :: Ignora las líneas "If...", "Gui.AddText..." y "Else" en la compilación de 64-bit
 If (A_PtrSize == 4)    ; solo la versión de 32-Bit soporta waterctrl
     Gui.AddText("x0 y0 w690 h110 vlogo"), Util_LoadWaterCtrl(), Util_EnableWater(Gui.Control["logo"].Hwnd, Util_LoadLogo())
+;@Ahk2Exe-IgnoreBegin32 2    :: Ignora las líneas "Else" y "Gui.AddPic..." en la compilación de 32-bit
 Else
-;@Ahk2Exe-IgnoreEnd
     Gui.AddPic("x0 y0 w690 h110 vlogo", "HBITMAP:" . Util_LoadLogo())
 Gui.AddButton("x318 y4 w368 h100 vinfo Left", "  ©2004-2009 Chris Mallet`n  ©2008-2011 Steve Gray (Lexikos)`n  ©2011-2018 fincs`n  ©2018-2018 Flipeador`n`n  Nota: La compilación no garantiza la protección del código fuente.")
     DllCall("User32.dll\SetParent", "Ptr", Gui.Control["info"].Hwnd, "Ptr", Gui.Control["logo"].Hwnd)
-    ImageButton.Create(Gui.Control["a"].Hwnd, [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEE786, 0xFEF5BF, 0x2D4868, 5, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1])
-    Gui.Control["info"].OnEvent("Click", Func("WM_KEYDOWN").Bind(0x70, 0))
+    ImageButton.Create(Gui.Control["info"].Hwnd, [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEE786, 0xFEF5BF, 0x2D4868, 5, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1])
 
-Gui.AddTab3("x0 y110 w692 h304 vtab", "General|Información de la versión|Registros|AutoHotkey")
+Gui.AddTab3("x0 y110 w692 h304 vtab", "General|Registros|AutoHotkey")
     Gui.Control["tab"].OnEvent("Change", "Gui_Tab")
 
 Gui.Control["tab"].UseTab(1)
-Gui.AddGroupBox("x20 y150 w650 h90", "Parámetros requeridos")
-Gui.AddText("x30 y175 w120 h20 +0x200", "Fuente (archivo script)")
-Gui.AddComboBox("x180 y175 w435 h22 vddlsrc R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastSrcList, "`r`n", "|"), "|"))
+Gui.AddGroupBox("x20 y140 w650 h90", "Parámetros requeridos")
+Gui.AddText("x30 y165 w120 h20 +0x200", "Fuente (archivo script)")
+Gui.AddComboBox("x180 y165 w435 h22 vddlsrc R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastSrcList, "`r`n", "|"), "|"))
     CB_SetItemHeight(Gui.Control["ddlsrc"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
     CB_SetItemHeight(Gui.Control["ddlsrc"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
     Gui.Control["ddlsrc"].OnEvent("Change", "Util_UpdateSrc")
     CB_SetSelection(Gui.Control["ddlsrc"], CB_FindString(Gui.Control["ddlsrc"], Cfg.LastSrcFile))
     GCT.Attach(Gui.Control["ddlsrc"], "Buscar y seleccionar el archivo fuente en la lista")
     GCT.Attach(CB_GetInfo(Gui.Control["ddlsrc"]).Edit, "El archivo fuente script a compilar")
-Gui.AddButton("x620 y175 w40 h22 vbsrc", "•••")
+Gui.AddButton("x620 y165 w40 h22 vbsrc", "•••")
     Gui.Control["bsrc"].OnEvent("Click", "Gui_SrcButton")
     ImageButton.Create(Gui.Control["bsrc"].Hwnd, ButtonStyle2*)
     GCT.Attach(Gui.Control["bsrc"], "Buscar y seleccionar un archivo fuente")
-Gui.AddText("x30 y202 w120 h20 +0x200", "Destino (archivo exe)")
-Gui.AddEdit("x180 y202 w435 h20 vedest ReadOnly")
+Gui.AddText("x30 y192 w120 h20 +0x200", "Destino (archivo exe)")
+Gui.AddEdit("x180 y192 w435 h20 vedest ReadOnly")
     GCT.Attach(Gui.Control["edest"], "El archivo destino compilado EXE")
-Gui.AddButton("x620 y202 w40 h20 vbdest", "•••")
+Gui.AddButton("x620 y192 w40 h20 vbdest", "•••")
     Gui.Control["bdest"].OnEvent("Click", "Gui_DestButton")
     ImageButton.Create(Gui.Control["bdest"].Hwnd, ButtonStyle2*)
     GCT.Attach(Gui.Control["bdest"], "Seleccionar el archivo destino")
-Gui.AddGroupBox("x20 y249 w650 h85", "Parámetros opcionales")
-Gui.AddText("x30 y272 w120 h20 +0x200", "Icono (archivo ico)")
-Gui.AddComboBox("x180 y272 w435 h22 vddlico R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastIconList, "`r`n", "|"), "|"))
+Gui.AddGroupBox("x20 y239 w650 h90", "Parámetros opcionales")
+Gui.AddText("x30 y262 w120 h20 +0x200", "Icono (archivo ico)")
+Gui.AddComboBox("x180 y262 w435 h22 vddlico R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastIconList, "`r`n", "|"), "|"))
     CB_SetItemHeight(Gui.Control["ddlico"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
     CB_SetItemHeight(Gui.Control["ddlico"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
     CB_SetSelection(Gui.Control["ddlico"], CB_FindString(Gui.Control["ddlico"], Cfg.LastIconFile))
     GCT.Attach(Gui.Control["ddlico"], "Buscar y seleccionar un icono en la lista")
     GCT.Attach(CB_GetInfo(Gui.Control["ddlico"]).Edit, "El icono principal del archivo compilado")
-Gui.AddButton("x620 y272 w40 h22 vbico", "•••")
+Gui.AddButton("x620 y262 w40 h22 vbico", "•••")
     Gui.Control["bico"].OnEvent("Click", "Gui_IcoButton")
     ImageButton.Create(Gui.Control["bico"].Hwnd, ButtonStyle2*)
     GCT.Attach(Gui.Control["bico"], "Buscar y seleccionar un archivo icono")
-Gui.AddText("x32 y296 w120 h22 +0x200", "Archivo base (bin)")
-Gui.AddDDL("x180 y296 w405 h22 vddlbin R6 +0x400")
-    CB_SetItemHeight(Gui.Control["ddlbin"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
-    CB_SetItemHeight(Gui.Control["ddlbin"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
+Gui.AddText("x32 y290 w120 h22 +0x200", "Archivo base (bin)")
+Gui.AddDDL("x180 y290 w405 h22 vddlbin R6 +0x400")
+    CB_SetItemHeight(Gui.Control["ddlbin"], 16,  0)
+    CB_SetItemHeight(Gui.Control["ddlbin"], 16, -1)
     Util_LoadBinFiles(Cfg.LastBinFile)
     GCT.Attach(Gui.Control["ddlbin"], "El archivo base BIN AutoHotkey")
-Gui.AddButton("x592 y296 w68 h22 vbrefbin", "Refrezcar")
+Gui.AddButton("x592 y290 w68 h22 vbrefbin", "Refrezcar")
     Gui.Control["brefbin"].OnEvent("Click", () => Util_LoadBinFiles(Cfg.LastBinFile))
     ImageButton.Create(Gui.Control["brefbin"].Hwnd, ButtonStyle2*)
     GCT.Attach(Gui.Control["brefbin"], "Volver a leer los archivos BIN")
-Gui.AddGroupBox("x20 y344 w650 h61", "Compresión del archivo exe resultante")
-Gui.AddText("x30 y367 w125 h22 +0x200", "Método de compresión")
-Gui.AddDDL("x180 y367 w405 h22 vddlcomp R4 +0x400")
-    CB_SetItemHeight(Gui.Control["ddlcomp"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
-    CB_SetItemHeight(Gui.Control["ddlcomp"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
+Gui.AddGroupBox("x20 y338 w650 h61", "Compresión del archivo exe resultante")
+Gui.AddText("x30 y362 w125 h22 +0x200", "Método de compresión")
+Gui.AddDDL("x180 y362 w405 h22 vddlcomp R4 +0x400")
+    CB_SetItemHeight(Gui.Control["ddlcomp"], 16,  0)
+    CB_SetItemHeight(Gui.Control["ddlcomp"], 16, -1)
     Util_LoadCompressionFiles(Cfg.Compression)
     GCT.Attach(Gui.Control["ddlcomp"], "El método de compresión del archivo EXE")
-Gui.AddButton("x592 y367 w68 h22 vbdownload", "Descargar")
+Gui.AddButton("x592 y362 w68 h22 vbdownload", "Descargar")
     Gui.Control["bdownload"].OnEvent("Click", () => InStr(CB_GetText(Gui.Control["ddlcomp"]), "upx") ? Run("https://upx.github.io/") : InStr(CB_GetText(Gui.Control["ddlcomp"]), "mpress") ? Run("http://www.matcode.com/mpress.htm") : 0)
     ImageButton.Create(Gui.Control["bdownload"].Hwnd, ButtonStyle2*)
     GCT.Attach(Gui.Control["bdownload"], "Ir a la página oficial para descargar la herramienta seleccionada")
 
 Gui.Control["tab"].UseTab(2)
-Gui.AddListView("x2 y138 w686 h272 vlvri -E0x200", "Nombre|Valor")
-    DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvri"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
-    Util_UpdateSrc()
+Gui.AddListView("x2 y138 w686 h272 vlvlog -E0x200", "ID|Mensaje|Archivo|Línea|Tiempo")
+    DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvlog"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
+    Gui.Control["lvlog"].SetImageList(g_data.il:=IL_Create(1)), IL_Add(g_data.il, A_WinDir . "\regedit.exe")
 
 Gui.Control["tab"].UseTab(3)
-Gui.AddListView("x2 y138 w686 h272 vlvlog -E0x200", "ID|Mensaje|Archivo|Línea|Detalles|Código de error|Información adicional|Tiempo")
-    DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvlog"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
-
-Gui.Control["tab"].UseTab(4)
-Gui.AddGroupBox("x20 y150 w650 h90", "Instalación de AutoHotkey")
-Gui.AddText("x30 y175 w120 h20 +0x200", "Ruta de instalación")
-Gui.AddEdit("x180 y175 w435 h20 veahkp ReadOnly")
-Gui.AddButton("x620 y175 w40 h20 vbahkp", "•••")
-    Gui.Control["bahkp"].OnEvent("Click", "Gui_FindAHKButton")
-Gui.AddRadio("x30 y212 w130 h20 vrcurru Disabled", "Usuario actual")
-    Gui.Control["rcurru"].OnEvent("Click", "Gui_CurrURadio")
-Gui.AddRadio("x180 y212 w130 h20 vrallu Disabled", "Todos los usuarios")
-    Gui.Control["rallu"].OnEvent("Click", "Gui_AllURadio")
+Gui.AddPic("x0 y134 w690 h278 vahk")
+    LinearGradient(Gui.Control["ahk"], [0xFF0000,0xFFFF00,0x00FF00,0x00FFFF,0x0000FF])
+Gui.AddText("x0 y134 w690 h278 vahk2 Center BackgroundTrans +0x200", "AutoHotkey")
+    Try Gui.Control["ahk2"].SetFont("Bold s75", "Segoe Print")
+    Catch
+        Gui.Control["ahk2"].SetFont("Bold s75", "Arial")
 
 Gui.Control["tab"].UseTab()
 Gui.AddText("x0 y413 w690 h2 vbsp BackgroundFED22C")    ; separador
@@ -335,6 +331,7 @@ OnMessage(0x100, "WM_KEYDOWN")    ; cuando se presiona una tecla que no sea del 
 OnMessage(0x200, "WM_MOUSEMOVE")  ; cuando se mueve el cursor en la ventana
 OnExit("_OnExit")    ; al terminar
 
+Util_UpdateSrc()
 Util_Status()
 Return
 
@@ -378,50 +375,13 @@ Gui_DropFiles(Gui, Ctrl, FileArray, X, Y)
 
 Gui_Tab(Tab)
 {
-    If (Tab.Value == 4)
-    {
-        Local InstallDir := RegRead("HKLM\SOFTWARE\AutoHotkey", "InstallDir")
-        If (ErrorLevel || DirExist(InstallDir) || !FileExist(InstallDir))
-        {
-            InstallDir := RegRead("HKCU\SOFTWARE\AutoHotkey", "InstallDir")
-            If (ErrorLevel || DirExist(InstallDir) || !FileExist(InstallDir))
-                Gui.Control["rcurru"].Value := FALSE, Gui.Control["rallu"].Value := FALSE
-            Else
-                Gui.Control["rcurru"].Value := TRUE
-        }
-        Else
-            Gui.Control["rallu"].Value := TRUE
-
-        Gui.Control["eahkp"].Text := InstallDir
-    }
-}
-
-Gui_FindAHKButton()
-{
-    Local File := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar ruta de instalación de AutoHotkey.exe"],, {Ejecutables: "#*.exe"})
-    If (File)
-    {
-        RegWrite(File, "REG_SZ", "HKLM\SOFTWARE\AutoHotkey", "InstallDir")
-        If (ErrorLevel)
-            TaskDialog(INFO_ICON, [Title,"AutoHotkey"], ["Ha ocurrido un error al escribir la clave.`nIntente ejecutar el compilador como Administrador.",File])
-        Else
-            Gui.Control["eahkp"].Text := File, Gui.Control["rallu"].Value := TRUE
-    }
-}
-
-Gui_CurrURadio()
-{
-}
-
-Gui_AllURadio()
-{
 }
 
 Gui_SrcButton()
 {
     Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo fuente AHK..")
     Local File := CB_GetSelection(Gui.Control["ddlsrc"]) == -1 ? Cfg.LastSrcFile : CB_GetText(Gui.Control["ddlsrc"])
-        , File := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar archivo fuente"], File, {"Todos los archivos": "*.*", Iconos: "#*.ahk"},, 0x1200)
+        , File := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar archivo fuente"], File, {"Todos los archivos": "*.*", Scripts: "#*.ahk"},, 0x1200)
     If (File)
     {
         Loop (ObjLength(File))
@@ -463,6 +423,10 @@ Gui_CompileButton()
 {
     ERROR := FALSE
     Util_ClearLog()
+
+    ObjRawSet(g_data, "IgnoreSetMainIcon", TRUE)
+    ObjRawSet(g_data, "IgnoreBinFile", TRUE)
+    ObjRawSet(g_data, "IcoFile", CB_GetText(Gui.Control["ddlico"]))
 
     Local BinaryType := 0
     ObjRawSet(g_data, "BinFile", Util_CheckBinFile(CB_GetText(Gui.Control["ddlbin"]), BinaryType))
@@ -600,24 +564,6 @@ Util_SaveCfg()
         RegWrite(CB_GetSelection(Gui.Control["ddlcomp"]), "REG_DWORD", "HKCU\Software\AutoHotkey\Ahk2Exe", "Compression")
 }
 
-Util_LoadVerInfo()
-{
-    Return {      CompanyName: ["CompanyName"]
-           ,  FileDescription: ["FileDescription"]
-           ,      Description: ["FileDescription"]
-           ,      FileVersion: ["FileVersion"]
-           ,     InternalName: ["InternalName"]
-           ,   LegalCopyright: ["LegalCopyright"]
-           ,        Copyright: ["LegalCopyright"]
-           , OriginalFilename: ["OriginalFilename"]
-           ,     OrigFilename: ["OriginalFilename"]
-           ,      ProductName: ["ProductName"]
-           ,   ProductVersion: ["ProductVersion"]
-           ,          Version: ["FileVersion","ProductVersion"]
-           ,         Comments: ["Comments"]
-           ,             Name: ["ProductName","InternalName"]    }
-}
-
 Util_LoadBinFiles(Default)
 {
     CB_Delete(Gui.Control["ddlbin"])
@@ -628,11 +574,11 @@ Util_LoadBinFiles(Default)
 
 Util_CheckBinFile(Name, ByRef BinaryType := "")
 {
-    Local BinFile := RegExReplace(Name, "v(\d\.?)+\s*")    ; remueve la versión del archivo al inicio "v2.0.0.0 XXX..." --> "XXX..."
+    Local BinFile := RegExReplace(Name, "^v(\d\.?)+\s*")    ; remueve la versión del archivo al inicio "v2.0.0.0 XXX..." --> "XXX..."
     If (PATH(BinFile).Ext == "")
         BinFile .= ".bin"
 
-    BinaryType := GetBinaryType(BinFile)
+    BinaryType := GetBinaryType(BinFile := GetFullPathName(BinFile, A_ScriptDir))
     Return BinaryType == SCS_32BIT_BINARY || BinaryType == SCS_64BIT_BINARY ? BinFile : FALSE
 }
 
@@ -656,29 +602,24 @@ Util_UpdateSrc()
     SetTimer("Update", -250)
     Update()
     {
-        Local Script := CB_GetText(Gui.Control["ddlsrc"])
-            ,    foo := new Status("Analizando archivo fuente.. " . Script)
-            ,   Data := QuickParse(Script)
-        Gui.Control["ddlsrc"].Enabled := FALSE
+        Util_Status("Leyendo archivo fuente ..")
+        Local Data := QuickParse(CB_GetText(Gui.Control["ddlsrc"]))
         If (Data)
         {
             If (Data.MainIcon != "")
                 CB_Insert(Gui.Control["ddlico"], Data.MainIcon,, 0), CB_SetSelection(Gui.Control["ddlico"], Data.MainIcon, 0)
-
-            Gui.Control["lvri"].Delete()
-            Loop Parse, "Comments|CompanyName|FileDescription|FileVersion|InternalName|LegalCopyright|OriginalFilename|ProductName|ProductVersion", "|"
-                Gui.Control["lvri"].Add(, A_LoopField, IsObject(Data.VerInfo) && ObjHasKey(Data.VerInfo, A_LoopField) ? Data.VerInfo[A_LoopField] : "")
-            Gui.Control["lvri"].ModifyCol(1, "AutoHdr")
+            If (Data.BinFile != "")
+                CB_SetSelection(Gui.Control["ddlbin"], Data.BinFile, 2)
         }
-        Gui.Control["ddlsrc"].Enabled := TRUE
+        Util_Status()
     }
 }
 
-Util_AddLog(What, Message, Script := "-", Line := "-", Extra := "-", ErrorCode := "-", Other := "-")
+Util_AddLog(What, Message, Script := "-", Line := "-")
 {
     If (CMDLN)
         Return
-    Gui.Control["lvlog"].Add(, What, Message, Script, Line, Extra, ErrorCode, Other, FormatTime(, "dd/MM/yyyy hh:mm:ss"))
+    Gui.Control["lvlog"].Add("Icon1", What, Message, Script, Line, FormatTime(, "dd/MM/yyyy hh:mm:ss"))
     Loop 7
         Gui.Control["lvlog"].ModifyCol(A_Index, "AutoHdr")
 }
@@ -692,7 +633,7 @@ Util_LoadLogo()
 {
     Local hBitmap := LoadImage(-1, "LOGO.BMP")
 
-    ;@Ahk2Exe-IgnoreBegin 64
+    ;@Ahk2Exe-IgnoreBegin64 9
     If (A_PtrSize == 4)
     {
         ; necesario rotar la imagen para la correcta visualización con waterctrl
@@ -704,21 +645,22 @@ Util_LoadLogo()
         DllCall("Gdiplus.dll\GdipCreateHBITMAPFromBitmap", "UPtr", pBitmap, "PtrP", hBitmap, "Int", 0xFFFFFFFF)
         DllCall("Gdiplus.dll\GdipDisposeImage", "UPtr", pBitmap)
     }
-    ;@Ahk2Exe-IgnoreEnd
 
     Return hBitmap
 }
 
+;@Ahk2Exe-IgnoreBegin64
 Util_LoadWaterCtrl()
 {
+    If (FileExist(A_ScriptDir . "\waterctrl.dll"))
+        Return LoadLibrary(A_ScriptDir . "\waterctrl.dll")
+
+    ;@Ahk2Exe-IgnoreBegin 2
     If (!A_IsCompiled)
-        Return LoadLibrary("waterctrl.dll")
+        Util_Error("No se ha encontrado waterctrl.dll.",, 2)
 
     If (FileExist(A_Temp . "\waterctrl.dll"))
         Return LoadLibrary(A_Temp . "\waterctrl.dll")
-
-    If (FileExist(A_ScriptDir . "\waterctrl.dll"))
-        Return LoadLibrary(A_ScriptDir . "\waterctrl.dll")
 
     Local hExe := LoadLibrary(A_ScriptFullPath, 2), Size := 0
     FileOpen(A_Temp . "\waterctrl.dll", "w").RawWrite(LoadResource3(hExe, RT_RCDATA, "WATERCTRL.DLL", Size), Size)
@@ -733,6 +675,7 @@ Util_EnableWater(Hwnd, hBitmap)
     If (WATER_BLOB_INTERVAL)
         SetTimer(wctrltimer := () => DllCall("waterctrl.dll\waterblob", "Int", Random(0, 690), "Int", Random(0, 110), "Int", Random(3, 12), "Int", Random(20, 75)), WATER_BLOB_INTERVAL)
 } ; https://autohotkey.com/boards/viewtopic.php?t=3302
+;@Ahk2Exe-IgnoreEnd64
 
 Util_GetAhkPath()
 {
