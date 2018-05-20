@@ -18,14 +18,15 @@
 */
 ProcessCmdLine()
 {
-    Local           n := 1
-        , Compression := Cfg.Compression
-        ,     BinFile := Util_CheckBinFile(Cfg.LastBinFile) ? Cfg.LastBinFile : "Unicode " . 8*A_PtrSize . "-bit"
-        ,     AhkFile := ""
-        ,     ExeFile := ""
-        ,     IcoFile := ""
+    ObjRawSet(g_data, "Compression", Cfg.Compression)
+    ObjRawSet(g_data, "BinFile", Util_CheckBinFile(Cfg.LastBinFile) ? Cfg.LastBinFile : "Unicode " . 8*A_PtrSize . "-bit")
+    ObjRawSet(g_data, "IgnoreSetMainIcon", FALSE)
+    ObjRawSet(g_data, "IcoFile", "")
+    ObjRawSet(g_data, "ExeFile", "")
+    ObjRawSet(g_data, "AhkFile", "")
 
-    Loop (ObjLength(A_Args))
+    Local n := 1
+    Loop ( ObjLength(A_Args) )
     {
         If (--n)
             Continue
@@ -33,17 +34,19 @@ ProcessCmdLine()
         If (A_Args[A_Index] ~= "^/|-")
         {
             If (A_Args[A_Index] ~= "i)(/|-)in")
-                AhkFile := GetFullPathName(A_Args[A_Index+1]), n := 2
+                ObjRawSet(g_data, "AhkFile", GetFullPathName(A_Args[A_Index+1])), n := 2
             Else If (A_Args[A_Index] ~= "i)(/|-)out")
-                ExeFile := GetFullPathName(A_Args[A_Index+1], DirGetParent(AhkFile)), n := 2
+                ObjRawSet(g_data, "ExeFile", GetFullPathName(A_Args[A_Index+1], DirGetParent(g_data.AhkFile))), n := 2
             Else If (A_Args[A_Index] ~= "i)(/|-)icon")
-                IcoFile := GetFullPathName(A_Args[A_Index+1], DirGetParent(AhkFile)), n := 2
+                ObjRawSet(g_data, "IgnoreSetMainIcon", A_Args[A_Index+1] ~= "^\*")
+              , ObjRawSet(g_data, "IcoFile", GetFullPathName(RegExReplace(A_Args[A_Index+1], "^\*"), DirGetParent(g_data.AhkFile))), n := 2
             Else If (A_Args[A_Index] ~= "i)(/|-)bin")
-                BinFile := GetFullPathName(A_Args[A_Index+1]), n := 2
+                ObjRawSet(g_data, "IgnoreBinFile", A_Args[A_Index+1] ~= "^\*")
+              , ObjRawSet(g_data, "BinFile", RegExReplace(A_Args[A_Index+1], "^\*")), n := 2
             Else If (A_Args[A_Index] ~= "i)(/|-)upx")
-                Compression := UPX, n := 1
+                ObjRawSet(g_data, "Compression", UPX), n := 1
             Else If (A_Args[A_Index] ~= "i)(/|-)mpress")
-                Compression := MPRESS, n := 1
+                ObjRawSet(g_data, "Compression", MPRESS), n := 1
             Else If (A_Args[A_Index] ~= "i)(/|-)q")
                 BE_QUIET := TRUE, n := 1
             If (!n || (n == 2 && ObjLength(A_Args) <= A_Index))
@@ -54,38 +57,42 @@ ProcessCmdLine()
             }
         }
         Else
-            AhkFile := GetFullPathName(A_Args[A_Index]), n := 1
+            ObjRawSet(g_data, "AhkFile", GetFullPathName(A_Args[A_Index])), n := 1
     }
 
-    If (AhkFile == "")
+    If (g_data.AhkFile == "")
         Return ERROR_SOURCE_NO_SPECIFIED
 
-    If (!IS_FILE(AhkFile))
+    If (!IS_FILE(g_data.AhkFile))
         Return ERROR_SOURCE_NOT_FOUND
 
-    If (!FileOpen(AhkFile, "r"))
+    If (!FileOpen(g_data.AhkFile, "r"))
         Return ERROR_CANNOT_OPEN_SCRIPT
 
-    If (ExeFile == "")
-        ExeFile := DirGetParent(AhkFile) . "\" . PATH(AhkFile).FNNE . ".exe"
-    Else If (DirExist(ExeFile))
-        ExeFile := RTrim(ExeFile, "\") . "\" . PATH(AhkFile).FNNE . ".exe"
-    Else If (PATH(ExeFile).Ext == "")
-        ExeFile .= ".exe"
+    If (g_data.ExeFile == "")
+        ObjRawSet(g_data, "ExeFile", DirGetParent(g_data.AhkFile) . "\" . PATH(g_data.AhkFile).FNNE . ".exe")
+    Else If (DirExist(g_data.ExeFile))
+        ObjRawSet(g_data, "ExeFile", RTrim(g_data.ExeFile, "\") . "\" . PATH(g_data.AhkFile).FNNE . ".exe")
+    Else If (PATH(g_data.ExeFile).Ext == "")
+        g_data.ExeFile .= ".exe"
     
     Local BinaryType := 0
-    If (!Util_CheckBinFile(BinFile, BinaryType))
+    If (!(g_data.BinFile := Util_CheckBinFile(g_data.BinFile, BinaryType)))
         Return ERROR_BIN_FILE_NOT_FOUND
     ObjRawSet(g_data, "Compile64", BinaryType == SCS_64BIT_BINARY)
 
-    ObjRawSet(g_data, "IcoFile", IcoFile)
-    Local Data := PreprocessScript(AhkFile)
+    Local Data := PreprocessScript(g_data.AhkFile)
     If (!Data)
         Return UNKNOWN_ERROR
 
-    ObjRawSet(g_data, "Compression", Compression)
-    ObjRawSet(g_data, "BinFile", BinFile)
-    ObjRawSet(g_data, "AhkFile", AhkFile)
-    ObjRawSet(g_data, "ExeFile", ExeFile)
     Return AhkCompile(Data) ? ERROR_SUCCESS : UNKNOWN_ERROR
+}
+
+
+
+
+
+CMDLN(n)
+{
+    Return CMDLN ? n : NO_EXIT
 }
