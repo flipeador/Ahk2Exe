@@ -17,6 +17,9 @@
 
         Var structure
         https://msdn.microsoft.com/en-us/library/windows/desktop/ms646994(v=vs.85).aspx
+
+    Thanks to:
+        fincs : https://autohotkey.com/boards/viewtopic.php?f=24&t=521
 */
 Class VersionRes
 {
@@ -34,11 +37,17 @@ Class VersionRes
     ; ===================================================================================================================
     ; CONSTRUCTOR
     ; ===================================================================================================================
-    __New(Ptr := 0)
+    __New(Ptr, Data := "", Length := "")
     {
-        If (!Ptr)
-            Return this
+        If (Type(Ptr) == "String")
+        {
+            this[Type(Data) == "Integer" ? "SetBinary" : "SetText"](Data, Length)
+            Return this.SetKey(Ptr)
+        }
         
+        If (Type(Ptr) != "Integer" || Ptr < 0x10000)
+            Throw Exception("Class VersionRes invalid parameter #1", -1, "Invalid address")
+
         ObjRawSet( this,      "Length", NumGet(Ptr += 0, "UShort") )
         Local Limit := Ptr + this.Length
         ObjRawSet( this, "ValueLength", NumGet(Ptr += 2, "UShort") )
@@ -68,54 +77,12 @@ Class VersionRes
     ; ===================================================================================================================
     ; PUBLIC METHODS
     ; ===================================================================================================================
-    /*
-        Crea una estructura miembro válida. Devuelve un objeto VersionRes.
-        Parámetros:
-            Type:
-                El tipo de datos en Data. 0 para datos binarios. 1 para texto.
-            Key:
-                El nombre para este nuevo miembro. Este valor no puede ser una cadena vacía.
-            Data:
-                Los datos. Este valor depende del tipo de datos o el tipo de valor pasado.
-                Si va a incluir datos binarios, debe especificar un puntero. Debe especificar el tamaño en ValueLength.
-                Si va a incluir texto, debe especificar una cadena.
-            ValueLength:
-                El tamaño de Data. Obligatorio si Data es un puntero y Type es 0.
-    */
-    CreateChild(Type, Key, Data := "", ValueLength := 0)
-    {
-        If (Key == "")
-            Return FALSE
-        ValueLength := Type ? StrLen(Data) + 1 : ValueLength
-        Local   Size := ((6 + 2*StrLen(Key)+2 + 3) & ~3) + ((ValueLength * (Type + 1) + 3) & ~3)
-            , VerRes := new VersionRes()
-        ObjRawSet( VerRes,      "Length",        Size )
-        ObjRawSet( VerRes, "ValueLength", ValueLength )
-        ObjRawSet( VerRes,        "Type",        Type )
-        ObjRawSet( VerRes,         "Key", String(Key) )
-        If (Type)
-            ObjRawSet( VerRes, "Value", ValueLength ? SubStr(Data, 1, ValueLength) : String(Data) )
-        Else
-            ObjSetCapacity( VerRes, "Value", ValueLength )
-          , DllCall("msvcrt.dll\memcpy", "UPtr", ObjGetAddress(VerRes, "Value"), "UPtr", Data, "UPtr", ValueLength, "Cdecl")
-        Return VerRes 
-    }
-
-    /*
-        Añade un miembro en la estructura actual.
-        Parámetros:
-            Node:
-                Un objeto VersionRes o un puntero a la estructura miembro.
-    */
     AddChild(Node)
     {
         ObjPush(this.Children, IsObject(Node) ? Node : Node := new VersionRes(Node))
         Return Node
     }
     
-    /*
-        Recupera el miembro con el nombre especificado en la estructura actual.
-    */
     GetChild(Key, CaseSensitive := FALSE)
     {
         Loop (ObjLength(this.Children))
@@ -124,9 +91,6 @@ Class VersionRes
         Return FALSE
     }
 
-    /*
-        Elimina el miembro con el nombre especificado en la estructura actual.
-    */
     DeleteChild(Key, CaseSensitive := FALSE)
     {
         Loop (ObjLength(this.Children))
@@ -135,27 +99,41 @@ Class VersionRes
         Return FALSE
     }
     
-    /*
-        Elimina todos los miembros de la estructura actual.
-    */
     DeleteAll()
     {
         ObjRawSet(this, "Children", [])
     }
 
-    /*
-        Cambia el valor de la estructura actual por el texto especificado.
-    */
-    SetText(Text)
+    SetKey(Key)
     {
-        ObjRawSet(this, "Value", String(Text))
-        ObjRawSet(this, "Type", 1)
-        ObjRawSet(this, "ValueLength", StrLen(Text) + 1)
+        ObjRawSet(this, "Key", String(Key))
+        Return this
     }
 
-    /*
-        Recupera el tamaño total de la estructura actual junto con todos sus miembros.
-    */
+    SetText(Text, Length := "")
+    {
+        Text := Length == "" ? String(Text) : SubStr(Text, 1, Length)
+        ObjRawSet(this, "ValueLength", StrLen(Text) + 1)
+        ObjRawSet(this, "Value", Text)
+        ObjRawSet(this, "Type", 1)
+        Return this.ValueLength
+    }
+    
+    SetBinary(Address, Length)
+    {
+        If (Type(Address) != "Integer" || Address < 0x10000)
+            Throw Exception("Class VersionRes::SetBinary invalid parameter #1", -1, "Invalid address")
+
+        If (Type(Length) != "Integer" || Length < 0)
+            Throw Exception("Class VersionRes::SetBinary invalid parameter #2", -1, "Invalid data size")
+
+        ObjRawSet(this, "ValueLength", Length)
+        ObjSetCapacity(this, "Value", Length)
+        DllCall("msvcrt.dll\memcpy", "UPtr", ObjGetAddress(this, "Value"), "UPtr", Address, "UPtr", Length, "Cdecl")
+        ObjRawSet(this, "Type", 0)
+        Return Length
+    }
+
     GetSize()
     {
         Local Size := ((6 + 2*StrLen(this.Key)+2 + 3) & ~3) + ((this.ValueLength * (this.Type + 1) + 3) & ~3)
@@ -164,29 +142,23 @@ Class VersionRes
         Return Size
     }
 
-    /*
-        Escribe esta estructura junto con todos sus miembros en la dirección de memoria especificada y devuelve el tamaño total.
-    */
-    Save(Ptr)
+    Save(Address)
     {
-        Local PtrO := Ptr
+        Local Address2 := Address
+        NumPut(this.ValueLength, Address += 2, "UShort")
+        NumPut(this.Type, Address += 2, "UShort")
 
-        NumPut(this.ValueLength, Ptr += 2, "UShort")
-        NumPut(this.Type, Ptr += 2, "UShort")
-
-        Ptr += 2 * StrPut(this.Key, Ptr += 2, "UTF-16")
-        Ptr := (Ptr + 3) & ~3    ; Padding
+        Address := ( Address + 2 * StrPut(this.Key, Address += 2, "UTF-16") + 3 ) & ~3
 
         Local Size := this.ValueLength * (this.Type + 1)
-        DllCall("msvcrt.dll\memcpy", "UPtr", Ptr, "UPtr", ObjGetAddress(this, "Value"), "UPtr", Size, "Cdecl")
+        DllCall("msvcrt.dll\memcpy", "UPtr", Address, "UPtr", ObjGetAddress(this, "Value"), "UPtr", Size, "Cdecl")
 
-        Ptr += Size
-        Ptr := (Ptr + 3) & ~3    ; Padding
-
+        Address := ( Address + Size + 3 ) & ~3
+        
         Loop (ObjLength(this.Children))
-            Ptr += this.Children[A_Index].Save(Ptr)
+            Address += this.Children[A_Index].Save(Address)
 
-        NumPut(Size := Ptr - PtrO, PtrO, "UShort")
+        NumPut(Size := Address - Address2, Address2, "UShort")
         Return Size
     }
 }
