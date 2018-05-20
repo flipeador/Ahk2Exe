@@ -16,14 +16,14 @@
         MsgBox DirGetParent("X:")    ; X:
         MsgBox DirGetParent("X:\")    ; X:
         MsgBox DirGetParent("X:\A")    ; X:
-        MsgBox DirGetParent("X:\A\B")    ; X:\A
+        MsgBox DirGetParent("X:\A\B\")    ; X:\A
         MsgBox DirGetParent(".")    ; .:
         MsgBox DirGetParent("XXXXXXXXX")    ; XXXXXXXXX
         MsgBox DirGetParent("123\456\789")    ; 123\456
 */
 DirGetParent(DirName)
 {
-    If (InStr(DirName, "\"))
+    If (InStr(DirName := RTrim(Trim(DirName), "\"), "\"))
         Return SubStr(DirName, 1, InStr(DirName, "\",, -1) - 1)
 
     If (StrLen(DirName) == 1)
