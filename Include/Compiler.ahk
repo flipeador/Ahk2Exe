@@ -2,7 +2,7 @@
 {
     Util_AddLog("INFO", "Se ha iniciado la compilación", Data.Script)
 
-    Local foo := "", bar := ""    ; variables temporales
+    Local foo := "" ;, bar := ""    ; variables temporales
 
 
     ; ======================================================================================================================================================
@@ -22,7 +22,7 @@
         Return Util_Error("El archivo BIN no se ha podido abrir para lectura.", g_data.BinFile, CMDLN ? ERROR_BIN_FILE_CANNOT_OPEN : NO_EXIT)
     }
 
-    Local ExeFile := CMDLN ? g_data.ExeFile : Gui.Control["edest"].Text
+    Local ExeFile := CMDLN ? g_data.ExeFile : GetFullPathName(Gui.Control["edest"].Text, DirGetParent(Data.Script))
     If (ExeFile == "")    ; si no se a especificado un archivo destino, utiliza la misma carpeta y nombre que el archivo fuente
     {
         Local SrcDir := "", SrcName := ""
@@ -86,12 +86,14 @@
     ; todas las funciones ejecutadas a continuación asumimos que no fallarán, debido a que tuvo éxito la función BeginUpdateResource, y que además es raro (¿lo és?)
     Local hExe := LoadLibrary(ExeFile, 2)
 
+
     ; incluir el archivo fuente
     ; se incluye como texto simple, con el nombre ">AUTOHOTKEY SCRIPT<" que AHK (archivo bin) reconocerá para proceder a ejecutar el Script
     Local Size := StrPut(Data.Code, "UTF-8") - 1, Buffer := ""
     VarSetCapacity(Buffer, Size), StrPut(Data.Code, &Buffer, Size, "UTF-8")
     UpdateResource(hUpdate, RT_RCDATA, ">AUTOHOTKEY SCRIPT<",, &Buffer, Size)
-    VarSetCapacity(Buffer, 0)
+    Free(Buffer)
+
 
     ; incluir el archivo icono principal
     ; el primer icono (grupo #1) es el que tomará Windows como el icono principal del archivo
@@ -119,6 +121,7 @@
         hIconFile.Close()    ; cerramos el archivo icono principal
     }
 
+
     ; incluimos los recursos
     Loop (ObjLength(Data.Directives.Resources))
     {
@@ -130,7 +133,7 @@
         ; añadimos un icono ICO
         ; un archivo icono normalmente contiene varias imágenes con distintos tamaños, por ello debemos primero crear un grupo de iconos, este grupo especifica información
         ;   de las imágenes y los identificadores de cada imagen en RT_ICON
-        If (foo.ResType == RT_ICON)
+        If (foo.ResType == RT_GROUP_ICON)
         {
             If (hIconFile := ResFileOpen(Data, foo.FileName))
             {
@@ -144,7 +147,7 @@
 
         ; añadimos un cursor CUR
         ; se aplica la misma lógica que para archivos ICO
-        Else If (foo.ResType == RT_CURSOR)
+        Else If (foo.ResType == RT_GROUP_CURSOR)
         {
             If (hIconFile := ResFileOpen(Data, foo.FileName))
             {
@@ -178,40 +181,49 @@
                 UpdateResource(hUpdate, foo.ResType, RES_CTYPE(foo.ResName), foo.LangID, &Buffer, Size)
         }
 
-        hIconFile := 0, Buffer := "", VarSetCapacity(Buffer, 0)
+        hIconFile := 0, Free(Buffer)
     }
     
 
     ; establecemos la información de la versión
-    Local pVS_VERSIONINFO := LoadResource3(hExe, RT_VERSION, 1)
-        ,          VerRes := new VersionRes(pVS_VERSIONINFO)
-        ,         VerInfo := VerRes.GetChild("StringFileInfo").GetChild("040904B0")
+    Local  VerRes := new VersionRes( LoadResource3(hExe, RT_VERSION, 1) )    ; LoadResource3 devuelve un puntero a la estructura VS_VERSIONINFO
+        , VerInfo := VerRes.GetChild("StringFileInfo").GetChild("040904B0")    ; VerInfo representa la estructura StringTable (que contiene las popiedades)
     
-    VerInfo.DeleteAll()    ; eliminamos todas las propiedades
+    VerInfo.DeleteAll()    ; eliminamos todas las propiedades (sub-estructuras String en StringTable)
     For g_k, g_v in Data.Directives.VersionInfo    ; añadimos las nuevas propiedades
         VerInfo.AddChild( new VersionRes(g_k, g_v) )    ; g_k = Prop | g_v = Value
 
-    ; establecemos la versión del archivo
+    ; establecemos la versión binaria del archivo
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms646997(v=vs.85).aspx
-    Local FileVersion := StrSplit(Data.Directives.VersionInfo.FileVersion, ".")
-    NumPut(MAKELONG(FileVersion[2] is "Integer" ? FileVersion[2] : 0, FileVersion[1] is "Integer" ? FileVersion[1] : 0), ObjGetAddress(VerRes, "Value")+8, "UInt")    ; VS_FIXEDFILEINFO.dwFileVersionMS
-    NumPut(MAKELONG(FileVersion[4] is "Integer" ? FileVersion[4] : 0, FileVersion[3] is "Integer" ? FileVersion[3] : 0), ObjGetAddress(VerRes, "Value")+12, "UInt")    ; VS_FIXEDFILEINFO.dwFileVersionLS
+    NumPut(MAKELONG(Data.Directives.FileVersion[2], Data.Directives.FileVersion[1]), VerRes.GetValue(8), "UInt")    ; VS_FIXEDFILEINFO.dwFileVersionMS
+    NumPut(MAKELONG(Data.Directives.FileVersion[4], Data.Directives.FileVersion[3]), VerRes.GetValue(12), "UInt")    ; VS_FIXEDFILEINFO.dwFileVersionLS
 
-    ; establecemos la versión del producto
+    ; establecemos la versión binaria del producto
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms646997(v=vs.85).aspx
-    Local ProductVersion := StrSplit(Data.Directives.VersionInfo.ProductVersion, ".")
-    NumPut(MAKELONG(ProductVersion[2] is "Integer" ? ProductVersion[2] : 0, ProductVersion[1] is "Integer" ? ProductVersion[1] : 0), ObjGetAddress(VerRes, "Value")+16, "UInt")    ; VS_FIXEDFILEINFO.dwProductVersionMS
-    NumPut(MAKELONG(ProductVersion[4] is "Integer" ? ProductVersion[4] : 0, ProductVersion[3] is "Integer" ? ProductVersion[3] : 0), ObjGetAddress(VerRes, "Value")+20, "UInt")    ; VS_FIXEDFILEINFO.dwProductVersionLS
+    NumPut(MAKELONG(Data.Directives.ProductVersion[2], Data.Directives.ProductVersion[1]), VerRes.GetValue(16), "UInt")    ; VS_FIXEDFILEINFO.dwProductVersionMS
+    NumPut(MAKELONG(Data.Directives.ProductVersion[4], Data.Directives.ProductVersion[3]), VerRes.GetValue(20), "UInt")    ; VS_FIXEDFILEINFO.dwProductVersionLS
 
     ; guardamos la nueva estructura
-    VarSetCapacity(Buffer, VerRes.GetSize())    ; Buffer es la nueva estructura VS_VERSIONINFO
-    UpdateResource(hUpdate, RT_VERSION, 1)    ; eliminamos el recurso de versión actual
-    UpdateResource(hUpdate, RT_VERSION, 1, Data.Directives.ResourceLang, &Buffer, VerRes.Save(&Buffer))    ; escribimos el nuevo recurso de versión
-    Buffer := VerRes := VerInfo := "", VarSetCapacity(Buffer, 0)
+    UpdateResource(hUpdate, RT_VERSION, 1, Data.Directives.ResourceLang, VerRes.Alloc(Size), Size)    ; escribimos el nuevo recurso de versión reemplazando el actual
+    Free(VerInfo), Free(VerRes)
+
+
+    ; verificamos si debemos hacer cambios en el archivo .manifest
+    ; https://msdn.microsoft.com/en-us/library/6ad1fshk.aspx
+    If (Data.Directives.RequireAdmin)
+    {
+        foo := StrGet(LoadResource3(hExe, RT_MANIFEST, 1, Size), Size, "UTF-8")
+        foo := StrReplace(foo, "asInvoker", "requireAdministrator")    ; security requestedPrivileges requestedExecutionLevel level
+        VarSetCapacity(Buffer, Size := StrPut(foo, "UTF-8") - 1)
+        StrPut(foo, &Buffer, Size, "UTF-8")
+        UpdateResource(hUpdate, RT_MANIFEST, 1,, &Buffer, Size)
+        Free(Buffer)
+    }
 
 
     ; cerramos el archivo destino
     FreeLibrary(hExe), EndUpdateResource(hUpdate)
+
 
     ; establecemos el subsistema requerido para ejecutar el archivo destino
     ; PE File Format: https://blog.kowalczyk.info/articles/pefileformat.html
