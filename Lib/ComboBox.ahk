@@ -227,8 +227,11 @@ CB_SetEditSel(CB, StartingPos, EndingPos)
         Si Item es -1, devuelve siempre 0 (CB_OKAY).
         Si Item no es -1, devuelve la cantidad de elementos aún en la lista, o -1 si el elemento es inválido.
 */
-CB_Delete(CB, Item := -1)
+CB_Delete(CB, Item := -1, Flag := -1)
 {
+    If (Flag != -1 && CB_FindString(CB, Item,, Flag) == -1)
+        Return -1
+
     ; CB_RESETCONTENT message | CB_DELETESTRING message
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775878(v=vs.85).aspx
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775830(v=vs.85).aspx
@@ -261,14 +264,14 @@ CB_Insert(CB, String, Item := -1, Flag := -1)
     {
         Local First := -1
         Loop (ObjLength(String))
-            If (Flag == -1 || CB_FindString(CB, String, Flag) == -1)
+            If (Flag == -1 || CB_FindString(CB, String,, Flag) == -1)
                 Item := DllCall("User32.dll\SendMessageW", "Ptr", CB.Hwnd, "UInt", 0x014A, "Ptr", Item, "UPtr", &String[A_Index], "Ptr"), First := A_Index == 1 ? Item : First
         Return First
     }
 
     ; CB_INSERTSTRING message
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775875(v=vs.85).aspx
-    Return Flag == -1 || CB_FindString(CB, String, Flag) == -1 ? DllCall("User32.dll\SendMessageW", "Ptr", CB.Hwnd, "UInt", 0x014A, "Ptr", Item, "UPtr", &String, "Ptr") : -3
+    Return Flag == -1 || CB_FindString(CB, String,, Flag) == -1 ? DllCall("User32.dll\SendMessageW", "Ptr", CB.Hwnd, "UInt", 0x014A, "Ptr", Item, "UPtr", &String, "Ptr") : -3
 }
 
 
