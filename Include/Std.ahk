@@ -22,6 +22,16 @@ PATH(Path, ByRef FN := "", ByRef Dir := "", ByRef Ext := "", ByRef FNNE := "", B
 
 
 
+Free(ByRef Var, Default := "")
+{
+    Var := ""
+    VarSetCapacity(Var, 0)
+    Var := Default
+}
+
+
+
+
 
 /*
     #define MAKEWORD(a, b)      ((WORD)(((BYTE)(((DWORD_PTR)(a)) & 0xff)) | ((WORD)((BYTE)(((DWORD_PTR)(b)) & 0xff))) << 8))
