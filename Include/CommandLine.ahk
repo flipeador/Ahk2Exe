@@ -80,6 +80,7 @@ ProcessCmdLine()
     If (!(g_data.BinFile := Util_CheckBinFile(g_data.BinFile, BinaryType)))
         Return ERROR_BIN_FILE_NOT_FOUND
     ObjRawSet(g_data, "Compile64", BinaryType == SCS_64BIT_BINARY)
+    ObjRawSet(g_data, "BinVersion", FileGetVersion(g_data.BinFile))
 
     Local Data := PreprocessScript(g_data.AhkFile)
     If (!Data)
