@@ -21,17 +21,16 @@
     Thanks to:
         fincs : https://autohotkey.com/boards/viewtopic.php?f=24&t=521
 */
-Class VersionRes
+Class VersionRes    ;// updated on 2018-05-25 | Flipeador
 {
     ; ===================================================================================================================
     ; INSTANCE VARIABLES
     ; ===================================================================================================================
-         Length := 0     ; WORD wLength
-    ValueLength := 0     ; wORD wValueLength
+    ValueLength := 0     ; WORD wValueLength
            Type := 0     ; WORD wType
             Key := ""    ; WCHAR szKey
           Value := ""    ; VS_FIXEDFILEINFO|WORD Value
-       Children := []    ; StringFileInfo|StringTable|String|VarFileInfo|Var Children
+       Children := []    ; VS_VERSIONINFO|StringFileInfo|StringTable|String|VarFileInfo|Var Children
     
 
     ; ===================================================================================================================
@@ -48,22 +47,19 @@ Class VersionRes
         If (Type(Ptr) != "Integer" || Ptr < 0x10000)
             Throw Exception("Class VersionRes invalid parameter #1", -1, "Invalid address")
 
-        ObjRawSet( this,      "Length", NumGet(Ptr += 0, "UShort") )
-        Local Limit := Ptr + this.Length
+        Local Limit := Ptr + NumGet(Ptr, "UShort")
         ObjRawSet( this, "ValueLength", NumGet(Ptr += 2, "UShort") )
         ObjRawSet( this,        "Type", NumGet(Ptr += 2, "UShort") )    ; 0 = Binary | 1 = Text
         ObjRawSet( this,         "Key", StrGet(Ptr += 2, "UTF-16") )
 
-        Ptr += 2 * ( StrLen(this.Key) + 1 )
-        Ptr := (Ptr + 3) & ~3    ; Padding
+        Ptr := (Ptr + 2 * ( StrLen(this.Key) + 1 ) + 3) & ~3
 
         Local Size := this.ValueLength * (this.Type + 1)
         ObjSetCapacity(this, "Value", Size)
 
         DllCall("msvcrt.dll\memcpy", "UPtr", ObjGetAddress(this, "Value"), "UPtr", Ptr, "UPtr", Size, "Cdecl")
 
-        Ptr += Size
-        Ptr := (Ptr + 3) & ~3    ; Padding
+        Ptr := (Ptr + Size + 3) & ~3
 
         While (Ptr < Limit)
         {
@@ -79,7 +75,9 @@ Class VersionRes
     ; ===================================================================================================================
     AddChild(Node)
     {
-        ObjPush(this.Children, IsObject(Node) ? Node : Node := new VersionRes(Node))
+        If (!IsObject(Node) || Node.__Class != "VersionRes")
+            Throw Exception("Class VersionRes::AddChild invalid parameter #1", -1)
+        ObjPush(this.Children, Node)
         Return Node
     }
     
@@ -102,6 +100,7 @@ Class VersionRes
     DeleteAll()
     {
         ObjRawSet(this, "Children", [])
+        Return this
     }
 
     SetKey(Key)
@@ -134,12 +133,35 @@ Class VersionRes
         Return Length
     }
 
+    GetKey()
+    {
+        Return this.Key
+    }
+
+    GetValue(Offset := 0)
+    {
+        Return this.Type ? this.Value : ObjGetAddress(this, "Value") + Offset
+    }
+
+    GetType()
+    {
+        Return this.Type
+    }
+
     GetSize()
     {
         Local Size := ((6 + 2*StrLen(this.Key)+2 + 3) & ~3) + ((this.ValueLength * (this.Type + 1) + 3) & ~3)
         Loop (ObjLength(this.Children))
             Size += this.Children[A_Index].GetSize()
         Return Size
+    }
+
+    Alloc(ByRef Size)
+    {
+        ObjRawSet(this, "Buffer", "")
+        ObjSetCapacity(this, "Buffer", this.GetSize())
+        Size := this.Save(ObjGetAddress(this, "Buffer"))
+        Return ObjGetAddress(this, "Buffer")
     }
 
     Save(Address)
