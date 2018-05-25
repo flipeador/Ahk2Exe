@@ -111,13 +111,17 @@ El orden de los parámetros especificados importa, por ejemplo, si especifica pr
 # Directivas específicas del compilador
 El compilador acepta ciertas directivas que le permiten personalizar aún más el script compilado `.exe`.
 
+Para asegurarse de que todas las directivas funcionen correctamente, considere **utilizar solo espacios** (no tabulaciones).
+
+En ciertas directivas, se permiten comentarios únicamente mediante el uso del caracter `;` y/o los parámetros se saparan por medio de comas, puede añadir un caracter de estos de forma literal utilizando el caracter de escape de AHK.
+
 - ##### Directivas que controlan el comportamiento del script
 
   - **`;@Ahk2Exe-IgnoreBegin`**`[Lines]`
 
     Es posible eliminar secciones de código del script compilado al encerrarlas en las directivas `@Ahk2Exe-IgnoreBegin` y `@Ahk2Exe-IgnoreEnd` como si fueran comentarios multilinea en bloque `/**/`.
 
-    `Lines` Es la cantidad de líneas a ignorar a partir de `IgnoreBegin`. Las líneas en blanco y comentarios no se tienen en cuenta (no cuentan como una línea). Si no se especifica, se ignora todo el código hasta encontrar un `IgnoreEnd`. Si se encuentra un `IgnoreEnd` antes de terminar el conteo de líneas especificadas, se terminará en ese punto y las líneas faltantes se incluirán en la compilación.
+    `Lines` Es la cantidad de líneas a ignorar a partir de `IgnoreBegin`. Las líneas en blanco y comentarios no se tienen en cuenta (no cuentan como una línea). Si no se especifica, se ignora todo el código hasta encontrar un `IgnoreEnd`. Si se encuentra un `IgnoreEnd` antes de terminar el conteo de líneas especificadas, se terminará en ese punto y las líneas restantes de código a excluir se terminarán incluyendo en la compilación.
 
     `IgnoreBegin32` y `IgnoreBegin64`En el primer caso, indica que el código no debe incluirse en la compilación de `32-bit`. En el segundo caso, indica que el código no debe incluirse en la compilación de `64-bit`. La directiva de cierre es `IgnoreEnd32` y `IgnoreEnd64` respectivamente.
 
@@ -135,8 +139,9 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
     MsgBox "Este mensaje solo aparecerá en la compilación AHK de 64-Bit"
     ;@Ahk2Exe-IgnoreEnd32
     MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
-    ;@Ahk2Exe-IgnoreBegin64 1
+    ;@Ahk2Exe-IgnoreBegin64
     MsgBox "Este mensaje solo aparecerá en la compilación AHK de 32-Bit"
+    ;@Ahk2Exe-IgnoreEnd64
     MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
     ```
 
@@ -163,36 +168,91 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
     MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
     ```
 
+  - **`@Ahk2Exe-Define`**`Identifier [Replacement]`
+    Define un identificador (variable) en el valor especificado. Este identificador podrá ser utilizado con otras directivas del compilador que soporten esta característica.
+
+    `Identifier` Es un nombre cualquiera sin espacio que será utilizado como identificador. El nombre no puede ser una cadena vacía.
+
+    `Replacement` Es el valor de `Identifier`. Puede ser cualquier cadena, incluyendo espacios. Si no se especifica, se establece en una cadena vacía.
+
+  - **`@Ahk2Exe-UnDef`**`Identifier`
+    Elimina un identificador definido anteriormente mediante la directiva `@Ahk2Exe-Define`.
+
+  - **`@Ahk2Exe-If/EndIf/IfDef/IfNDef`**`Condition`
+    Estas directivas permiten incluir o descartar parte del código de un programa si se cumple una determinada condición.
+
+    ```autohotkey
+    ;@Ahk2Exe-define A
+    ;@Ahk2Exe-define B 115
+    ;@Ahk2Exe-define C 255
+    MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
+    ;@Ahk2Exe-ifdef A
+    MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
+    ;@Ahk2Exe-endif
+    ;@Ahk2Exe-ifndef B
+    MsgBox "Este mensaje no aparece en el script compilado"
+    ;@Ahk2Exe-endif
+    ;@Ahk2Exe-if C 255
+    MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
+    ;@Ahk2Exe-endif
+    ;@Ahk2Exe-if B 125
+    MsgBox "Este mensaje no aparece en el script compilado"
+    ;@Ahk2Exe-endif
+    MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
+    ```
+
+	**Nota: Esta caracteristica se encuentra actualmente en desarrollo, por lo que su funcionamiento es muy limitado. Actualmente no soporta expresiones, ifs anidados, entre otros. La funcionalidad actual que se muestra en el ejemplo de arriba no será cambiada, por lo que puede utilizar esta directiva sin preocupaciones a futuro y su código seguirá compilando correctamente.**
+
 <br><br>
 
 - ##### Directivas que controlan los metadatos ejecutables
 
   - **`;@Ahk2Exe-SetProp`**`Valor`
 
-    Cambia una propiedad en la información de versión del ejecutable compilado. En la tabla siguiente se describen las propiedades disponibles y su descripción. Puede utilizar las propiedades descritas entre parentesis para evitar utilizar, por ejemplo, la propiedad `Name`, que cambia tanto el nombre del producto como el nombre interno.
+    Cambia una propiedad en la información de versión del ejecutable compilado. En la tabla siguiente se describen las propiedades disponibles y su descripción. Puede utilizar las propiedades descritas entre parentesis para evitar utilizar, por ejemplo, la propiedad `Name`, que cambia tanto el nombre del producto como el nombre interno. Si desea un mayor control sobre la información de la versión, considere utilizar las directivas `@Ahk2Exe-VerInfo`, `@Ahk2Exe-FileVersion` y `@Ahk2Exe-ProductVersion`.
 
     `Prop` Debe reemplazarse por el nombre de la propiedad a cambiar. Puede ser cualquier cadena/texto que no contenga espacios.
 
-    `Value` Es el valor a establecer a la propiedad. Puede ser cualquier cadena/texto con cualquier caracter, incluido espacios.
+    `Value` Es el valor a establecer a la propiedad. Puede ser cualquier cadena/texto con cualquier caracter, incluido espacios. Este valor puede ser una cadena vacía.
 
     | Propiedad | Descripción |
     | --------- | ----------- |
     | Name | Cambia el nombre del producto (`ProductName`) y el nombre interno (`InternalName`). |
     | Description | Cambia la descripción del archivo (`FileDescription`). |
-    | Version | Cambia la versión del archivo (`FileVersion`) y la versión del producto (`ProductVersion`). Si esta propiedad no se modifica, se usa de forma predeterminada la versión de AutoHotkey utilizada para compilar el script. Esto tambien establece la versión binaria (`VS_FIXEDFILEINFO`) en el archivo (la que se obtiene con `FileGetVersion`). |
+    | Version | Cambia la versión del archivo (`FileVersion`) y la versión del producto (`ProductVersion`). Si esta propiedad no se modifica, se usa de forma predeterminada la versión de AutoHotkey utilizada para compilar el script. Esto tambien establece la versión binaria (`VS_FIXEDFILEINFO`) en el archivo; Si algún valor no es un número se establece en cero, por ejemplo: `1.A.5 -> 1.0.5.0`. Para especificar una versión binaria diferente a este valor, utilize las directivas `@Ahk2Exe-FileVersion` y `@Ahk2Exe-ProductVersion`. |
     | Copyright  | Cambia la información legal de copyright (derechos de autor). |
     | OrigFilename | Cambia la información del nombre de archivo original (`OriginalFileName`). |
     | CompanyName | Cambia el nombre de la compañía. |
 	| Comments | Contiene cualquier información adicional que se debe mostrar con fines de diagnóstico |
 	| XXX | `XXX` es cualquier otro nombre que no sea los comunes de arriba. [Aquí](https://goo.gl/DtVHA5) puede ver los nombres de propiedad más comunes para la información de la versión. Puede especificar cualquier nombre excepto `MainIcon` que es otra directiva. |
 
+  - **`;@Ahk2Exe-FileVersion`**`0.0.0.0`
+
+    Establece el número de versión binaria del archivo, esto es, `VS_FIXEDFILEINFO.dwFileVersionMS` y `VS_FIXEDFILEINFO.dwFileVersionLS`. Este es el número que recupera la función incorporada de AutoHotkey `FileGetVersion`. Este valor se establece automáticamente cuando se establece la propiedad `FileVersion` en la directiva `@Ahk2Exe-SetProp`.
+
+    `0.0.0.0` Especifica la versión. Debe especificar 4 numeros enteros positivos separados por un punto. Si el valor especificado es inválido se mostrará un error y la compilación será cancelada.
+
+  - **`;@Ahk2Exe-ProductVersion`**`0.0.0.0`
+
+    Establece el número de versión binaria del producto con el que se distribuyó este archivo, esto es, `VS_FIXEDFILEINFO.dwProductVersionMS` y `VS_FIXEDFILEINFO.dwProductVersionLS`. Este valor se establece automáticamente cuando se establece la propiedad `ProductVersion` en la directiva `@Ahk2Exe-SetProp`.
+
+  - **`;@Ahk2Exe-VerInfo`**`Prop [, Value] [, Delete?]`
+
+    Esta directiva es una alternativa a `@Ahk2Exe-SetProp`. Hace modificaciones en la información de la versión, permite añadir, modificar y eliminar propiedades. Esta directiva le será útil si desea eliminar las propiedades por defecto que se añaden a la información de la versión (`Comments`, `FileVersion` y `ProductVersion`), además de añadir propiedades cuyo nombre contenga espacios. Puede especificar una coma `,` literal utilizando el caracter de escape de AHK.
+
+    `Prop` El nombre de la propiedad. A diferencia de `@Ahk2Exe-SetProp` aquí se admiten espacios. Este parámetro únicamente puede ser omitido (cadena vacía) si `Delete` se estableció en el número `2`.
+
+    `Value` El valor de la propiedad. Si no se especifica, se establece en una cadena vacía.
+
+    `Delete` Especifica si desea eliminar una propiedad o si se desea eliminar todas las propiedades. Para eliminar la propiedad especificada debe especificar el número `1`. Para eliminar todas las propiedades debe especificar el número `2` (en este caso los dos primeros parámetros se ignoran). Si se va a añadir o modificar una propiedad, debe omitir este parámetro.
+
   - **`;@Ahk2Exe-SetMainIcon`**`IcoFile`
 
-    Establece el icono principal, esta directiva sobreescribe el icono especificado en la interfaz y línea de parámetros del compilador. Si utiliza esta directiva, antes de añadir el icono se eliminan todos los iconos por defecto de AHK, incluyendo los iconos de `Pausa` y `Suspensión`, quedando únicamente el icono por defecto especificado. El nombre del grupo en `RT_GROUP_ICON` es `159`, por lo que debe evitar añadir recursos iconos con este nombre mediante `AddResource`. El idioma utilizado para el icono principal es 0x0409 (`SUBLANG_ENGLISH_US`).
+    Establece el icono principal, esta directiva sobreescribe el icono especificado en la interfaz y línea de parámetros del compilador. Si utiliza esta directiva, antes de añadir el icono se eliminan todos los iconos por defecto de AHK, incluyendo los iconos de `Pausa` y `Suspensión`, quedando únicamente el icono por defecto especificado. El nombre del grupo en `RT_GROUP_ICON` es `159`, por lo que debe evitar añadir recursos iconos con este nombre mediante `AddResource`. El idioma utilizado para el icono principal es 0x0409 (`SUBLANG_ENGLISH_US`). Esta directiva será ignorada si se especificó un asterisco `*` al inicio del nombre del archivo ICO en la línea de parámetros.
 
-  - **`;@Ahk2Exe-PostExec`**`Comando`
+  - **`;@Ahk2Exe-PostExec`**`Command`
 
-    Especifica un comando que se ejecutará después de una compilación exitosa. La cadena especificada en `Comando` será ejecutada mediante la función incorporada en AHK `Run`.
+    Especifica un comando que se ejecutará después de una compilación exitosa. La cadena especificada en `Command` será ejecutada mediante la función incorporada en AHK `Run`.
 
   - **`;@Ahk2Exe-ConsoleApp`**
 
@@ -216,15 +276,15 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
 
     | Tipo de recurso | Extensiones |
     | --------------- | ------------ |
-    | 1 (RT_CURSOR) | .cur (cursores) |
     | 2 (RT_BITMAP) | .bmp; .dib |
-    | 3 (RT_ICON) | .ico (iconos) |
     | 4 (RT_MENU) | - |
     | 5 (RT_DIALOG) | - |
     | 6 (RT_STRING) | - |
     | 9 (RT_ACCELERATORS) | - |
     | 10 (RT_RCDATA) | Cualquier otra extensión. Este es el recurso utilizado por la función `FileInstall`. |
     | 11 (RT_MESSAGETABLE) | - |
+    | 12 (RT_GROUP_CURSOR) | .cur (cursores) |
+    | 14 (RT_GROUP_ICON) | .ico (iconos) |
     | 23 (RT_HTML) | .htm; .html; .mht |
     | 24 (RT_MANIFEST) | .manifest (El nombre por defecto para este tipo de recurso es el número entero `1`) |
 
@@ -234,15 +294,19 @@ El compilador acepta ciertas directivas que le permiten personalizar aún más e
     | --------------- | ----------- |
     | .PNG (RT_ICON) | Imágenes PNG |
 
+  - **`;@Ahk2Exe-RequireAdmin`**
+
+    La aplicación se ejecutará con permisos de administrador. El usuario que inicia la aplicación debe ser un miembro del grupo Administradores. Si el proceso de apertura no se ejecuta con permisos administrativos, el sistema solicitará credenciales.
+
   - **`;@Ahk2Exe-UseResourceLang`**`LangCode`
 
-    Cambia el lenguaje por defecto de los recursos añadidos por medio de la directiva `@Ahk2Exe-AddResource`. Tenga en cuenta que este valor no se tendrá en cuenta si se especificó el código de idioma en la directiva `AddResource`. El código de idioma utilizado por defecto es 0x0409 (`SUBLANG_ENGLISH_US`).
+    Cambia el lenguaje por defecto de los recursos añadidos por medio de la directiva `@Ahk2Exe-AddResource`. Tenga en cuenta que este valor no se tendrá en cuenta si se especificó el código de idioma en la directiva `AddResource`. El código de idioma utilizado por defecto es 0x0409 (`SUBLANG_ENGLISH_US`). Esto también afecta al idioma del recurso de información de versión (`@Ahk2Exe-SetProp`).
 
     `LangCode` Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693%28v=vs.85%29.aspx). Tenga en cuenta que los números hexadecimales deben tener un prefijo `0x`. Si se especifica un código de idioma inválido/desconocido ocurrirá un error; Se utiliza la función [LCIDToLocaleName](https://goo.gl/pTQtjp) para comprobar que el código sea válido.
 
   - **`;@Ahk2Exe-Bin`**`BinFile`
 
-    Especifica el archivo BIN a utilizar durante la compilación.
+    Especifica el archivo BIN a utilizar durante la compilación. Esta directiva será ignorada si se especificó un asterisco `*` al inicio del nombre del archivo BIN en la línea de parámetros.
 
 
 
