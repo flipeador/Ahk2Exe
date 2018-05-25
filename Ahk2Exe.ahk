@@ -1,15 +1,15 @@
 ﻿;@Ahk2Exe-SetName             Ahk2Exe
 ;@Ahk2Exe-SetOrigFilename     Ahk2Exe.exe
 ;@Ahk2Exe-SetDescription      Compilador de scripts para AutoHotkey v2 en español
-;@Ahk2Exe-SetFileVersion      1.0.0.1
+;@Ahk2Exe-SetFileVersion      1.0.0.2
 ;@Ahk2Exe-SetCompanyName      AutoHotkey
 ;@Ahk2Exe-SetCopyright        Copyright (c) 2004-2018
-;@Ahk2Exe-SetComments         https://github.com/flipeador/Ahk2Exe
+;@Ahk2Exe-SetComments         [2018-05-25] https://github.com/flipeador/Ahk2Exe
 
-;@Ahk2Exe-SetMainIcon         Ahk2Exe.ico
+;@Ahk2Exe-SetMainIcon Ahk2Exe.ico
 
-;@Ahk2Exe-AddResource logo.bmp
-;@Ahk2Exe-AddResource waterctrl.dll
+;@Ahk2Exe-AddResource logo.bmp         ; imagen logo de AHK
+;@Ahk2Exe-AddResource waterctrl.dll    ; para el efecto de agua en la imagen logo
 
 
 
@@ -77,7 +77,7 @@ global Title := "Ahk2Exe para AutoHotkey v" . A_AhkVersion . " | Script a EXE Co
 
 
 ; variables super-globales
-global  g_data := {}
+global  g_data := { define: {} }
       ,    g_k := 0, g_v := 0    ; for g_k, g_v in Obj
 global     Cfg := Util_LoadCfg()
 global    Gdip := new Gdiplus
@@ -169,7 +169,7 @@ If (CMDLN)
 
 ; comprobamos instancia (no permitir más de una instancia de la interfaz gráfica GUI)
 If (WinExist(Title))
-    WinShow(Title), WinActivate(Title), WinMoveBottom(Title), ExitApp()
+    WinShow(Title), WinMoveBottom(Title), WinActivate(Title), ExitApp()
 
 
 ; variables super-globales necesarias cuando se muestra la interfaz GUI
@@ -188,7 +188,10 @@ global WIN_MINIMIZED := -1
      ,    WIN_NORMAL :=  0
      , WIN_MAXIMIZED :=  1
 
-global VK_F1 := 0x70    ; https://msdn.microsoft.com/en-us/library/windows/desktop/dd375731(v=vs.85).aspx
+global     VK_F1 := 0x70    ; F1 key                       || https://msdn.microsoft.com/en-us/library/windows/desktop/dd375731(v=vs.85).aspx
+     , VK_DELETE := 0x2E    ; DEL key
+     ,   VK_BACK := 0x08    ; BACKSPACE key
+
 
 global COLOR_3DFACE := DllCall("User32.dll\GetSysColor", "Int", 15, "UInt")    ; color por defecto de las ventanas GUI
        COLOR_3DFACE := (COLOR_3DFACE & 255) << 16 | (COLOR_3DFACE & 65280) | (COLOR_3DFACE >> 16)
@@ -209,11 +212,11 @@ Gui := GuiCreate("-DPIScale -Resize -MaximizeBox +MinSize690x481 +E0x00000400", 
     GCT.SetFont("Italic", "Segoe UI")
 Gui.SetFont("s9", "Segoe UI")
 
-;@Ahk2Exe-IgnoreBegin32 1    :: Ignora la línea "If (A_PtrSize..." en la compilación de 32-bit
-;@Ahk2Exe-IgnoreBegin64 3    :: Ignora las líneas "If...", "Gui.AddText..." y "Else" en la compilación de 64-bit
+;@Ahk2Exe-IgnoreBegin32 1    // Ignora la línea "If (A_PtrSize..." en la compilación de 32-bit
+;@Ahk2Exe-IgnoreBegin64 3    // Ignora las líneas "If...", "Gui.AddText..." y "Else" en la compilación de 64-bit
 If (A_PtrSize == 4)    ; solo la versión de 32-Bit soporta waterctrl
     Gui.AddText("x0 y0 w690 h110 vlogo"), Util_LoadWaterCtrl(), Util_EnableWater(Gui.Control["logo"].Hwnd, Util_LoadLogo())
-;@Ahk2Exe-IgnoreBegin32 2    :: Ignora las líneas "Else" y "Gui.AddPic..." en la compilación de 32-bit
+;@Ahk2Exe-IgnoreBegin32 2    // Ignora las líneas "Else" y "Gui.AddPic..." en la compilación de 32-bit
 Else
     Gui.AddPic("x0 y0 w690 h110 vlogo", "HBITMAP:" . Util_LoadLogo())
 Gui.AddButton("x318 y4 w368 h100 vinfo Left", "  ©2004-2009 Chris Mallet`n  ©2008-2011 Steve Gray (Lexikos)`n  ©2011-2018 fincs`n  ©2018-2018 Flipeador`n`n  Nota: La compilación no garantiza la protección del código fuente.")
@@ -227,19 +230,20 @@ Gui.Control["tab"].UseTab(1)
 Gui.AddGroupBox("x20 y140 w650 h90", "Parámetros requeridos")
 Gui.AddText("x30 y165 w120 h20 +0x200", "Fuente (archivo script)")
 Gui.AddComboBox("x180 y165 w435 h22 vddlsrc R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastSrcList, "`r`n", "|"), "|"))
-    CB_SetItemHeight(Gui.Control["ddlsrc"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
-    CB_SetItemHeight(Gui.Control["ddlsrc"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
-    Gui.Control["ddlsrc"].OnEvent("Change", "Util_UpdateSrc")
+    CB_SetItemHeight(Gui.Control["ddlsrc"], 16,  0)
+    CB_SetItemHeight(Gui.Control["ddlsrc"], 16, -1)
+    Gui.Control["ddlsrc"].OnEvent("Change", "Util_DDLSrc")
     CB_SetSelection(Gui.Control["ddlsrc"], CB_FindString(Gui.Control["ddlsrc"], Cfg.LastSrcFile))
     GCT.Attach(Gui.Control["ddlsrc"], "Buscar y seleccionar el archivo fuente en la lista")
-    GCT.Attach(CB_GetInfo(Gui.Control["ddlsrc"]).Edit, "El archivo fuente script a compilar")
+    GCT.Attach(CB_GetInfo(Gui.Control["ddlsrc"]).Edit, "El archivo fuente script a compilar`nPresione Supr para eliminar el elemento de la lista")
 Gui.AddButton("x620 y165 w40 h22 vbsrc", "•••")
     Gui.Control["bsrc"].OnEvent("Click", "Gui_SrcButton")
     ImageButton.Create(Gui.Control["bsrc"].Hwnd, ButtonStyle2*)
     GCT.Attach(Gui.Control["bsrc"], "Buscar y seleccionar un archivo fuente")
 Gui.AddText("x30 y192 w120 h20 +0x200", "Destino (archivo exe)")
-Gui.AddEdit("x180 y192 w435 h20 vedest ReadOnly")
-    GCT.Attach(Gui.Control["edest"], "El archivo destino compilado EXE")
+Gui.AddEdit("x180 y192 w435 h20 vedest")
+    Gui.Control["edest"].OnEvent("Change", () => SetTimer("Util_UpdateSrc", Gui.Control["edest"].Text == "" ? -1000 : "Off"))
+    GCT.Attach(Gui.Control["edest"], "El archivo destino compilado EXE`nSe tene en cuenta el directorio del archivo fuente")
 Gui.AddButton("x620 y192 w40 h20 vbdest", "•••")
     Gui.Control["bdest"].OnEvent("Click", "Gui_DestButton")
     ImageButton.Create(Gui.Control["bdest"].Hwnd, ButtonStyle2*)
@@ -247,11 +251,11 @@ Gui.AddButton("x620 y192 w40 h20 vbdest", "•••")
 Gui.AddGroupBox("x20 y239 w650 h90", "Parámetros opcionales")
 Gui.AddText("x30 y262 w120 h20 +0x200", "Icono (archivo ico)")
 Gui.AddComboBox("x180 y262 w435 h22 vddlico R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastIconList, "`r`n", "|"), "|"))
-    CB_SetItemHeight(Gui.Control["ddlico"], 16,  0)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura de los elementos en la lista
-    CB_SetItemHeight(Gui.Control["ddlico"], 16, -1)    ; 0x153 = CB_SETITEMHEIGHT - Establece la altura del campo de selección
+    CB_SetItemHeight(Gui.Control["ddlico"], 16,  0)
+    CB_SetItemHeight(Gui.Control["ddlico"], 16, -1)
     CB_SetSelection(Gui.Control["ddlico"], CB_FindString(Gui.Control["ddlico"], Cfg.LastIconFile))
     GCT.Attach(Gui.Control["ddlico"], "Buscar y seleccionar un icono en la lista")
-    GCT.Attach(CB_GetInfo(Gui.Control["ddlico"]).Edit, "El icono principal del archivo compilado")
+    GCT.Attach(CB_GetInfo(Gui.Control["ddlico"]).Edit, "El icono principal del archivo compilado`nPresione Supr para eliminar el elemento de la lista")
 Gui.AddButton("x620 y262 w40 h22 vbico", "•••")
     Gui.Control["bico"].OnEvent("Click", "Gui_IcoButton")
     ImageButton.Create(Gui.Control["bico"].Hwnd, ButtonStyle2*)
@@ -315,9 +319,10 @@ Gui.AddButton("x110 y426 w90 h22 vbabout", "Acerca de (F1)")
 Gui.AddLink("x210 y429 w200 h22 BackgroundFFFFFF vlnk", "<a href=`"https://autohotkey.com/`">https://autohotkey.com/</a>")
     WinSetTransColor("FFFFFF", "ahk_id" . Gui.Control["lnk"].Hwnd)
     GCT.Attach(Gui.Control["lnk"], "Ir a la página oficial de AutoHotkey")
-Gui.AddStatusBar("vsb +0x100", "Inicializando ..")
+Gui.AddStatusBar("vsb +0x100")
     GCT.Attach(Gui.Control["sb"], "Muestra información del estado actual")
     WinSetTransColor(Format("{:06X}", COLOR_3DFACE), "ahk_id" . Gui.Control["sb"].Hwnd)
+    Util_Status("Inicializando ..")
 
 Gui.Show("w690 h481")
     Gui.OnEvent("Close", "ExitApp")
@@ -332,7 +337,6 @@ OnMessage(0x200, "WM_MOUSEMOVE")  ; cuando se mueve el cursor en la ventana
 OnExit("_OnExit")    ; al terminar
 
 Util_UpdateSrc()
-Util_Status()
 Return
 
 
@@ -362,6 +366,7 @@ Gui_DropFiles(Gui, Ctrl, FileArray, X, Y)
     }
     CB_SetSelection(Gui.Control["ddlsrc"], LastSrc, 0)
     CB_SetSelection(Gui.Control["ddlico"], LastIco, 0)
+    Gui.Control["edest"].Text := ""
     Util_UpdateSrc()
 
     Load(File)
@@ -375,6 +380,12 @@ Gui_DropFiles(Gui, Ctrl, FileArray, X, Y)
 
 Gui_Tab(Tab)
 {
+}
+
+Util_DDLSrc()
+{
+    Gui.Control["edest"].Text := ""
+    Util_UpdateSrc()
 }
 
 Gui_SrcButton()
@@ -433,6 +444,7 @@ Gui_CompileButton()
     ObjRawSet(g_data, "Compile64", BinaryType == SCS_64BIT_BINARY)
     If (!g_data.BinFile)
         Return Util_Error("El archivo BIN no existe.", g_data.BinFile)
+    ObjRawSet(g_data, "BinVersion", FileGetVersion(g_data.BinFile))
 
     Local Script := CB_GetText(Gui.Control["ddlsrc"])
         ,   Data := PreprocessScript(Script)
@@ -459,6 +471,8 @@ Gui_CompileButton()
 ; =====================================================================================================================================================
 WM_KEYDOWN(VKCode, lParam)
 {
+    Local FocusedCtrl := Gui.FocusedCtrl
+
     If (VKCode == VK_F1)
     {
         Util_Status("Mostrando Acerca de.. (F1)")
@@ -472,6 +486,14 @@ WM_KEYDOWN(VKCode, lParam)
                                                         . "Copyright ©2018-2018 Flipeador"
                                                         , "flipeador@gmail.com"] )
         Util_Status()
+    }
+
+    Else If (VKCode == VK_DELETE)
+    {
+        If (FocusedCtrl.Name == "ddlsrc")
+            CB_Delete(Gui.Control["ddlsrc"], CB_GetText(Gui.Control["ddlsrc"]), 1), CB_SetText(Gui.Control["ddlsrc"], "")
+        Else If (FocusedCtrl.Name == "ddlico")
+            CB_Delete(Gui.Control["ddlico"], CB_GetText(Gui.Control["ddlico"]), 1), CB_SetText(Gui.Control["ddlico"], "")
     }
 } ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms646280(v=vs.85).aspx
 
@@ -604,12 +626,15 @@ Util_UpdateSrc()
     {
         Util_Status("Leyendo archivo fuente ..")
         Local Data := QuickParse(CB_GetText(Gui.Control["ddlsrc"]))
+        CB_SetText(Gui.Control["ddlico"], "")
         If (Data)
         {
             If (Data.MainIcon != "")
                 CB_Insert(Gui.Control["ddlico"], Data.MainIcon,, 0), CB_SetSelection(Gui.Control["ddlico"], Data.MainIcon, 0)
             If (Data.BinFile != "")
                 CB_SetSelection(Gui.Control["ddlbin"], Data.BinFile, 2)
+            If (Trim(Gui.Control["edest"].Text) == "")
+                Gui.Control["edest"].Text := PATH(Data.Script).FNNE . ".exe"
         }
         Util_Status()
     }
