@@ -181,27 +181,7 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
   - **`@Ahk2Exe-If/EndIf/IfDef/IfNDef`**`Condition`
     Estas directivas permiten incluir o descartar parte del código de un programa si se cumple una determinada condición.
 
-    ```autohotkey
-    ;@Ahk2Exe-define A
-    ;@Ahk2Exe-define B 115
-    ;@Ahk2Exe-define C 255
-    MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
-    ;@Ahk2Exe-ifdef A
-    MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
-    ;@Ahk2Exe-endif
-    ;@Ahk2Exe-ifndef B
-    MsgBox "Este mensaje no aparece en el script compilado"
-    ;@Ahk2Exe-endif
-    ;@Ahk2Exe-if C 255
-    MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
-    ;@Ahk2Exe-endif
-    ;@Ahk2Exe-if B 125
-    MsgBox "Este mensaje no aparece en el script compilado"
-    ;@Ahk2Exe-endif
-    MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
-    ```
-
-	**Nota: Esta caracteristica se encuentra actualmente en desarrollo, por lo que su funcionamiento es muy limitado. Actualmente no soporta expresiones, ifs anidados, entre otros. La funcionalidad actual que se muestra en el ejemplo de arriba no será cambiada, por lo que puede utilizar esta directiva sin preocupaciones a futuro y su código seguirá compilando correctamente.**
+    **Nota: Esta caracteristica se encuentra actualmente en desarrollo, por lo que su funcionamiento es muy limitado. Actualmente no soporta expresiones, ifs anidados, entre otros.**
 
 <br><br>
 
