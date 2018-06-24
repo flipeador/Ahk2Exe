@@ -52,7 +52,7 @@ UpdateResource(hUpdate, ResType, ResName, LangID := 0x0409, pData := 0, Size := 
     If (Type(Size) != "Integer" || Size < 0)
         Throw Exception("Function UpdateResource invalid parameter #6", -1, "Invalid size")
 
-    Return DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", LangID, "UPtr", pData, "UInt", Size)
+    Return DllCall("Kernel32.dll\UpdateResourceW", "Ptr", hUpdate, "UPtr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", LangID, "UPtr", pData, "UInt", Size)
 }
 
 
@@ -61,7 +61,7 @@ UpdateResource(hUpdate, ResType, ResName, LangID := 0x0409, pData := 0, Size := 
 
 FindResource(hExe, ResType, ResName, LangID := 0x0409)
 {
-    Return DllCall("Kernel32.dll\FindResourceExW", "Ptr", hExe, "Ptr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", LangID, "Ptr")
+    Return DllCall("Kernel32.dll\FindResourceExW", "Ptr", hExe, "UPtr", RES_TYPE(ResType), "UPtr", RES_NAME(ResName), "UShort", LangID, "Ptr")
 }
 
 
@@ -125,15 +125,25 @@ LoadLibrary(DllName, Flags := 0)
 
 
 
+GetProcAddress(hModule, ProcName)
+{
+    ; GetProcAddress function
+    ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms683212(v=vs.85).aspx
+    Return DllCall("Kernel32.dll\GetProcAddress", "Ptr", hModule, Type(ProcName) == "Integer" ? "UPtr" : "AStr", ProcName, "UPtr")
+}
+
+
+
+
+
 LoadImage(hInstance, Name, Type := 0, W := 0, H := 0, Flags := "")
 {
     Local hExe := 0
     If (hInstance == -1)
         hInstance := A_IsCompiled ? hExe := LoadLibrary(A_ScriptFullPath, 2) : 0
     Flags := Flags == "" ? (hInstance ? 0 : 0x10) : Flags
-    Local hImage := DllCall("User32.dll\LoadImageW", "Ptr", hInstance, "UPtr", Type(Name) == "Integer" ? Name : &Name, "UInt", Type, "Int", W, "Int", H, "UInt", Flags, "Ptr")
-    FreeLibrary(hExe)
-    Return hImage
+    Local hImage := DllCall("User32.dll\LoadImageW", "Ptr", hInstance, "UPtr", RES_NAME(Name), "UInt", Type, "Int", W, "Int", H, "UInt", Flags, "Ptr")
+    Return FreeLibrary(hExe) * 0 + hImage
 } ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms648045(v=vs.85).aspx
 
 
@@ -154,6 +164,31 @@ EnumResourceIcons(hExe, IconGroupName, LangId := 0x0409)
         Icons[A_Index] := NumGet(hResLock + 6 + (A_Index-1)*14 + 12, "UShort")
 
     Return Icons
+}
+
+
+
+
+/*
+    Carga un icono predefinido.
+    Parámetros:
+        ID: El identificador del icono prefedinido a cargar, debe ser uno de los siguientes valores:
+            32512 (IDI_APPLICATION) = Icono de la aplicación predeterminada.
+            32516 (IDI_INFORMATION) = Icono de información.
+            32513 (IDI_ERROR)       = Icono de error.
+            32515 (IDI_WARNING)     = Icono de advertencia.
+            32518 (IDI_SHIELD)      = Icono de escudo.
+            32514 (IDI_QUESTION)    = Icono de pregunta.
+        W : El ancho deseado. Cero para un icono pequeño. -1 para un icono grande.
+        H : El alto deseado. Cero para un icono pequeño. -1 para un icono grande.
+*/
+LoadPredefinedIcon(ID, W := 0, H := 0)
+{
+    ; LoadIconWithScaleDown function
+    ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775703(v=vs.85).aspx
+    Local HICON := 0
+    DllCall("Comctl32.dll\LoadIconWithScaleDown", "Ptr", 0, "Ptr", ID, "Int", W==-1?SysGet(11):W?W:SysGet(49), "Int", H==-1?SysGet(11):H?H:SysGet(49), "PtrP", HICON)
+    Return HICON
 }
 
 
