@@ -193,6 +193,7 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
     Los identificadores en `Condition` son reemplazados por sus correspondientes valores asignados mediante `If`. Tenga en cuenta que a la hora de reemplazar los identificadores por sus correspondientes valores se utiliza `RegEx` de la siguiente manera: `RegExReplace(Condition, "\bIdentifier\b", Replacement)`.
 
+<<<<<<< HEAD
     ```autohotkey
     ;@Ahk2Exe-define A
     ;@Ahk2Exe-define B 115
@@ -214,6 +215,9 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
     ```
 
 	**Nota: Actualmente estas directivas tienen ciertas limitantes, no soporta ifs anidados y el comportamiento puede no ser el deseado.**
+=======
+    **Nota: Esta caracteristica se encuentra actualmente en desarrollo, por lo que su funcionamiento es muy limitado. Actualmente no soporta expresiones, ifs anidados, entre otros.**
+>>>>>>> 2bbf0fc7933cb713c092272a5c1d768291f3f6d3
 
 <br><br>
 
