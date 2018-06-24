@@ -1,15 +1,17 @@
 ﻿;@Ahk2Exe-SetName             Ahk2Exe
 ;@Ahk2Exe-SetOrigFilename     Ahk2Exe.exe
 ;@Ahk2Exe-SetDescription      Compilador de scripts para AutoHotkey v2 en español
-;@Ahk2Exe-SetFileVersion      1.0.0.2
+;@Ahk2Exe-SetFileVersion      1.1.0.5    ; major.minor.maintenance.build
 ;@Ahk2Exe-SetCompanyName      AutoHotkey
 ;@Ahk2Exe-SetCopyright        Copyright (c) 2004-2018
-;@Ahk2Exe-SetComments         [2018-05-25] https://github.com/flipeador/Ahk2Exe
+;@Ahk2Exe-SetComments         [2018-06-23] https://github.com/flipeador/Ahk2Exe
 
 ;@Ahk2Exe-SetMainIcon Ahk2Exe.ico
 
 ;@Ahk2Exe-AddResource logo.bmp         ; imagen logo de AHK
 ;@Ahk2Exe-AddResource waterctrl.dll    ; para el efecto de agua en la imagen logo
+
+;;@Ahk2Exe-PostExec MsgBox "Done!",,*
 
 
 
@@ -19,15 +21,16 @@
 ; CONFIGURACIÓN DE INICIO
 ; =====================================================================================================================================================
 #Warn
-#NoTrayIcon
+;@Ahk2Exe-Keep #NoTrayIcon    ; ocultamos el icono en el área de notificación en el script compilado
 #SingleInstance Off
-#KeyHistory 0
+;@Ahk2Exe-Keep #KeyHistory 0
 
-ListLines FALSE
-DetectHiddenWIndows "On"
-;@Ahk2Exe-IgnoreBegin64 1    // el comando SetRegView no es necesario en compilaciones x64
+;@Ahk2Exe-Keep ListLines FALSE
+DetectHiddenWIndows TRUE
+;@Ahk2Exe-IgnoreBegin64 1    ; SetRegView no es necesario en compilaciones x64
 SetRegView 64
-FileEncoding "UTF-8"    ; unicode
+FileEncoding "UTF-8"    ; unicode (el script compilado siempre incluirá BOM)
+;;@Ahk2Exe-Keep OnError "_OnError"
 
 
 
@@ -38,19 +41,20 @@ FileEncoding "UTF-8"    ; unicode
 ; =====================================================================================================================================================
 ; Lib\
 #Include <Gdiplus\Gdiplus>
-#Include <LinearGradient>
-#Include <ImageButton>
-#Include <ComboBox>
-#Include <RunAsAdmin>
+#Include <LinearGradient>       ; crea imagen para fondos con degradado
+#Include <ImageButton>          ; asigna imagenes a botones
+#Include <ComboBox>             ; funciones para controles combobox
+#Include <RunAsAdmin>           ; función para ejecutar el script como administraor
 #Include <TaskDialog>           ; diálogo de tareas (un MsgBox más completo)
-#Include <DirGetParent>
+#Include <DirGetParent>         ; función para recuperar el directorio superior
+#Include <Eval>                 ; evalúa expresiones en una cadena
 #Include <SaveFile>             ; diálogo para guardar archivos
 #Include <ChooseFile>           ; diálogo para seleccionar archivos
 #Include <GuiControlTips>       ; para añadir ToolTips cuando se posiciona le cursor en un control
 #Include <GetFullPathName>      ; función para recuperar la ruta absoluta teniendo en cuenta el directorio de trabajo actual
 #Include <GetBinaryType>        ; para recuperar el tipo de archivo binario
 #Include <Language>             ; algunas funciones de idiomas
-#Include <DefaultBaseObject>    ; para poder utilizar cadenas como objetos (array) y acceder a caracteres mediante indices
+#Include <Subprocess>           ; para crear sub-procesos : thanks «coffee» -> https://autohotkey.com/boards/viewtopic.php?f=44&t=48953#p223878
 
 ; Include\
 #Include Include
@@ -69,16 +73,23 @@ FileEncoding "UTF-8"    ; unicode
 ; INICIO
 ; =====================================================================================================================================================
 ; comprobamos sistema operativo (necesario WIN_V+)
-If (StrSplit(A_OSVersion, ".")[1] < 6)
+global g_osv := StrSplit(A_OSVersion, ".")
+;global   WIN_V := [6,0]
+;     ,   WIN_7 := [6,1]
+;     ,   WIN_8 := [6,2]
+;     , WIN_8_1 := [6,3]
+;     ,  WIN_10 := [10,0]
+
+If ( !OSVersion(6) )    ; WIN_V+
     Util_Error("Sistema operativo no soportado.", A_OSVersion, 196)
 
 A_ScriptName := "Ahk2Exe Compilador"
 global Title := "Ahk2Exe para AutoHotkey v" . A_AhkVersion . " | Script a EXE Conversor (" . (A_PtrSize==4?"32-Bit)":"64-Bit)")
 
-
 ; variables super-globales
-global  g_data := { define: {} }
-      ,    g_k := 0, g_v := 0    ; for g_k, g_v in Obj
+global     g_data := { define: {} }
+      ,       g_k := 0, g_v := 0    ; for g_k, g_v in Obj
+      , g_ahkpath := Util_GetAhkPath()
 global     Cfg := Util_LoadCfg()
 global    Gdip := new Gdiplus
 global ERROR := FALSE
@@ -140,24 +151,27 @@ global           ERROR_SUCCESS := 0x00    ; todas las operaciones se han realiza
      ,     ERROR_INCLUDE_FILE_NOT_FOUND := 0x18    ; el archivo a incluir no existe
      ,      ERROR_INCLUDE_DIR_NOT_FOUND := 0x19    ; el directorio a incluir no existe
      , ERROR_FILEINSTALL_FILE_NOT_FOUND := 0x20    ; el archivo a incluir especificado en FileInstall no existe
-     , ERROR_RESOURCE_FILE_NOT_FOUND := 0x21    ; el archivo de recurso a incluir no existe
+     ,    ERROR_RESOURCE_FILE_NOT_FOUND := 0x21    ; el archivo de recurso a incluir no existe
+     ,         ERROR_DEST_DIR_NOT_FOUND := 0x22    ; el directorio destino para el archivo destino EXE no existe
      ; ---- ESCRITURA DE ARCHIVOS ----
-     , ERROR_CANNOT_COPY_BIN_FILE := 0x30    ; no se ha podido copiar el archivo BIN al destino
-     , ERROR_CANNOT_OPEN_EXE_FILE := 0x31    ; no se ha podido abrir el archivo destino EXE para escritura
+     ,   ERROR_CANNOT_COPY_BIN_FILE := 0x30    ; no se ha podido copiar el archivo BIN al destino
+     ,   ERROR_CANNOT_OPEN_EXE_FILE := 0x31    ; no se ha podido abrir el archivo destino EXE para escritura
+     , ERROR_CANNOT_CREATE_DEST_DIR := 0x32    ; no se ha podido crear el directorio destino para archivo destino EXE
      ; ---- SINTAXIS ----
      ,   ERROR_INVALID_DIRECTIVE_SYNTAX := 0x50    ; la sintaxis de la directiva es inválida
      ,  ERROR_UNKNOWN_DIRECTIVE_COMMAND := 0x51    ; la directiva especificada es desconocida
      , ERROR_INVALID_FILEINSTALL_SYNTAX := 0x52    ; la sintaxis de FileInstall es inválida
+     ,             ERROR_INVALID_SYNTAX := 0x53    ; la sintaxis en el código fuente AHK es inválida
      ; ---- OTROS ----
      , NO_EXIT := 0x00
 
 ; https://msdn.microsoft.com/en-us/library/aa364819(VS.85).aspx
 global SCS_32BIT_BINARY := 0    ; A 32-bit Windows-based application
-     ,   SCS_DOS_BINARY := 1    ; An MS-DOS – based application
-     ,   SCS_WOW_BINARY := 2    ; A 16-bit Windows-based application
-     ,   SCS_PIF_BINARY := 3    ; A PIF file that executes an MS-DOS – based application
-     , SCS_POSIX_BINARY := 4    ; A POSIX – based application
-     , SCS_OS216_BINARY := 5    ; A 16-bit OS/2-based application
+     ;,   SCS_DOS_BINARY := 1    ; An MS-DOS – based application
+     ;,   SCS_WOW_BINARY := 2    ; A 16-bit Windows-based application
+     ;,   SCS_PIF_BINARY := 3    ; A PIF file that executes an MS-DOS – based application
+     ;, SCS_POSIX_BINARY := 4    ; A POSIX – based application
+     ;, SCS_OS216_BINARY := 5    ; A 16-bit OS/2-based application
      , SCS_64BIT_BINARY := 6    ; A 64-bit Windows-based application
 
 
@@ -174,7 +188,8 @@ If (WinExist(Title))
 
 ; variables super-globales necesarias cuando se muestra la interfaz GUI
 global Gui := 0        ; almacena el objeto GUI de la ventana principal
-global wctrltimer := 0
+global g_dpix := 0, g_dpiy := 0
+global wctrltimer := 0, waterctrldll := {path: A_ScriptDir . "\waterctrl.dll"}
 global ButtonStyle := [[3, 0xFEF5BF, 0xFEE88A, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [3, 0xFEDF63, 0xFED025, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [5, 0xFEDF63, 0xFED025, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [0, 0xFEF5BF, "Black", 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [3, 0xFEF5BF, 0xFEE88A, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 2], [0, 0xFEF5BF, "Black", 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1]]
 global ButtonStyle2 := [[0, 0xE1E1E1, "Black", 0x151515, 5, 0xFFFFFF, 0xADADAD, 1], [0, 0xE5F1FB, "Black", 0x151515, 5, 0xFFFFFF, 0x007CE1, 1], [0, 0xCCE4F7, "Black", 0x151515, 5, 0xFFFFFF, 0x005499, 1], [0, 0xE1E1E1, "Black", 0x808080, 5, 0xFFFFFF, 0xADADAD, 1], [0, 0xE1E1E1, "Black", 0x151515, 5, 0xFFFFFF, 0x007CE1, 2], [0, 0xE5F1FB, "Black", 0x151515, 1, 0xFFFFFF, 0x007CE1, 1]]
 
@@ -192,16 +207,17 @@ global     VK_F1 := 0x70    ; F1 key                       || https://msdn.micro
      , VK_DELETE := 0x2E    ; DEL key
      ,   VK_BACK := 0x08    ; BACKSPACE key
 
+global COLOR_3DFACE := DllCall("User32.dll\GetSysColor", "Int", 15, "UInt")    ; color por defecto de las ventanas GUI (BGR)
+       COLOR_3DFACE := (COLOR_3DFACE & 255) << 16 | (COLOR_3DFACE & 65280) | (COLOR_3DFACE >> 16)    ; RGB
 
-global COLOR_3DFACE := DllCall("User32.dll\GetSysColor", "Int", 15, "UInt")    ; color por defecto de las ventanas GUI
-       COLOR_3DFACE := (COLOR_3DFACE & 255) << 16 | (COLOR_3DFACE & 65280) | (COLOR_3DFACE >> 16)
+global MONITOR_DEFAULTTONEAREST := 0x00000002
 
 
 ; comprobamos permisos
 If (!FileOpen("~tmp", "w"))
     If (!RunAsAdmin())
         Util_Error("Error de permisos.`nIntente ejecutar el compilador como Administrador.",, TRUE)
-FileDelete(A_ScriptDir . "\~tmp"), A_IconHidden := A_IsCompiled
+FileDelete(A_ScriptDir . "\~tmp")
 
 
 ; creamos la interfaz de usuario (GUI)
@@ -212,6 +228,20 @@ Gui := GuiCreate("-DPIScale -Resize -MaximizeBox +MinSize690x481 +E0x00000400", 
     GCT.SetFont("Italic", "Segoe UI")
 Gui.SetFont("s9", "Segoe UI")
 
+hMonitor := DllCall("User32.dll\MonitorFromWindow", "Ptr", Gui.Hwnd, "UInt", 0x00000002)    ; MONITOR_DEFAULTTONEAREST = 0x00000002
+If ( OSVersion(6, 1) )    ; WIN_8_1+
+    DllCall("Shcore.dll\GetDpiForMonitor", "Ptr", hMonitor, "Int", 0, "UIntP", g_dpix, "UIntP", g_dpiy)    ; MDT_EFFECTIVE_DPI = 0
+Else
+{
+    MONITORINFOEX := ""
+    NumPut(VarSetCapacity(MONITORINFOEX, 104, 0), MONITORINFOEX, 0, "UInt")
+    DllCall("User32.dll\GetMonitorInfoW", "Ptr", hMonitor, "UPtr", &MONITORINFOEX)
+    hDC := DllCall("Gdi32.dll\CreateDC", "Str", StrGet(&MONITORINFOEX+40), "Ptr", 0, "Ptr", 0, "Ptr", 0, "Ptr")
+    g_dpix := DllCall("Gdi32.dll\GetDeviceCaps", "Ptr", hDC, "Int", 88)    ; LOGPIXELSX = 88
+    g_dpiy := DllCall("Gdi32.dll\GetDeviceCaps", "Ptr", hDC, "Int", 90)    ; LOGPIXELSY = 90
+    DllCall("Gdi32.dll\DeleteDC", "Ptr", hDC)
+}
+
 ;@Ahk2Exe-IgnoreBegin32 1    // Ignora la línea "If (A_PtrSize..." en la compilación de 32-bit
 ;@Ahk2Exe-IgnoreBegin64 3    // Ignora las líneas "If...", "Gui.AddText..." y "Else" en la compilación de 64-bit
 If (A_PtrSize == 4)    ; solo la versión de 32-Bit soporta waterctrl
@@ -219,9 +249,15 @@ If (A_PtrSize == 4)    ; solo la versión de 32-Bit soporta waterctrl
 ;@Ahk2Exe-IgnoreBegin32 2    // Ignora las líneas "Else" y "Gui.AddPic..." en la compilación de 32-bit
 Else
     Gui.AddPic("x0 y0 w690 h110 vlogo", "HBITMAP:" . Util_LoadLogo())
-Gui.AddButton("x318 y4 w368 h100 vinfo Left", "  ©2004-2009 Chris Mallet`n  ©2008-2011 Steve Gray (Lexikos)`n  ©2011-2018 fincs`n  ©2018-2018 Flipeador`n`n  Nota: La compilación no garantiza la protección del código fuente.")
-    DllCall("User32.dll\SetParent", "Ptr", Gui.Control["info"].Hwnd, "Ptr", Gui.Control["logo"].Hwnd)
-    ImageButton.Create(Gui.Control["info"].Hwnd, [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEE786, 0xFEF5BF, 0x2D4868, 5, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1])
+Gui.AddButton("x318 y4 w368 h100 vbinfo Left", "  ©2004-2009 Chris Mallet`n  ©2008-2011 Steve Gray (Lexikos)`n  ©2011-2018 fincs`n  ©2018-2018 Flipeador`n`n  Nota: La compilación no garantiza la protección del código fuente.")
+    DllCall("User32.dll\SetParent", "Ptr", Gui.Control["binfo"].Hwnd, "Ptr", Gui.Control["logo"].Hwnd)
+    ImageButton.Create(Gui.Control["binfo"].Hwnd, [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEE786, 0xFEF5BF, 0x2D4868, 5, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1])
+
+Gui.AddButton("x585 y111 w100 h20 vbdpi", "High-DPI Settings")
+    Gui.Control["bdpi"].SetFont("s" . DPI(8,,0) . " w" . DPI(400,0,1.1), "Tahoma")
+    Gui.Control["bdpi"].OnEvent("Click", "HighDPIBtn")
+    ImageButton.Create(Gui.Control["bdpi"].Hwnd, ButtonStyle2*)
+    GCT.Attach(Gui.Control["bdpi"], "Ajusta la interfaz para adaptarse a pantallas de alto DPI (PPP)")
 
 Gui.AddTab3("x0 y110 w692 h304 vtab", "General|Registros|AutoHotkey")
     Gui.Control["tab"].OnEvent("Change", "Gui_Tab")
@@ -285,7 +321,12 @@ Gui.AddButton("x592 y362 w68 h22 vbdownload", "Descargar")
 Gui.Control["tab"].UseTab(2)
 Gui.AddListView("x2 y138 w686 h272 vlvlog -E0x200", "ID|Mensaje|Archivo|Línea|Tiempo")
     DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvlog"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
-    Gui.Control["lvlog"].SetImageList(g_data.il:=IL_Create(1)), IL_Add(g_data.il, A_WinDir . "\regedit.exe")
+    Gui.Control["lvlog"].SetImageList(g_data.log_il:=IL_Create(1))
+    IL_Add(g_data.log_il, "HICON:" . LoadPredefinedIcon(32516))    ; IDI_INFORMATION
+    IL_Add(g_data.log_il, "HICON:" . LoadPredefinedIcon(32515))    ; IDI_WARNING
+    IL_Add(g_data.log_il, "HICON:" . LoadPredefinedIcon(32513))    ; IDI_ERROR
+    IL_Add(g_data.log_il, "HICON:" . LoadPredefinedIcon(32518))    ; IDI_SHIELD
+    IL_Add(g_data.log_il, "shell32.dll", -51380)    ; INCLUDE
 
 Gui.Control["tab"].UseTab(3)
 Gui.AddPic("x0 y134 w690 h278 vahk")
@@ -388,6 +429,24 @@ Util_DDLSrc()
     Util_UpdateSrc()
 }
 
+; I know, this is horrible - for the moment it stays like this
+HighDPIBtn(Btn)    ; sin terminar (este método no es muy eficiente. lo correcto sería ajustar las dimensiones y coordenadas de los controles)
+{
+    Btn.Visible := FALSE
+    For g_k, g_v in Gui
+    {
+        try g_v.SetFont(g_v.Name == "ahk2" ? "s" . DPI(75,,0) . " Bold" : "s" . DPI(9) . " w" . DPI(400,0,1.1), "Segoe UI")
+        If (g_v.Type == "Button")   
+            If InStr("bclosebcompilebgitbabout", g_v.Name)
+                ImageButton.Create(g_k, ButtonStyle*)
+            Else If (g_v.Name == "binfo")
+                    ImageButton.Create(g_k, [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEE786, 0xFEF5BF, 0x2D4868, 5, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1])
+            Else
+                ImageButton.Create(g_k, ButtonStyle2*)
+    }
+    WinRedraw("ahk_id" . Gui.Hwnd)
+}
+
 Gui_SrcButton()
 {
     Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo fuente AHK..")
@@ -419,7 +478,7 @@ Gui_IcoButton()
 Gui_DestButton()
 {
     Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo de destino..")
-    Local File := Gui.Control["edest"].Text == "" ? (CB_GetSelection(Gui.Control["ddlsrc"]) == -1 ? DirGetParent(Cfg.LastExeFile) . "\" : CB_GetText(Gui.Control["ddlsrc"])) : Gui.Control["edest"].Text
+    Local File := Gui.Control["edest"].Text == "" ? (CB_GetSelection(Gui.Control["ddlsrc"]) == -1 ? DirGetParent(Cfg.LastExeFile) . "\" : CB_GetText(Gui.Control["ddlsrc"])) : GetFullPathName(Gui.Control["edest"].Text, DirGetParent(CB_GetText(Gui.Control["ddlsrc"])))
         , File := SaveFile([Gui.Hwnd,"Ahk2Exe - Guardar como"], SubStr(File, -4) = ".ahk" ? SubStr(File, 1, -4) . ".exe" : File, {Ejecutables: "#*.exe"})
     If (File)
     {
@@ -435,6 +494,9 @@ Gui_CompileButton()
     ERROR := FALSE
     Util_ClearLog()
 
+    If (A_IsAdmin)
+        Util_AddLog("*INFO", "El compilador se está ejecutando con permisos de Administrador")
+
     ObjRawSet(g_data, "IgnoreSetMainIcon", TRUE)
     ObjRawSet(g_data, "IgnoreBinFile", TRUE)
     ObjRawSet(g_data, "IcoFile", CB_GetText(Gui.Control["ddlico"]))
@@ -445,6 +507,7 @@ Gui_CompileButton()
     If (!g_data.BinFile)
         Return Util_Error("El archivo BIN no existe.", g_data.BinFile)
     ObjRawSet(g_data, "BinVersion", FileGetVersion(g_data.BinFile))
+    ObjRawSet(g_data, "SyntaxCheck", TRUE)
 
     Local Script := CB_GetText(Gui.Control["ddlsrc"])
         ,   Data := PreprocessScript(Script)
@@ -452,13 +515,17 @@ Gui_CompileButton()
     If (Data)
     {
         If (AhkCompile(Data))
-            Util_AddLog("OK", "La compilación a finalizado con éxito", DirGetParent(Script) . "\" . PATH(Script).FNNE . ".exe")
+            Util_AddLog("INFO", "La compilación a finalizado con éxito", DirGetParent(Script) . "\" . PATH(Script).FNNE . ".exe")
+          , OutputDebug("Successful compilation.")
         Else
             Util_AddLog("ERROR", "Ha ocurrido un error durante la compilación", Script)
+          , OutputDebug("Failed compilation.")
     }
     Else
         Util_AddLog("ERROR", "Ha ocurrido un error durante el procesado del script", Script)
+      , OutputDebug("Failed compilation.")
 
+    Util_AutoHdrLog()
     Util_Status()
 }
 
@@ -515,7 +582,7 @@ _OnExit(ExitReason, ExitCode)
     If (wctrltimer)
         SetTimer(wctrltimer, "Delete")
     DllCall("User32.dll\AnimateWindow", "Ptr", Gui.HWnd, "UInt", 350, "UInt", 0x00080000|0x00010000)
-    A_IconHidden := TRUE
+
     Util_SaveCfg()
 
     Return 0    ; EXIT
@@ -532,6 +599,7 @@ Util_Error(Message, ExpandedInfo := "", ExitCode := FALSE)
 {
     ERROR := TRUE
     Util_Status("Ha ocurrido un error y las operaciónes an sido abortadas.")
+    OutputDebug "[" . FormatTime(, "yyyyMMddhhmmss") . "] " . Message . " | " . ExpandedInfo
     If (!BE_QUIET)
         TaskDialog(ERROR_ICON, [Title,"Ha ocurrido un error y las operaciónes an sido abortadas."], ExpandedInfo == "" ? Message : [Message,ExpandedInfo])
     If (ExitCode)
@@ -642,16 +710,20 @@ Util_UpdateSrc()
 
 Util_AddLog(What, Message, Script := "-", Line := "-")
 {
-    If (CMDLN)
-        Return
-    Gui.Control["lvlog"].Add("Icon1", What, Message, Script, Line, FormatTime(, "dd/MM/yyyy hh:mm:ss"))
-    Loop 7
-        Gui.Control["lvlog"].ModifyCol(A_Index, "AutoHdr")
+    static Icon := {INFO: 1, ADVERTENCIA: 2, ERROR: 3, "*INFO": 4, INCLUDE: 5}
+    if (!CMDLN)
+        Gui.Control["lvlog"].Add("Icon" . Icon[What], What, Message, Script, Line, FormatTime(, "dd/MM/yyyy hh:mm:ss"))
 }
 
 Util_ClearLog()
 {
     Gui.Control["lvlog"].Delete()
+}
+
+Util_AutoHdrLog()
+{
+    Loop 4
+        Gui.Control["lvlog"].ModifyCol(A_Index, "AutoHdr")
 }
 
 Util_LoadLogo()
@@ -677,35 +749,48 @@ Util_LoadLogo()
 ;@Ahk2Exe-IgnoreBegin64
 Util_LoadWaterCtrl()
 {
-    If (FileExist(A_ScriptDir . "\waterctrl.dll"))
-        Return LoadLibrary(A_ScriptDir . "\waterctrl.dll")
+    If (IS_FILE(waterctrldll.path))
+        Return waterctrldll.hModule := LoadLibrary(waterctrldll.path)
 
     ;@Ahk2Exe-IgnoreBegin 2
     If (!A_IsCompiled)
-        Util_Error("No se ha encontrado waterctrl.dll.",, 2)
+        Util_Error("No se ha encontrado waterctrl.dll.", waterctrldll.path, 2)
 
-    If (FileExist(A_Temp . "\waterctrl.dll"))
-        Return LoadLibrary(A_Temp . "\waterctrl.dll")
+    If (IS_FILE(waterctrldll.path := A_Temp . "\waterctrl.dll") && FileGetSize(waterctrldll.path) == 16896)
+        Return waterctrldll.hModule := LoadLibrary(waterctrldll.path)
 
     Local hExe := LoadLibrary(A_ScriptFullPath, 2), Size := 0
-    FileOpen(A_Temp . "\waterctrl.dll", "w").RawWrite(LoadResource3(hExe, RT_RCDATA, "WATERCTRL.DLL", Size), Size)
-    FreeLibrary(hExe)
-    Return LoadLibrary(A_Temp . "\waterctrl.dll")
+    FileOpen(waterctrldll.path, "w", "UTF-8-RAW").RawWrite(LoadResource3(hExe, RT_RCDATA, "WATERCTRL.DLL", Size), Size)
+    Return FreeLibrary(hExe) * 0 + (waterctrldll.hModule := LoadLibrary(waterctrldll.path))
 }
 
 Util_EnableWater(Hwnd, hBitmap)
 {
-    DllCall("waterctrl.dll\enablewater", "Ptr", Gui.Hwnd, "Int", 0, "Int", 0, "Ptr", hBitmap, "Int", 3, "Int", 20)
-    DllCall("waterctrl.dll\setwaterparent", "Ptr", Hwnd)
+    For g_k, g_v in ["enablewater","disablewater","waterblob","flattenwater","setwaterparent"]
+        waterctrldll[g_v] := GetProcAddress(waterctrldll.hModule, g_k)
+    DllCall(waterctrldll.enablewater, "Ptr", Gui.Hwnd, "Int", 0, "Int", 0, "Ptr", hBitmap, "Int", 3, "Int", 20)
+    DllCall(waterctrldll.setwaterparent, "Ptr", Hwnd)
     If (WATER_BLOB_INTERVAL)
-        SetTimer(wctrltimer := () => DllCall("waterctrl.dll\waterblob", "Int", Random(0, 690), "Int", Random(0, 110), "Int", Random(3, 12), "Int", Random(20, 75)), WATER_BLOB_INTERVAL)
+        SetTimer(wctrltimer := () => DllCall(waterctrldll.waterblob, "Int", Random(0, 690), "Int", Random(0, 110), "Int", Random(3, 12), "Int", Random(20, 75)), WATER_BLOB_INTERVAL)
 } ; https://autohotkey.com/boards/viewtopic.php?t=3302
 ;@Ahk2Exe-IgnoreEnd64
 
 Util_GetAhkPath()
 {
-    Local AhkPath := DirGetParent(A_ScriptDir) . "\AutoHotkey.exe"
+    Local AhkPath := DirGetParent(A_ScriptDir) . "\AutoHotkeyU" . (A_Is64bitOS?64:32) . ".exe"
     If (IS_FILE(AhkPath))
+        Return AhkPath
+
+    If (IS_FILE(AhkPath := DirGetParent(A_ScriptDir) . "\AutoHotkey.exe"))
+        Return AhkPath
+
+    If (IS_FILE(AhkPath := A_ScriptDir . "\AutoHotkey.exe"))
+        Return AhkPath
+
+    If (IS_FILE(AhkPath := A_ProgramFiles . "\AutoHotkey\AutoHotkeyU" . (A_Is64bitOS?64:32) . ".exe"))
+        Return AhkPath
+
+    If (IS_FILE(AhkPath := A_ProgramFiles . "\AutoHotkey\AutoHotkey.exe"))
         Return AhkPath
 
     AhkPath := RegRead("HKLM\SOFTWARE\AutoHotkey", "InstallDir")
