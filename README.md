@@ -1,5 +1,8 @@
-# Ahk2Exe
+# <p align="center">Ahk2Exe 1.1.0.5 | Alpha v2.0-a097-60f26de</p>
 ###### Compilador no oficial para AutoHotkey v2 en español.
+
+Puedes reportar errores, proponer nueva funcionalidad o hacer cualquier otro tipo de comentarios acerca del compilador en el sitio en el foro de AutoHotkey: [autohotkey.com/boards/viewtopic.php?f=44&t=48953](https://autohotkey.com/boards/viewtopic.php?f=44&t=48953).
+
 <p align="center">
   <img src="https://github.com/flipeador/Ahk2Exe/raw/master/preview.jpg" alt="Ahk2Exe For AHKv2"/>
 </p>
@@ -8,7 +11,6 @@
 
   1. `Mejorar el rendimiento`, por más insignificante que éste sea. Este es el objetivo más importante, debido a la lentitud extrema de los lenguajes interpretados como lo es AHK.
   2. Lograr `reducir al máximo el tamaño del código`, quitando espacios y utilizando equivalentes más cortos en expresiones.
-  3. `Ofuscar el código` (hacerlo lo más confuso posible) sin perdidas de rendimiento ni aumento del tamaño del código en lo absoluto.
 
 ##### Debe tener en cuenta los siguientes puntos con respecto al compilador.
 
@@ -20,7 +22,7 @@
 
   - Microsoft **Windows Vista** en adeltante.
   - El compilador es únicamente para **AutoHotkey versión 2**.
-  - La interfaz gráfica de usuario (GUI) no ha sido probada en pantallas con un DPI ([PPP](https://es.wikipedia.org/wiki/P%C3%ADxeles_por_pulgada)) alto (mayor a 96).
+  - La interfaz gráfica de usuario (GUI) no ha sido probada en pantallas con un DPI ([PPP](https://es.wikipedia.org/wiki/P%C3%ADxeles_por_pulgada)) alto (mayor a 96). Si **la interfaz no se visualiza correctamente** haga clic en el botón `High-DPI Settings`.
 
 
 
@@ -33,12 +35,12 @@
 
 
 # Notas:
-- Los archivos `Ahk2Exe.exe` y `Ahk2Exe64.exe` son totalmente independientes, no requieren de ningún otro archivo para su funcionamiento, aunque para poder compilar los scripts es necesario tener los archivos `BIN` en el mismo directorio que `Ahk2Exe.exe`.
-- Para poder comprimir el archivo `EXE` resultante, es necesario tener `UPX` y/o `MPRESS` en el mismo directorio que `Ahk2Exe.exe`.
-- La versión de 64-bit (`Ahk2Exe64.exe`) no soporta el efecto de agua en el logo `AHK`. La funcionalidad es exactamente la misma que en la de 32-bit.
-- Por lo general, la compilación no mejora el rendimiento de un script.
-- En el caso de una falla, `Ahk2Exe` tiene códigos de salida que indican el tipo de error que ocurrió.
-- La codificación por defecto utilizada es `UTF-8 con BOM` (unicode), esto quiere decir que, si va a compilar un script sin `BOM`, el script compilado lo incluirá automáticamente, para asegurarse de que todos los caracteres (ej. `á`) se visualizen correctamente.
+- Los archivos `Ahk2Exe.exe` y `Ahk2Exe64.exe` son totalmente independientes, **no requieren de ningún otro archivo para su funcionamiento**, aunque para poder compilar los scripts es necesario tener los archivos `BIN` en el mismo directorio que `Ahk2Exe.exe`.
+- Para poder **comprimir el archivo** `EXE` resultante, es necesario tener `UPX` y/o `MPRESS` en el mismo directorio que `Ahk2Exe.exe`. **Tenga en cuenta que comprimir un script puede aumentar la probabilidad de ser detectado por los antivirus, por lo que no se recomienda**.
+- La **versión de 64-bit** (`Ahk2Exe64.exe`) no soporta el efecto de agua en el logo `AHK`. La funcionalidad es exactamente la misma que en la de 32-bit.
+- Por lo general, **la compilación no mejora el rendimiento de un script**.
+- En el caso de una falla, `Ahk2Exe` tiene **códigos de salida** que indican el tipo de error que ocurrió.
+- La **codificación por defecto** utilizada es `UTF-8 con BOM` (unicode), esto quiere decir que, si va a compilar un script sin `BOM`, el script compilado lo incluirá automáticamente, para asegurarse de que todos los caracteres (ej. `á`) se visualizen correctamente.
 
 
 
@@ -54,7 +56,8 @@
 - [x] Compilar Scripts (función principal).
 - [x] La configuración se guarda en el registro, en donde se incluye las últimas opciones conocidas al momento de cerrar el compilador y además, almacena una lista con los 10 primeros archivos fuente e iconos en el control.
 - [x] Detección de errores y registro de los mismos. Se incluye un control `ListView` dedicado explícitamente a guardar los registros de la compilación, para ayudarle a detectar los errores.
-- [x] Detectar y remover comentarios en el script. Se incluye detección de comentarios en expresiones (actualmente no soportado por AHK), por ejemplo: `expr+1 /* comentario */ expr+1` --> `expr+1 expr+2`; comentarios en línea `;` y comentarios en bloque `/**/`.
+- [x] Detectar errores de sintaxis mediante `AutoHotkey.exe`.
+- [x] Detectar y remover comentarios en bloque y comentarios en línea.
 - [x] Detectar y remover espacios innecesarios de cada línea.
 - [x] Detectar y optimizar secciones de continuación.
 - [x] Detectar y optimizar expresiones y cadenas.
@@ -66,6 +69,7 @@
 - [x] Soporte para cambiar la información de la versión.
 - [x] Soporte para cambiar el sub-sistema del ejecutable a modo consola.
 - [x] Soporte completo para las directivas `#Include` y `#IncludeAgain`. Soporte para variables (debe encerrarlas entre `%`).
+- [x] Soporte para inclusión automática de biblioteca (incluir funciones automáticamente sin la declaración explícita de `#Include`).
 - [x] Soporte **parcial** para la función `FileInstall`. Evite los parentesis, expresiones (que no sean variables) y escriba la función en una línea completamente dedicada a ella. Soporte para variables.
 - [x] Soporte para compresión del archivo compilado con `UPX` y `MPRESS`.
 
@@ -82,20 +86,21 @@
 # Compilación por línea de comandos
 Aquí se detalla la sintaxis para poder compilar por medio de la línea de comandos. Puede ver los códigos de salida más abajo.
 
-El orden de los parámetros especificados importa, por ejemplo, si especifica primero `iconfile.ahk` sin una ruta absoluta, se tendra en cuenta el directorio del compilador; por el contrario, si especifica `infile.ahk` antes, se tendra en cuenta el directorio de `infile.ahk`.
+El orden de los parámetros especificados importa, por ejemplo, si especifica primero `iconfile.ahk` sin una ruta absoluta, se tendra en cuenta el directorio del compilador si se especifica una ruta parcial en `iconfile`; por el contrario, si especifica `infile.ahk` antes, se tendra en cuenta el directorio de `infile.ahk`. Para indicar el comando puede utilizar `/` como se describe a continuación, o `-` también es válido.
 
 - ##### Sintaxis
 
-  ```Ahk2Exe.exe [/in] infile.ahk [/out outfile.exe] [/icon iconfile.ico] [/bin binfile.bin] [/upx] [/mpress] [/quiet]```
+  ```Ahk2Exe.exe [/in] infile.ahk [/out outfile.exe] [/icon iconfile.ico] [/bin binfile.bin] [/upx] [/mpress] [/nocheck] [/quiet]```
 
 - ##### Descripción
 | Parámetro  | Descripción | Directorio de trabajo |
 | ---------- | ----------- | --------------------- |
 | **infile.ahk** | Archivo fuente AHK (script) que se va a compilar (obligatorio). | Compilador |
-| **outfile.exe** | Archivo destino EXE compilado. Si no se especifica, se establece en `infile.exe`. Si se especifica un directorio se establece en `\infile.exe`. Si no se especifica la extensión se añade automáticamente `.exe`; puede especificar cualquier extensión. Si el archivo ya existe, lo intenta sobreescribir. | infile.ahk o compilador |
+| [&ast;]**outfile.exe** | Archivo destino EXE compilado. Si no se especifica, se establece en `infile.exe`. Si se especifica un directorio se establece en `\infile.exe`. Si no se especifica la extensión se añade automáticamente `.exe`; puede especificar cualquier extensión. Si el archivo ya existe, lo intenta sobreescribir. Si el directorio no existe la compilación falla. Para forzar la creación del directorio destino en caso de que no exista especifique como prefijo `*`. | infile.ahk o compilador |
 | [&ast;]**iconfile.ico** | Icono principal del archivo compilado. Si no se especifica se mantiene el icono por defecto de AutoHotkey. Si se especificó la directiva `@Ahk2Exe-SetMainIcon` se utilizará el icono allí especificado. Puede añadir el caracter `*` como prefijo para ignorar la directiva `@Ahk2Exe-SetMainIcon` y forzar el uso de este icono. Tenga en cuenta que establecer un icono elimina todos los iconos por defecto de AHK, incluyendo iconos de _pausa_ (pause) y _suspensión_ (suspend). | infile.ahk o compilador |
 | [&ast;]**binfile.bin** | Archivo BIN AutoHotkey. Si no se especifica utiliza el último archivo BIN utilizado. En caso de no haber una configuración válida guardada se establece dependiendo de la arquitectura del compilador `Unicode %8*A_PtrSize%-bit`. Por ejemplo: `Unicode 64-bit` (la extensión es opcional). Si se especificó la directiva `@Ahk2Exe-Bin` se utilizará el archivo BIN allí especificado. Puede añadir el caracter `*` como prefijo para ignorar la directiva `@Ahk2Exe-Bin` y forzar el archivo BIN aquí especificado. | Compilador |
 | **/upx** o **/mpress** | Especifica el método de compresión del archivo EXE resultante. Los archivos `upx.exe` y `mpress.exe` deben estar en el directorio junto al compilador. | Compilador |
+| **/nocheck** | Omite la comprobación de sintaxis por medio de `AutoHotkey.exe`. Si especifica este parámetro, no se autoincluirá ninguna función automáticamente. | - |
 | **/quiet** o **/q** | Especifica que deben suprimirse todos los mensajes, diálogos y ventanas durante la compilación. Esta opción es útil si se aprovecha el código de salida, que le permite identificar el error ocurrido, si lo hubo. | - |
 
 
@@ -111,19 +116,19 @@ El orden de los parámetros especificados importa, por ejemplo, si especifica pr
 # Directivas específicas del compilador
 El compilador acepta ciertas directivas que le permiten personalizar aún más el script compilado `.exe`.
 
-Para asegurarse de que todas las directivas funcionen correctamente, considere **utilizar solo espacios** (no tabulaciones).
+Para asegurarse de que todas las directivas funcionen correctamente, considere **utilizar solo espacios** (y no tabulaciones).
 
-En ciertas directivas, se permiten comentarios únicamente mediante el uso del caracter `;` y/o los parámetros se saparan por medio de comas, puede añadir un caracter de estos de forma literal utilizando el caracter de escape de AHK.
+En ciertas directivas, se permiten comentarios únicamente mediante el uso del caracter `;` y/o los parámetros se saparan por medio de comas, puede añadir un caracter de estos de forma literal utilizando el caracter de escape de AHK ```.
 
 - ##### Directivas que controlan el comportamiento del script
 
   - **`;@Ahk2Exe-IgnoreBegin`**`[Lines]`
 
-    Es posible eliminar secciones de código del script compilado al encerrarlas en las directivas `@Ahk2Exe-IgnoreBegin` y `@Ahk2Exe-IgnoreEnd` como si fueran comentarios multilinea en bloque `/**/`.
+    Es posible **eliminar secciones de código** del script compilado al encerrarlas en las directivas `@Ahk2Exe-IgnoreBegin` y `@Ahk2Exe-IgnoreEnd` como si fueran comentarios multilinea en bloque `/**/`.
 
-    `Lines` Es la cantidad de líneas a ignorar a partir de `IgnoreBegin`. Las líneas en blanco y comentarios no se tienen en cuenta (no cuentan como una línea). Si no se especifica, se ignora todo el código hasta encontrar un `IgnoreEnd`. Si se encuentra un `IgnoreEnd` antes de terminar el conteo de líneas especificadas, se terminará en ese punto y las líneas restantes de código a excluir se terminarán incluyendo en la compilación.
+    `Lines` Es la cantidad de **líneas a ignorar** a partir de `IgnoreBegin`. Las líneas en blanco y comentarios no se tienen en cuenta (no cuentan como una línea). Si no se especifica, se ignora todo el código hasta encontrar un `IgnoreEnd`. Si se encuentra un `IgnoreEnd` antes de terminar el conteo de líneas especificadas, se terminará en ese punto y las líneas restantes de código a excluir se terminarán incluyendo en la compilación.
 
-    `IgnoreBegin32` y `IgnoreBegin64`En el primer caso, indica que el código no debe incluirse en la compilación de `32-bit`. En el segundo caso, indica que el código no debe incluirse en la compilación de `64-bit`. La directiva de cierre es `IgnoreEnd32` y `IgnoreEnd64` respectivamente.
+    `IgnoreBegin32` indica que el código no debe incluirse en la compilación de **32-bit**; La directiva de cierre es `IgnoreEnd32`. `IgnoreBegin64` Indica que el código no debe incluirse en la compilación de **64-bit**; La directiva de cierre es `IgnoreEnd64`.
 
     ```autohotkey
     MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
@@ -154,9 +159,9 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
     MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
     ```
 
-  - **`@Ahk2Exe-Keep`**`[Code]`
+  - **`;@Ahk2Exe-Keep`**`[Code]`
 
-    Lo contrario también es posible, es decir, marcar una sección de código para que solo se ejecute en el script compilado.
+    Lo contrario también es posible, es decir, marcar una sección de código para que solo se ejecute en el script compilado. Esta directiva también acepta las variantes `@Ahk2Exe-Keep32` y `@Ahk2Exe-Keep64`.
 
     ```autohotkey
     /*@Ahk2Exe-Keep
@@ -168,18 +173,25 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
     MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
     ```
 
-  - **`@Ahk2Exe-Define`**`Identifier [Replacement]`
+  - **`;@Ahk2Exe-Define`**`Identifier [Replacement]`
+
     Define un identificador (variable) en el valor especificado. Este identificador podrá ser utilizado con otras directivas del compilador que soporten esta característica.
 
-    `Identifier` Es un nombre cualquiera sin espacio que será utilizado como identificador. El nombre no puede ser una cadena vacía.
+    `Identifier` Es un nombre cualquiera sin espacio que será utilizado como identificador. El nombre no puede ser una cadena vacía. Si bien el identificador puede contener cualquier texto, tenga en cuenta que éste es tratado como `RegEx` en la directiva `If` al evaluar expresiones.
 
     `Replacement` Es el valor de `Identifier`. Puede ser cualquier cadena, incluyendo espacios. Si no se especifica, se establece en una cadena vacía.
 
-  - **`@Ahk2Exe-UnDef`**`Identifier`
-    Elimina un identificador definido anteriormente mediante la directiva `@Ahk2Exe-Define`.
+  - **`;@Ahk2Exe-UnDef`**`Identifier`
 
-  - **`@Ahk2Exe-If/EndIf/IfDef/IfNDef`**`Condition`
-    Estas directivas permiten incluir o descartar parte del código de un programa si se cumple una determinada condición.
+    Elimina un identificador definido anteriormente mediante la directiva `@Ahk2Exe-Define`. Si el identificador especificado no se encuentra definido, se mostrará un error y la compilación será cancelada; Para evitar esto compruebe antes mediante la directiva `;@Ahk2Exe-IfDef` si el identificador ya se encuentra definido o no.
+
+  - **`;@Ahk2Exe-If/EndIf/IfDef/IfNDef`**`Condition`
+
+    Estas directivas están basadas en [Preprocessor directives (C++)](http://www.cplusplus.com/doc/tutorial/preprocessor/), permiten incluir o descartar parte del código de un programa si se cumple una determinada condición.
+
+    La directiva `;@Ahk2Exe-If` soporta expresiones mediante el uso de la función [Eval](https://github.com/flipeador/AutoHotkey/blob/master/Lib/math/Eval.ahk). Puede consultar el enlace a esa función para ver las limitantes y las características soportadas.
+
+    Los identificadores en `Condition` son reemplazados por sus correspondientes valores asignados mediante `If`. Tenga en cuenta que a la hora de reemplazar los identificadores por sus correspondientes valores se utiliza `RegEx` de la siguiente manera: `RegExReplace(Condition, "\bIdentifier\b", Replacement)`.
 
     ```autohotkey
     ;@Ahk2Exe-define A
@@ -192,16 +204,16 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
     ;@Ahk2Exe-ifndef B
     MsgBox "Este mensaje no aparece en el script compilado"
     ;@Ahk2Exe-endif
-    ;@Ahk2Exe-if C 255
+    ;@Ahk2Exe-if C > (B + 58)
     MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
     ;@Ahk2Exe-endif
-    ;@Ahk2Exe-if B 125
+    ;@Ahk2Exe-if B = 125
     MsgBox "Este mensaje no aparece en el script compilado"
     ;@Ahk2Exe-endif
     MsgBox "Este mensaje aparece tanto en el script compilado como en el no compilado"
     ```
 
-	**Nota: Esta caracteristica se encuentra actualmente en desarrollo, por lo que su funcionamiento es muy limitado. Actualmente no soporta expresiones, ifs anidados, entre otros. La funcionalidad actual que se muestra en el ejemplo de arriba no será cambiada, por lo que puede utilizar esta directiva sin preocupaciones a futuro y su código seguirá compilando correctamente.**
+	**Nota: Actualmente estas directivas tienen ciertas limitantes, no soporta ifs anidados y el comportamiento puede no ser el deseado.**
 
 <br><br>
 
@@ -223,8 +235,8 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
     | Copyright  | Cambia la información legal de copyright (derechos de autor). |
     | OrigFilename | Cambia la información del nombre de archivo original (`OriginalFileName`). |
     | CompanyName | Cambia el nombre de la compañía. |
-	| Comments | Contiene cualquier información adicional que se debe mostrar con fines de diagnóstico |
-	| XXX | `XXX` es cualquier otro nombre que no sea los comunes de arriba. [Aquí](https://goo.gl/DtVHA5) puede ver los nombres de propiedad más comunes para la información de la versión. Puede especificar cualquier nombre excepto `MainIcon` que es otra directiva. |
+	| Comments | Contiene cualquier información adicional que se debe mostrar con fines de diagnóstico. Este valor se establece por defecto con información sobre el compilador. |
+	| XXX | `XXX` es cualquier otro nombre que no sea los comunes de arriba. [Aquí](https://goo.gl/DtVHA5) puede ver los nombres de propiedad más comunes para la información de la versión. Puede especificar cualquier nombre excepto aquellos que interfieran con el nombre de otra directiva. |
 
   - **`;@Ahk2Exe-FileVersion`**`0.0.0.0`
 
@@ -244,15 +256,27 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
     `Value` El valor de la propiedad. Si no se especifica, se establece en una cadena vacía.
 
-    `Delete` Especifica si desea eliminar una propiedad o si se desea eliminar todas las propiedades. Para eliminar la propiedad especificada debe especificar el número `1`. Para eliminar todas las propiedades debe especificar el número `2` (en este caso los dos primeros parámetros se ignoran). Si se va a añadir o modificar una propiedad, debe omitir este parámetro.
+    `Delete` Especifica si desea eliminar una propiedad o si se desea eliminar todas las propiedades. Para eliminar la propiedad especificada debe establecerse en el número `1` (en este caso el segundo parámetro se ignora). Para eliminar todas las propiedades debe especificar el número `2` (en este caso los dos primeros parámetros se ignoran). Si se va a añadir o modificar una propiedad, debe omitir este parámetro.
 
   - **`;@Ahk2Exe-SetMainIcon`**`IcoFile`
 
     Establece el icono principal, esta directiva sobreescribe el icono especificado en la interfaz y línea de parámetros del compilador. Si utiliza esta directiva, antes de añadir el icono se eliminan todos los iconos por defecto de AHK, incluyendo los iconos de `Pausa` y `Suspensión`, quedando únicamente el icono por defecto especificado. El nombre del grupo en `RT_GROUP_ICON` es `159`, por lo que debe evitar añadir recursos iconos con este nombre mediante `AddResource`. El idioma utilizado para el icono principal es 0x0409 (`SUBLANG_ENGLISH_US`). Esta directiva será ignorada si se especificó un asterisco `*` al inicio del nombre del archivo ICO en la línea de parámetros.
 
-  - **`;@Ahk2Exe-PostExec`**`Command`
+  - **`;@Ahk2Exe-PostExec`**`Command [, WorkingDir] [, Options]`
 
-    Especifica un comando que se ejecutará después de una compilación exitosa. La cadena especificada en `Command` será ejecutada mediante la función incorporada en AHK `Run`.
+    Especifica un **comando que se ejecutará después de una compilación exitosa**. El compilador no espera al nuevo proceso.
+
+    `Command` el **comando** que será ejecutado mediante la función incorporada en **AHK** `Run`.
+
+    `WorkingDir` el **directorio de trabajo** a utilizar. Si el directorio especificado no existe, se establecerá en el directorio del archivo compilado destino. Si se especificó un asterisco en `Options` este parámetro establece el directorio de trabajo del Script, en caso contrario actúa también como el segundo parámetro de la función incorporada en **AHK** `Run`.
+
+    `Options` especifica las **opciones** de la función `Run`. Para ejecutar cualquier otro código **AHK** especifique un asteristo, vea más abajo.
+
+    Si se detecta la ruta de `AutoHotkey.exe` este comando se ejecutará en un **nuevo proceso** de **AHK** (el compilador no espera al comando). El compilador dará prioridad a la versión de **64-Bit** o **32-Bit** dependiendo la arquitectura del sistema en donde se ejecuta el compilador.
+
+    Si desea **ejecutar otro comando o varios** comandos **AHK**, debe especificar un asterisco `*` en el parámetro `Options`, en cuyo caso `Command` representa cualquier código **AHK**. Tenga en cuenta que si no se puede encontrar una versión de `AutoHotkey.exe` este comando se omitirá y se añadirá la información correspondiente al registro. Al ejecutar un nuevo proceso, puede que se requieran permisos administrativos. Puede separar varios comandos utilizando comas, utilize el caracter de espape para ello.
+
+    Por ejemplo, `;@Ahk2Exe-PostExec "notepad.exe"` y `;@Ahk2Exe-PostExec Run "notepad.exe",,*` son idénticos, ambos ejecutan el Bloc de notas, pero el último requiere de `AutoHotkey.exe` ya que utiliza un nuevo proceso.
 
   - **`;@Ahk2Exe-ConsoleApp`**
 
@@ -302,11 +326,23 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
     Cambia el lenguaje por defecto de los recursos añadidos por medio de la directiva `@Ahk2Exe-AddResource`. Tenga en cuenta que este valor no se tendrá en cuenta si se especificó el código de idioma en la directiva `AddResource`. El código de idioma utilizado por defecto es 0x0409 (`SUBLANG_ENGLISH_US`). Esto también afecta al idioma del recurso de información de versión (`@Ahk2Exe-SetProp`).
 
-    `LangCode` Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693%28v=vs.85%29.aspx). Tenga en cuenta que los números hexadecimales deben tener un prefijo `0x`. Si se especifica un código de idioma inválido/desconocido ocurrirá un error; Se utiliza la función [LCIDToLocaleName](https://goo.gl/pTQtjp) para comprobar que el código sea válido.
+    `LangCode` Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693). Tenga en cuenta que los números hexadecimales deben tener un prefijo `0x`. Si se especifica un código de idioma inválido/desconocido ocurrirá un error; Se utiliza la función [LCIDToLocaleName](https://goo.gl/pTQtjp) para comprobar que el código sea válido.
 
   - **`;@Ahk2Exe-Bin`**`BinFile`
 
     Especifica el archivo BIN a utilizar durante la compilación. Esta directiva será ignorada si se especificó un asterisco `*` al inicio del nombre del archivo BIN en la línea de parámetros.
+
+  - **`;@Ahk2Exe-AddStream`**`Name, Value [, IsText]`
+
+    Añade un [stream](https://msdn.microsoft.com/en-us/library/windows/desktop/aa364404) al archivo destino. Puede entender un stream como archivos que están contenidos en un archivo principal. Se utilizan generalmente para almacenar ciertos datos/atributos en un archivo. Se puede acceder a un stream utilizando, por ejemplo: `C:\nombre_archivo:nombre_stream`. Para eliminar un stream puede utilizar la función de AHK incorporada `FileDelete`.
+
+    `Name` es el nombre del stream, se aplican las mismas reglas que con el nombre de un archivo, por lo que no puede contener los siguientes caracteres: `<>:"/\|?*`. 
+
+    `Value` representa los datos a añadir. Este valor depende del valor especificado en `IsText`. Si va a añadir texto, este parámetro puede ser una cadena vacía.
+
+    `IsText` determina si el valor en `Value` debe interpretarse como texto, en cuyo caso debe especificar **1**. Si este parámetro no se especifica, `Value` se interpretará como un archivo. Si el archivo no se puede abrir para lectura se omite y se añade una advertencia al registro. El texto se añade utilizando la codificación **UTF-8** sin **BOM**. Si se va a añadir un archivo, éste se interpretará en forma binaria (se incluye entero, sin modificaciones).
+
+    Tenga en cuenta que los streams solo son soportados en sistemas de archivos [NTFS](https://es.wikipedia.org/wiki/NTFS) y [ReFS](https://en.wikipedia.org/wiki/ReFS)[+](https://docs.microsoft.com/en-us/windows-server/storage/refs/refs-overview), este último tiene un tamaño límite de 128K. Si copia el archivo a otro sistema de archivos todos los streams son eliminados (esto también ocurre si sube el archivo a ciertos sitios de almacenamiento en la nube). Puede administrar los streams en un archivo utilizando [ADS Manager](https://dmitrybrant.com/adsmanager).
 
 
 
@@ -329,7 +365,7 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
      | 0x02 | ERROR_NOT_SUPPORTED | No soportado |
      | 0x03 | ERROR_INVALID_PARAMETER | Los parámetros pasados son inválidos |
 
-  - **Apertura de archivos**
+  - **Apertura de archivos y directorios**
 
      | Código de salida | Constante | Descripción |
      | ---------------- | --------- | ----------- |
@@ -345,13 +381,15 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
      | 0x19 | ERROR_INCLUDE_DIR_NOT_FOUND | El directorio a incluir no existe |
      | 0x20 | ERROR_FILEINSTALL_FILE_NOT_FOUND | El archivo a incluir especificado en FileInstall no existe |
      | 0x21 | ERROR_RESOURCE_FILE_NOT_FOUND | El archivo de recurso a incluir no existe |
+     | 0x22 | ERROR_DEST_DIR_NOT_FOUND | El directorio destino para el archivo destino EXE no existe |
 
-  - **Escritura de archivos**
+  - **Escritura de archivos y directorios**
 
      | Código de salida | Constante | Descripción |
      | ---------------- | --------- | ----------- |
      | 0x30 | ERROR_CANNOT_COPY_BIN_FILE | No se ha podido copiar el archivo BIN al destino |
-     | 0x31 | ERROR_CANNOT_OPEN_EXE_FILE | no se ha podido abrir el archivo destino EXE para escritura |
+     | 0x31 | ERROR_CANNOT_OPEN_EXE_FILE | No se ha podido abrir el archivo destino EXE para escritura |
+     | 0x32 | ERROR_CANNOT_CREATE_DEST_DIR | No se ha podido crear el directorio destino para archivo destino EXE |
 
   - **Sintaxis**
 
@@ -360,6 +398,7 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
      | 0x50 | ERROR_INVALID_DIRECTIVE_SYNTAX | La sintaxis de la directiva es inválida |
      | 0x51 | ERROR_UNKNOWN_DIRECTIVE_COMMAND | Comando de directiva desconocido |
      | 0x52 | ERROR_INVALID_FILEINSTALL_SYNTAX | La sintaxis de FileInstall es inválida |
+     | 0x53 | ERROR_INVALID_SYNTAX | La sintaxis en el código fuente AHK es inválida |
 
 
 
@@ -372,10 +411,12 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
 
 
 # Pensamientos para futuras actualizaciones
-  - Mejorar el procesado del Script para reducir al máximo el tamaño del archivo compilado y, si es posible, mejorar el rendimiento.
-  - Mejorar el soporte para incluir recursos.
+  - **Mejorar el procesado del Script** para reducir al máximo el tamaño del archivo compilado y, si es posible, mejorar el rendimiento.
+  - **Mejorar el soporte para incluir recursos**.
   - Mejorar soporte de la función `FileInstall`.
-  - Implementar más opciones en la interfaz.
+  - **Implementar más opciones en la interfaz**.
+  - **Implementar mas directivas**.
+  - Si te interesa alguna característica o funcionalidad actualmente no soportada, puedes dejar un comentario en el foro en AutoHotkey y veré si la implemento o no. De todas formas, puedes hacer una copia del código fuente y modificarlo tu mismo.
 
 
 
@@ -408,8 +449,8 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
 # Archivos de terceros utilizados durante el desarrollo y otros útiles para la compilación.
   - ##### [Visual Studio Community](https://www.visualstudio.com/es/vs/community/) - Para las constantes y comprobaciones de tamaño de ciertas estructuras.
   - ##### [Cool Pix Bar](https://toolslib.net/downloads/viewdownload/157-cool-pix-bar/) - Para la selección de colores RGB.
-  - ##### [FastStone Capture](http://www.faststone.org/FSCaptureDetail.htm) - Exelente capturador de imagenes, de gran ayuda con el LOGO y colores.
+  - ##### [FastStone Capture](http://www.faststone.org/FSCaptureDetail.htm) y [ShareX](https://getsharex.com/) - Exelente capturador de imagenes, de gran ayuda con el LOGO y colores.
   - ##### [UPX](https://upx.github.io/) - Compresor de archivos ejecutables.
-  - ##### [MPRESS](http://www.matcode.com/mpress.htm) - Empaquetador ejecutable de alto rendimiento. Utilizado para comprimir `Ahk2Exe.exe` y `Ahk2Exe64.exe`.
+  - ##### [MPRESS](http://www.matcode.com/mpress.htm) - Empaquetador ejecutable de alto rendimiento.
   - ##### [SublimeText](https://www.sublimetext.com/) - Para la edición de los scripts ([IDE](https://es.wikipedia.org/wiki/Entorno_de_desarrollo_integrado)).
   - ##### [AutoGUI](https://autohotkey.com/boards/viewforum.php?f=64) - Para la creación de la interfaz gráfica de usuario ([GUI](https://es.wikipedia.org/wiki/Interfaz_gr%C3%A1fica_de_usuario)).
