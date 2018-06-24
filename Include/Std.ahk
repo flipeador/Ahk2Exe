@@ -1,8 +1,73 @@
 ﻿/*
-    Determina si el archivo especificado existe o no.
-    Return:
-        Si existe devuelve sus atributos, si no existe devuelve cero.
+expr := InputBox("Enter an expression to evaluate as a new script.",,, "Ord('*')")
+result := ExecScript("FileAppend " .  expr . ", '*'")
+MsgBox "Result: " . result
 */
+ExecScript(Script, WorkingDir := "", Wait := TRUE)
+{
+    If (g_ahkpath == "")
+        Throw Exception("ExecScript", -1, "AutoHotkey.exe not found")
+
+    Local ahk := new Subprocess("`"" . g_ahkpath . "`" /ErrorStdOut *",, 0)    ; thanks «coffee»
+    If (!ahk)    ; puede requerir permisos Administrativos
+        Throw Exception("ExecScript", -1, "Process couldn't be created")
+
+    ahk.StdIn.Write( "#NoTrayIcon"
+                   . "`nListLines 0"
+                   . "`n#KeyHistory 0"
+                   . "`n#Warn"
+                   . "`nA_RegView:=64"
+                   . "`nA_DetectHiddenWIndows:=1"
+                   . "`nA_WorkingDir:='" . (DirExist(WorkingDir) ? WorkingDir : A_WorkingDir) . "'"
+                   . "`n" . Script
+                   . "`nExitApp")
+    ahk.StdIn.Close()    ; Close StdIn so it can run
+
+    Return Wait ? ahk.StdOut.ReadAll() : ""
+}
+
+
+
+
+
+VarSetLength(ByRef Var, Bytes := "", FillByte := 0)
+{
+    If (Bytes == "")
+        Return VarSetCapacity(Var)
+   
+    VarSetCapacity(Var, 0)
+    VarSetCapacity(Var, Bytes, FillByte)
+    Return Bytes
+}
+
+
+
+
+
+Contains2(Var, Data)
+{
+    Local Key := ""
+    If (!IsObject(Var))
+    {
+        If (IsObject(Data))
+        {
+            For Key, Data in Data
+                If (InStr(Var, Data))
+                    Return Key
+        }
+        Else
+            Loop Parse, Data
+                If (InStr(Var, A_LoopField))
+                    Return A_Index
+        Return FALSE
+    }
+    Throw Exception("Error in function Contains2", -1)
+}
+
+
+
+
+
 IS_FILE(Path)
 {
     Local Att := FileExist(Path)
@@ -16,18 +81,57 @@ IS_FILE(Path)
 PATH(Path, ByRef FN := "", ByRef Dir := "", ByRef Ext := "", ByRef FNNE := "", ByRef Drive := "", ByRef Attrib := "")
 {
     SplitPath(Path, FN, Dir, Ext, FNNE, Drive), Attrib := FileExist(Path)
-    Return {Path: Path, FN: FN, Dir: Dir, Ext: Ext, FNNE: FNNE, Drive: Drive, IsDir: InStr(Attrib, "D")?Attrib:0, IsFile: Attrib!=""&&Attrib&&!InStr(Attrib, "D")?Attrib:0, Exist: Attrib!=""&&Attrib}
+    Return {Path:Path,FN:FN,Dir:Dir,Ext:Ext,FNNE:FNNE,Drive:Drive,IsDir:InStr(Attrib,"D")?Attrib:0,IsFile:Attrib!=""&&Attrib&&!InStr(Attrib,"D")?Attrib:0,Exist:Attrib!=""&&Attrib}
 }
 
 
 
 
-Free(ByRef Var, Default := "")
+
+; MsgBox (i:=ObjModify([1,2,3],(n)=>n*2,-4,8))[1] i[2] i[3] i[4]    ; test 2468
+ObjModify(Obj, Fnc, Limit := 0, Default := "")
 {
-    Var := ""
-    VarSetCapacity(Var, 0)
-    Var := Default
+    Local k := "", v := ""
+    For k, v in Obj    ; [] | {}
+        If (A_Index == Limit)
+            Break
+        Else
+            Obj[k] := Fnc.MaxParams == 1 ? Fnc.Call(v) : Fnc.MaxParams == 2 ? Fnc.Call(k,v) : Fnc.Call(A_Index,k,v)
+    Loop (Limit < 0 ? Abs(Limit)-ObjLength(Obj) : 0)    ; array
+        ObjPush(Obj, Default)
+    Return Obj
 }
+
+
+
+
+
+; MsgBox "ptr:" . StrPutVar("Hola Mundo!", Buffer, Size) . "`nsize:" . Size . "`nstr:" . StrGet(&Buffer, "UTF-8")
+; MsgBox StrPutVar("•", Buffer, Size) . " | " . Size . " | " . StrGet(&Buffer, "UTF-8")
+; MsgBox StrPutVar("•", Buffer, Size, "UTF-16") . " | " . Size . " | " . StrGet(&Buffer, "UTF-16")
+StrPutVar(String, ByRef Buffer, ByRef Size := "", Encoding := "UTF-8")
+{
+    VarSetCapacity(Buffer, (Size := StrPut(String, Encoding) - VarSetCapacity(Buffer, 0)*0) * ((Encoding = "UTF-16") + 1))
+    Return IsByRef(Size) ? StrPut(String, &Buffer, Size, Encoding) * 0 + &Buffer : StrPut(String, &Buffer, Size, Encoding)
+} ; AutoHotkey Documentation
+
+
+
+
+
+DPI(n, dpi := 1, m := 1)
+{
+    return m > 0 ? n * ((dpi ? g_dpiy : g_dpix) / 96) * m : n / ((dpi ? g_dpiy : g_dpix) / 96) * (m ? m : 1)
+}
+
+
+
+
+
+OSVersion(MajorVersion, MinorVersion := 0, BuildVersion := 0)
+{
+    Return g_osv[1] > MajorVersion || (g_osv[1] == MajorVersion && g_osv[2] >= MinorVersion && g_osv[3] >= BuildVersion)
+} ; https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/wdm/ns-wdm-_osversioninfoexw
 
 
 
