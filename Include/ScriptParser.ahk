@@ -9,7 +9,7 @@
         Directives := {         MainIcon: g_data.IcoFile
                       ,        Subsystem: IMAGE_SUBSYSTEM_WINDOWS_GUI
                       ,     ResourceLang: SUBLANG_ENGLISH_US
-                      ,         PostExec: ""
+                      ,         PostExec: FALSE
                       ,      VersionInfo: {      FileVersion: g_data.BinVersion    ; estos son los valores por defecto de la información de versión
                                           ,   ProductVersion: g_data.BinVersion
                                           , OriginalFilename: PATH(Script).FN
@@ -17,7 +17,8 @@
                       ,      FileVersion: StrSplit(g_data.BinVersion, ".")    ; versión binaria del archivo
                       ,   ProductVersion: StrSplit(g_data.BinVersion, ".")    ; versión binaria del producto
                       ,        Resources: []
-                      ,     RequireAdmin: FALSE }
+                      ,     RequireAdmin: FALSE
+                      ,          Streams: [] }
     }
 
     ObjPush(FileList, Script)
@@ -62,46 +63,58 @@
     ; caracteres especiales regex \.*?+[{|()^$
     Loop Read, Script    ; abrimos el archivo para lectura y leemos línea por línea
     {
+        LineTxt := A_LoopReadLine
+
+
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        ; Ignoramos líneas en blanco y comentarios
+        ; Detectamos secciones de continuación (cadenas)
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (A_LoopReadLine ~= "^\s*$")    ; ¿línea en blanco?
-            Continue
-
-        If (InComment)    ; ¿comentario en bloque multilínea?
-        {
-            InComment := !(A_LoopReadLine ~= "^\s*\*/")
-            If (!InComment || !Keep)
-                Continue
-        }
-
-        If (IgnoreBegin)    ; ignorar líneas especificadas entre @Ahk2Exe-IgnoreBegin[32/64] y @Ahk2Exe-IgnoreEnd[32/64]
-        {
-            If (A_LoopReadLine ~= "i)^\s*;@Ahk2Exe-IgnoreEnd" . IgnoreBegin.Bits)
-                IgnoreBegin := FALSE
-
-            Else If (!(A_LoopReadLine ~= "^\s*;") && IgnoreBegin.Lines != "" && !--IgnoreBegin.Lines)
-                IgnoreBegin := FALSE
-
-            Continue
-        }
-
         If (ContSection)
         {
-            If (!(A_LoopReadLine ~= "^\s*\)(`"|')"))    ; ¿no termina la sección?    )" | )'
+            If ( !(LineTxt ~= "^\s*\)(`"|')") )    ; ¿no termina la sección?    )" | )'
             {
-                LineTxt := A_LoopReadLine
-
                 If (!InStr(ContSection.Options, "LTrim0"))
                     LineTxt := LTrim(LineTxt)
 
                 If (!InStr(ContSection.Options, "RTrim0"))
                     LineTxt := RTrim(LineTxt)
 
-                NewCode .= ( InStr(ContSection.Options, "C") ? RegExReplace(LineTxt, "\s+;((?!'|`").)*$") : LineTxt ) . "`n"    ; C = Comments (si se permite comentarios los quitamos con regex)
+                NewCode .= ( InStr(ContSection.Options, "C") ? RegExReplace(LineTxt, "\s+;.*") : LineTxt ) . "`n"    ; C = Comments (si se permite comentarios los quitamos con regex)
                 Continue
             }
-            ContSection := "*"
+            NewCode .= ProcessLine(Trim(RegExReplace(LineTxt, "\s+;.*"))) . "`n"
+            ContSection := FALSE
+            Continue
+        }
+
+
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        ; Eliminamos comentarios en línea, espacios en blanco al inicio/final y omitimos líneas en blanco
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        LineTxt := Trim(LineTxt)
+        If (LineTxt ~= "^\s*$")    ; ignoramos líneas en blanco | ignore blank lines
+            Continue
+
+
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        ; Detercamos comentarios
+        ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+        If (InComment)    ; ¿comentario en bloque multilínea?
+        {
+            InComment := !(LineTxt ~= "\*/$")    ; fix 20180614 | thanks «coffee»
+            If (!InComment || !Keep)
+                Continue
+        }
+
+        If (IgnoreBegin)    ; ignorar líneas especificadas entre @Ahk2Exe-IgnoreBegin[32/64] y @Ahk2Exe-IgnoreEnd[32/64]
+        {
+            If (LineTxt ~= "i)^;@Ahk2Exe-IgnoreEnd" . IgnoreBegin.Bits)
+                IgnoreBegin := FALSE
+
+            Else If (!(LineTxt ~= "^;") && IgnoreBegin.Lines != "" && !--IgnoreBegin.Lines)
+                IgnoreBegin := FALSE
+
+            Continue
         }
 
 
@@ -110,33 +123,42 @@
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         If (_If)
         {
-            If (A_LoopReadLine ~= "i)^\s*;@Ahk2Exe-EndIf\s*")
+            If (LineTxt ~= "i)^;@Ahk2Exe-EndIf\s*")
             {
                 _If := FALSE
                 Continue
             }
 
-            If (A_LoopReadLine ~= "i)^\s*;@Ahk2Exe-(ifn?def|if|else|elif)")
+            If (LineTxt ~= "i)^;@Ahk2Exe-(ifn?def|if|else|elif)")    ; nested ifs - is it really important?
             {
                 Util_AddLog("ERROR", "@Ahk2Exe-If no soportado dentro de otros ifs", Script, A_Index)
                 Return Util_Error("@Ahk2Exe-If no soportado dentro de otros ifs.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_NOT_SUPPORTED))
             }
 
-            If ( (_If.Type = "ifdef" && !ObjHasKey(g_data.define, _If.Def[1])) || (_If.Type = "ifndef" && ObjHasKey(g_data.define, _If.Def[1])) )
+            If ( _If.Type = "ifdef" && !ObjHasKey(g_data.define, _If.Def[1]) )
                 Continue
             
-            If ( _If.Type = "if" && (!ObjHasKey(g_data.define, _If.Def[1]) || !(g_data.define[_If.Def[1]] == _If.Def[2])) )
+            If ( _If.Type = "ifndef" && ObjHasKey(g_data.define, _If.Def[1]) )
                 Continue
+
+            If (_If.Type = "if")
+            {
+                foo := _If.Def
+                For g_k, g_v in g_data.define    ; g_k = Identifier | g_v = Replacement
+                    foo := RegExReplace(foo, "\b" . g_k . "\b", g_v)
+                If ( !Eval(foo) )    ; eval expr | ExecScript("FileAppend " .  foo . ", '*'")
+                    Continue
+            } 
         }
 
-
+        
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Detectamos comentarios en bloque
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (A_LoopReadLine ~= "^\s*/\*")
+        If (LineTxt ~= "^/\*")
         {
-            InComment := !(A_LoopReadLine ~= "\*/\s*$")    ; ¿el comentario en bloque termina en la misma línea o no? (/* comentario */)
-            Keep := A_LoopReadLine ~= "i)^\s*/\*@Ahk2Exe-Keep"
+            InComment := !(LineTxt ~= "\*/\s*$")    ; ¿el comentario en bloque termina en la misma línea o no? (/* comentario */)
+            Keep := LineTxt ~= "i)^/\*@Ahk2Exe-Keep"
             Continue
         }
 
@@ -144,45 +166,51 @@
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Detectamos secciones de continuación var:="`n(`n)"
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (A_LoopReadLine ~= "^\s*\(((?!\)).)*$")    ; ¿la línea empieza por "(" y no contiene ningún ")" en ella?
-            ContSection := { Options: Trim(SubStr(A_LoopReadLine, 2)) }
+        If (LineTxt ~= "^\(((?!\)).)*$")    ; ¿la línea empieza por "(" y no contiene ningún ")" en ella?
+            ContSection := { Options: Trim(SubStr(LineTxt, 2)) }
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Directivas específicas del compilador
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (A_LoopReadLine ~= "i)^\s*;@Ahk2Exe-")
+        If (LineTxt ~= "i)^;@Ahk2Exe-")
         {
-            LineTxt := SubStr(Trim(A_LoopReadLine), 11)    ; removemos espacios al principio y final de la línea, luego eliminamos ";@Ahk2Exe-" al principio
+            LineTxt := SubStr(LineTxt, 11)    ; eliminamos ";@Ahk2Exe-" al principio
             foo := (bar := InStr(LineTxt, A_Space)) ? SubStr(LineTxt, 1, bar - 1) : LineTxt    ; recuperamos el nombre del comando
-            bar := RegExReplace(bar ? LTrim(SubStr(LineTxt, bar)) : "", "\s+;((?!'|`").)*$")    ; recupera el valor y remueve los comentarios
-
+            bar := bar ? RegExReplace(LTrim(SubStr(LineTxt, bar)), "\s+;.*") : ""    ; recupera el valor
 
             ; ##############################################################################################################################################
             ; Directivas que controlan los metadatos ejecutables que se añadirán al archivo EXE resultante
             ; ##############################################################################################################################################
             If (foo = "ConsoleApp")    ; ConsoleApp
-                ObjRawSet(Directives, "Subsystem", IMAGE_SUBSYSTEM_WINDOWS_CUI)
+            {
+                If (bar != "")    ; esta directiva no admite parámetros
+                    Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-ConsoleApp", Script, A_Index)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-ConsoleApp.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
+                Else
+                    ObjRawSet(Directives, "Subsystem", IMAGE_SUBSYSTEM_WINDOWS_CUI)
+            }
 
             Else If (foo = "UseResourceLang")    ; UseResourceLang LangID
             {
-                If (bar == "")
+                If (bar == "")    ; el primer parámetro es requerido
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-UseResourceLang", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-UseResourceLang.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else If (!(bar is "Integer") || !LCIDToLocaleName(bar))
+                Else If (!(bar is "Integer") || !LCIDToLocaleName(bar))    ; comprueba el código de idioma
                     Util_AddLog("ERROR", "El valor de idioma en @Ahk2Exe-UseResourceLang es inválido", Script, A_Index)
                   , Util_Error("El valor de idioma en @Ahk2Exe-UseResourceLang es inválido.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
                 Else
                     ObjRawSet(Directives, "ResourceLang", Integer(bar))
             }
 
-            Else If (foo = "PostExec")    ; PostExec Command
+            Else If (foo = "PostExec")    ; PostExec Command [, WorkingDir] [, Options]
             {
-                If (bar == "")
+                bar := ParseParams(bar,, 3)
+                If (bar[1] == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-PostExec", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-PostExec.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
                 Else
-                    ObjRawSet(Directives, "PostExec", bar)
+                    ObjRawSet(Directives, "PostExec", {Target: bar[1], WorkingDir: bar[2], Options: bar[3]})
             }
 
             Else If (foo = "AddResource")    ; AddResource [*Type] FileName [, ResName] [, LangID]
@@ -217,23 +245,16 @@
 
                 Else
                 {
-                    If (foo = "SetFileVersion" || foo = "SetVersion")
+                    If (foo = "SetFileVersion" || foo = "SetProductVersion" || foo = "SetVersion")
                     {
                         bar := [foo, bar]
-                        Loop ( ObjLength(foo := StrSplit(bar[2], ".")) * 0 + 4 )    ; 4 (0.0.0.0)
-                            foo[A_Index] := foo[A_Index] is "Integer" ? Integer(foo[A_Index]) : 0
-                        ObjRawSet(Directives, "FileVersion", foo)
-                        ObjRawSet(Directives.VersionInfo, "FileVersion", bar[2])
-                        If (bar[1] = "SetVersion")
+                        foo := ObjModify(StrSplit(bar[2], "."), (n) => n is "Integer" ? Integer(n) : 0, -4, 0)
+                        If (bar[1] = "SetFileVersion" || bar[1] = "SetVersion")
+                            ObjRawSet(Directives, "FileVersion", foo)
+                          , ObjRawSet(Directives.VersionInfo, "FileVersion", bar[2])
+                        If (bar[1] = "SetProductVersion" || bar[1] = "SetVersion")
                             ObjRawSet(Directives, "ProductVersion", foo)
                           , ObjRawSet(Directives.VersionInfo, "ProductVersion", bar[2])
-                    }
-                    Else If (foo = "SetProductVersion")
-                    {
-                        Loop ( ObjLength(foo := StrSplit(bar, ".")) * 0 + 4 )    ; 4 (0.0.0.0)
-                            foo[A_Index] := foo[A_Index] is "Integer" ? Integer(foo[A_Index]) : 0
-                        ObjRawSet(Directives, "ProductVersion", foo)
-                        ObjRawSet(Directives.VersionInfo, "ProductVersion", bar)
                     }
                     Else If (foo = "SetName")
                     {
@@ -272,12 +293,21 @@
                     Util_AddLog("ERROR", "El valor especificado en @Ahk2Exe-" . foo . " es inválido", Script, A_Index)
                   , Util_Error("El valor especificado en @Ahk2Exe-" . foo . " es inválido.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
                 Else
-                    bar := StrSplit(bar, ".")
-                  , ObjRawSet(Directives, foo, [Integer(bar[1]), Integer(bar[2]), Integer(bar[3]), Integer(bar[4])])
+                    ObjRawSet(Directives, foo, ObjModify(StrSplit(bar, "."), (n) => Integer(n)))
             }
 
             Else If (foo = "RequireAdmin")    ; RequireAdmin
                 ObjRawSet(Directives, "RequireAdmin", TRUE)
+
+            Else If (foo = "AddStream")    ; AddStream Name [, Value] [, IsText?]
+            {
+                bar := ParseParams(bar,, 3)
+                If (Contains2(bar[1], "<>:`"/\|?*`t") || (bar[3] != 1 && bar[3] != ""))
+                    Util_AddLog("ERROR", "La sintaxis en la directiva @Ahk2Exe-AddStream no es correcta", Script, A_Index)
+                  , Util_Error("La sintaxis en la directiva @Ahk2Exe-AddStream no es correcta.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
+                Else
+                    ObjPush(Directives.Streams, {Name: bar[1], Value: bar[2], IsText: bar[3] == 1})
+            }
 
 
             ; ##############################################################################################################################################
@@ -303,16 +333,16 @@
 
             Else If (foo ~= "i)^Keep(32|64)?$")    ; Keep[32|64] Code
             {
-                If (bar == "" || foo ~= "^;")    ; bar == "" || line == ;@Ahk2Exe-Keep ;comment
+                If (bar == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-Keep", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-Keep.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
 
                 Else If (foo = "Keep")
-                    NewCode .= RegExReplace(bar, "\s+;((?!'|`").)*$") . "`n"
+                    NewCode .= bar . "`n"
                 Else If (foo = "Keep32" && !g_data.Compile64)
-                    NewCode .= RegExReplace(bar, "\s+;((?!'|`").)*$") . "`n"
+                    NewCode .= bar . "`n"
                 Else If (foo = "Keep64" && g_data.Compile64)
-                    NewCode .= RegExReplace(bar, "\s+;((?!'|`").)*$") . "`n"
+                    NewCode .= bar . "`n"
             }
 
             Else If (foo = "Bin")    ; Bin BinFile
@@ -328,7 +358,7 @@
                 }
             }
 
-            Else If (foo = "Define")   ; Define A [ B ..]
+            Else If (foo = "define")   ; Define A [B ..]
             {
                 bar := ParseParams(bar, "\s", 2)    ; bar := [A,B]
                 If (bar[1] == "")
@@ -347,13 +377,23 @@
                     ObjDelete(g_data.define, bar)
             }
 
-            Else If (foo ~= "i)^ifn?def$" || foo = "if")    ; if[n]def A [ B ..]  |  if A B..
+            Else If (foo ~= "i)^ifn?def$")    ; if[n]def A [B ..]
             {
                 bar := ParseParams(bar, "\s", 2)    ; bar := [A,B]
                 If (bar[1] == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-" . foo, Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-" . foo . ".`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                _If := { Type: foo, Def: bar }
+                Else
+                    _If := { Type: foo, Def: bar }
+            }
+
+            Else If (foo = "if")
+            {
+                If (bar == "")
+                    Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-If", Script, A_Index)
+                  , Util_Error("Uso inválido de la directiva @Ahk2Exe-If.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
+                Else
+                    _If := { Type: foo, Def: bar }
             }
 
             Else
@@ -368,16 +408,11 @@
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        ; Eliminamos comentarios en línea y espacios innecesarios de la línea actual
+        ; Eliminamos comentarios en línea y optimizamos la línea
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If ((LineTxt := ProcessLine(A_LoopReadLine, {ContSection: ContSection})) == "")
+        If ( (LineTxt := RegExReplace(LineTxt, "\s+;.*")) == "" )
             Continue
-        If (Type(LineTxt) != "String")
-        {
-            Util_AddLog("ERROR", "Error de sintaxis", Script, A_Index)
-            Return Util_Error("Error de sintaxis.", "[" . A_Index . "] " . Script)
-        }
-        ContSection := ContSection == "*" ? FALSE : ContSection
+        LineTxt := ProcessLine(LineTxt)
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -415,16 +450,16 @@
 
                 ObjRawSet(g_data, "Included", FALSE)
                                 ; Biblioteca estándar
-                For foo, bar in [ DirGetParent(FileList[1]) . "\Lib\"
+                For g_k, g_v in [ DirGetParent(FileList[1]) . "\Lib\"
                                 ; Biblioteca de usuario
                                 , A_MyDocuments . "\AutoHotkey\Lib\"
                                 ; Biblioteca local
-                                , DirGetParent(Util_GetAhkPath()) . "\Lib\" ]
+                                , g_ahkpath == "" ? "" : DirGetParent(g_ahkpath) . "\Lib\" ]
                 {
-                    If (IS_FILE(bar . LineTxt))
+                    If (g_v != "" && IS_FILE(g_v . LineTxt))
                     {
-                        If (!IsAlreadyIncluded(FileList, bar . LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
-                            NewCode .= PreprocessScript(bar . LineTxt, Tree . "`n" . Script, FileList, Directives) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
+                        If (!IsAlreadyIncluded(FileList, g_v . LineTxt, IncludeAgain))    ; ¿el archivo aún no se ha incluido?
+                            NewCode .= PreprocessScript(g_v . LineTxt, Tree . "`n" . Script, FileList, Directives) . "`n"    ; procesa el script incluido y añadimos el resultado al nuevo código
                         If (ERROR)
                             Return FALSE
                         ObjRawSet(g_data, "Included", TRUE)
@@ -528,9 +563,66 @@
     If (NewCode == "")    ; ¿este script no contiene datos?
         Util_AddLog("ADVERTENCIA", "El script no contiene datos", Script)
     If (Tree == "")    ; ¿estamos procesando el script principal que se va a compilar?
+    {
+        ; Thanks «coffee» : https://autohotkey.com/boards/viewtopic.php?f=44&t=48953#p223878
+        If (g_data.SyntaxCheck)    ; comprobación de sintaxis y autoinclución de bibliotecas
+        {
+            Util_AddLog("INFO", "La comprobación de sintaxis está habilitada", Script)
+            If (g_ahkpath == "")
+            {
+                Util_AddLog("ADVERTENCIA", "No se ha podido realizar la comprobación de sintaxis porque no se ha encontrado AutoHotkey.exe", Script)
+                OutputDebug("Syntax check unsuccessful. Can't find AutoHotkey.exe.")
+            }
+            Else
+            {
+                Local ahk := {}
+                Loop 2
+                ; en la primera iteración comprueba la sintaxis y luego se añaden las librerias faltantes (si las hay)
+                ; en la segunda iteración -si es necesaria- se comprueba la sintaxis con las librerías ya añadidas
+                {
+                    If (!(ahk.prc := new SubProcess("`"" . g_ahkpath . "`"" . " /iLib * /ErrorStdOut *")))
+                    {
+                        Util_AddLog("ADVERTENCIA", "No se ha podido realizar la comprobación de sintaxis porque no se ha podido ejecutar un nuevo proceso de AutoHotkey.exe", Script)
+                        OutputDebug("Syntax check unsuccessful. Can't execute new AutoHotkey.exe Subprocess.")
+                        Break
+                    }
+                    ahk.prc.StdIn.Write(NewCode)
+                    ahk.prc.StdIn.Close()
+
+                    if ((ahk.stderr := ahk.prc.StdErr.ReadAll()) != "")    ; comprueba por errores de sintaxis
+                    {
+                        Util_AddLog("ERROR", "El script contiene errores de sintaxis", Script)
+                        Return Util_Error("El script contiene errores de sintaxis.", ahk.stderr, CMDLN(ERROR_INVALID_SYNTAX))
+                    }
+
+                    If ((ahk.stdout := ahk.prc.StdOut.ReadAll()) != "")    ; comprueba por librerías faltantes
+                    {
+                        Loop Parse, ahk.stdout, "`n", "`r"
+                        {
+                            If (A_LoopField ~= "^#IncludeAgain")
+                            {
+                                NewCode .= PreprocessScript(SubStr(A_LoopField, 15), Tree . "`n" . Script, FileList, Directives) . "`n"
+                                If (ERROR)
+                                    Return FALSE
+                                Util_AddLog("INFO", "Se ha autoincluido una biblioteca", SubStr(A_LoopField, 15))
+                            }
+                        }
+                    }
+                    Else If (A_Index == 1)
+                    {
+                        Util_AddLog("INFO", "No se han encontrado bibliotecas para autoincluir", Script)
+                        Break
+                    }
+
+                    ahk := {}
+                }
+            }
+        }
+
         Return {       Code: "; <COMPILER: v" . A_AhkVersion . ">`n" . Trim(NewCode, "`t`s`r`n")
                , Directives: Directives
                ,     Script: Script }
+    }
 
     Return Trim(NewCode, "`t`s`r`n")
 }
@@ -539,155 +631,82 @@
 
 
 
-
-/*
-    Procesa una línea de texto. Se realizan las siguientes operaciones.
-    Se remueven los comentarios en-línea al final de la línea. Estos son los que comienzan con el caracter ';'.
-    Se remueven otros tipos de comentarios actualmente no soportados por AHK.
-    Se quita espacios innecesarios al inicio y final de la línea y entre operadores.
-    Se quitan los caracteres de escape '`' innecesarios en las cadenas, como por ejemplo '`x' --> 'x'. Los literales '``' son detectados correctamente.
-    Se reemplaza en las cadenas "`t" por A_Tab para ocupar solo 1 caracter.
-    Se reemplaza en las cadenas "`s" por A_Space para ocupar solo 1 caracter.
-    Se reemplaza "OR" y "AND" en expresiones por su equivalente "||" y "&&" respectivamente.
-    Return:
-         String = El procesado se ha realizado con éxito y no ha ocurrido ningún error.
-        Integer = Error de sintaxis. Actualmente este valor no tiene un significado, es siempre 1.
-    Por hacer:
-        Detectar A_PtrSize y optimizar el código removiendolo y dejando solo el valor dependiendo la versión de AHK que se va a compilar.
-        Remover por completo los espacios innecesarios.
-    Nota:
-        Gran parte del procesamiento aquí realizado es "experimental" y no se ha probado exaustivamente. Podría dejar el código con errores al compilar.
-        Este procesamiento relentiza considerablemente la compilación, aunque a costo de reducir el tamaño del archivo compilado, y en ciertos casos favorecer el rendimiento (lo más importante).
-          El tiempo de compilación en AHK no es demasiado importante, debido a que normalmente no es necesario compilar el código para probarlo. Una vez compilado, debería funcionar correctamente.
-        Durante el procesado, se tienen en cuenta los siguientes factores (en orden descentente de importancia):
-            1. Mejorar el rendimiento, por más insignificante que éste sea. Este es el objetivo más importante, debido a la lentitud extrema de los lenguajes interpretados como lo es AHK.
-            2. Lograr reducir al máximo el tamaño del código, quitando espacios y utilizando equivalentes más cortos en expresiones.
-            3. Ofuscar el código (hacerlo lo más confuso posible) sin perdidas de rendimiento ni aumento del tamaño del código en lo absoluto.
-*/
-;MsgBox ProcessLine("Return -1 +  3 (1) . '`"X ' . /*Comment*/ expr1 OR expr2 AND expr3 `; Comment", {})   ; return -1+3 (1) '"X ' expr1||expr2&&expr3
-;MsgBox ProcessLine("expr, expr,  expr", {})    ; expr,expr,expr
-ProcessLine(Txt, Data)
+ProcessLine(Code) ; \.*?+[{|()^$
 {
-    Static EscSequ := ";``:nrbtsvaf`"'{}^!+#"    ; por algún motivo extraño (bug?) "``;" se transforma en ";" (imagino que tendra algo que ver con " ;" que debe especificarse "`;")
-           , ERROR := 1
+    Code := StrSplit(Code)
+    Local   Escape := 0
+        ,  EscSequ := ";:nrbtsvaf'{}^!+#```""
+        ,     Last := ""
+        ,        i := 1    ; Index
 
-    Local     Escape := FALSE
-        ,  InComment := FALSE
-        ,       Skip := 0
-        ,       Char := []
-
-    Local NewTxt := ""
-    VarSetCapacity(NewTxt, StrLen(Txt := Trim(Txt)) * 2)
-
-    Loop ( StrLen(Txt) )
+    While (i <= ObjLength(Code))
     {
-        If (InStr("`t`s", Skip) && !(Skip := 0))    ; Skip x1
-            Continue
-
-        If (Skip ~= "^R")    ; Skip \s{2,}
+        ; procesamos las cadenas de caracteres
+        If (Last ~= "`"|'")
         {
-            If (Skip ~= "=$" && Txt[A_Index] == "=")
-            {
-                NewTxt .= "="
-                Continue
-            }
-            If (Txt[A_Index] ~= "\s")
-                Continue
-            Skip := 0
-        }
-
-        If (Skip-- > 0)
-            Continue
-
-        If (InComment)    ; expr/*comment*/expr
-        {
-            If (Txt[A_Index] == "*" && Txt[A_Index+1] == "/")
-            {
-                NewTxt := RTrim(NewTxt) . (Txt[A_Index+2] ~= "\s" ? "" : A_Space)    ; corrige espacios en los casos "expr/*comment*/expr" y "expr /*comment*/ expr"
-                Skip := 1    ; omitir "/"
-                InComment := FALSE
-            }
-            Continue
-        }
-
-        ; aquí se procesan las cadenas de caracteres
-        If (Char[0] == "`"" || Char[0] == "'")    ; expr "string" 'string' expr
-        {
-            If (Data.ContSection || (!Escape && Txt[A_Index] == Char[0]))
-                Char[0] := "", Data.ContSection := FALSE
-            If (!Escape && Txt[A_Index] == "``")
-                NewTxt .= InStr(EscSequ, Txt[A_Index+1], TRUE) ? (Txt[A_Index+1] == "t" ? Skip:=A_Tab    ; "`x`n" --> "x`n"  ||  "`t" --> A_Tab  ||  "`s" --> A_Space
-                                                                                          : Txt[A_Index+1] == "s" ? Skip:=A_Space 
-                                                                                                                   : Txt[A_Index])
-                                                                : ""
+            If (!Escape && Code[i] == Last)
+                ++i, Last := ""
             Else
-                NewTxt .= Txt[A_Index]
-            Escape := !Escape && Txt[A_Index] == "``" && Skip != A_Tab
+            {
+                Escape := !Escape && Code[i] == "``"
+                If (Escape)
+                {
+                    If (InStr(EscSequ, Code[i+1], TRUE))    ; caracter especial?
+                    {
+                        If (Code[i+1] == "s")
+                            ObjRemoveAt(Code, i+1), Code[i] := A_Space  ; `s = A_Space
+                        Else If (Code[i+1] == "t")
+                            ObjRemoveAt(Code, i+1), Code[i] := A_Tab    ; `t = A_Tab
+                        ++i
+                    }
+                    Else
+                        ObjRemoveAt(Code, i)    ; quita `
+                }
+                Else
+                    ++i
+            }
             Continue
         }
-
-        ; todo aquí abajo procesa las expresiones
-        ;Txt[A_Index] := Format("{:L}", Txt[A_Index])    ; transforma todos los caracteres a minúsculas
-
-        If (Txt[A_Index] == ";")    ; foo ;comment
+        
+        If (Code[i] ~= "\s")
         {
-            If (A_Index != 1 && !(SubStr(Txt, A_Index-1, 1) ~= "\s"))    ; expr;comment  ||  "string";comment
-                Return ERROR
-            Break
-        }
-
-        If (Txt[A_Index] == "/" && Txt[A_Index+1] == "*")    ; expr/*comment*/expr
-        {
-            InComment := TRUE
-            Continue
-        }
-
-        If (Txt[A_Index] ~= "\s")
-        {
-            If (Txt[A_Index+1] ~= "\s")    ; omitimos más de un espacio en expresiones  |  expr{space xn>1}expr --> expr{space x1}expr
-                Continue
-
-            Else If (Txt[A_Index+1] == "." && Txt[A_Index+2] ~= "\s")    ; expr . expr --> expr expr
+            If (Code[i+1] ~= "\s")    ; quita espacios de más
             {
-                NewTxt .= A_Space, Skip := 2    ; omitimos ". "
+                ObjRemoveAt(Code, i)
                 Continue
             }
 
-            Else If (Txt[A_Index+1,3] ~= "i)OR\s")    ; expr OR expr --> expr||expr
+            If (Code[i+1] == "." && Code[i+2] ~= "\s")    ; " . " = " "
             {
-                NewTxt .= "||", Skip := 3    ; omitimos "OR "
-                Continue
-            }
-
-            Else If (Txt[A_Index+1,4] ~= "i)AND\s")    ; expr AND expr --> expr&&expr
-            {
-                NewTxt .= "&&", Skip := 4    ; omitimos "AND "
+                ObjRemoveAt(Code, i+1, 2)
                 Continue
             }
         }
-
-        If (InStr(".~:=", Txt[A_Index]) && Txt[A_Index+1] == "=")    ; expr .= expr --> expr.=expr
-            NewTxt := RTrim(NewTxt), Skip := "R="
-
-        Else If (InStr("+-*/^&|", Txt[A_Index]))    ; expr + expr --> expr+expr
+        
+        If (Code[i-1] == "" || Code[i-1] ~= "\s|\(|~|\-|\+|/|&|,|\*|!|<|>|\||=|\?|:|\[|\{|\^")
         {
-            Char[-1] := RTrim(SubStr(Txt, 1, A_Index-1))
-            If (RegExReplace(Char[-1], "\w") != "" || Char[-1] ~= "\s")    ; evita "Return -1" --> "Return-1" || "XXX -1" --> "XXX-1" al comienzo de la línea siendo X letras o números (una función sin parentesis)
-                                                                           ; esto tiene una limitante, y es que si se utiliza una función sin parentesis que contiene por lo menos una letra que no sea del alfabeto
-                                                                           ; inglés generará un código con errores; Como por ejemplo "FuncionÑ -1" --> "FuncionÑ-1" que es inválido
-                NewTxt := RTrim(NewTxt), Skip := "R"
+            If (ArrSubStr(i,12) = "A_IsCompiled")
+                ObjRemoveAt(Code, i+1, 11), Code[i] := 1
+            Else If (ArrSubStr(i,9) = "A_PtrSize")
+                ObjRemoveAt(Code, i+1, 8), Code[i] := g_data.Compile64 ? 8 : 4
         }
 
-        Else If (InStr(",", Txt[A_Index]))
-        {
-            If (Txt[A_Index+1] ~= "\s")    ; expr, expr --> expr,expr
-                Skip := "R"    ; expr,{space xn>0} --> expr,{no space}
-        }
-
-        NewTxt .= Char[Escape := 0] := Txt[A_Index]
+        Last := Code[i++]
     }
 
-    Return Trim(NewTxt)
+    Local NewCode := ""
+    VarSetCapacity(NewCode, ObjLength(Code) * 2)
+    For i, Last in Code
+        NewCode .= Last
+    Return NewCode
+
+    ArrSubStr(start, length)
+    {
+        Local sub_str := ""
+        Loop (length)
+            sub_str .= Code[start+A_Index-1]
+        Return sub_str
+    }
 }
 
 
@@ -787,7 +806,7 @@ DerefVar(ByRef String, Chr, Script)
 
 
 
-ParseFuncParams(Params, Script)    ; FileInstall Source, Dest
+ParseFuncParams(Params, Script)    ; FileInstall Source, Dest | support for fileinstall function - very limited | need rewrite
 {
     Local Arr := []
         , prm := 1
@@ -892,6 +911,8 @@ ParseResourceStr(String, Script, Line)    ;@Ahk2Exe-AddResource [*Type] FileName
 
 
 
+;MsgBox ParseParams("a,b,c")[2]    ; b
+;MsgBox ParseParams(".1 2 3.","\s")[3]    ; 3.
 ParseParams(String, Delimiter := ",", Max := 0, Default := "", Trim := TRUE)
 {
     Local Data := [], Len := StrLen(String)
@@ -914,9 +935,8 @@ ParseParams(String, Delimiter := ",", Max := 0, Default := "", Trim := TRUE)
             Data[Pos] .= A_LoopField
     }
 
-    If (Trim)
-        Loop (ObjLength(Data))
-            Data[A_Index] := Trim( Data[A_Index] )
+    Loop (Trim ? ObjLength(Data) : 0)
+        Data[A_Index] := Trim( Data[A_Index] )
 
     Loop ( Max - ObjLength(Data) )
         ObjPush(Data, Default)
