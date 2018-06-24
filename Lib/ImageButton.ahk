@@ -446,7 +446,8 @@ Class ImageButton {
          ; Free resources
          DllCall("Gdiplus.dll\GdipDisposeImage", "Ptr", PBITMAP)
          DllCall("Gdiplus.dll\GdipDeleteBrush", "Ptr", PBRUSH)
-         DllCall("Gdiplus.dll\GdipDeleteStringFormat", "Ptr", HFORMAT)
+         If (BtnCaption <> "")
+            DllCall("Gdiplus.dll\GdipDeleteStringFormat", "Ptr", HFORMAT)
          DllCall("Gdiplus.dll\GdipDeleteGraphics", "Ptr", PGRAPHICS)
          ; Add the bitmap to the array
       }
@@ -466,7 +467,7 @@ Class ImageButton {
       NumPut(HIL, BIL, 0, "Ptr")
       Numput(BUTTON_IMAGELIST_ALIGN_CENTER, BIL, A_PtrSize + 16, "UInt")
       ; Hide buttons's caption
-      ControlSetText("",, "ahk_id" . HWND)
+      ;ControlSetText("",, "ahk_id" . HWND)
       ControlSetStyle("+" . BS_BITMAP,, "ahk_id" . HWND)
       ; Assign the ImageList to the button
       SendMessage(BCM_SETIMAGELIST, 0, 0,, "ahk_id" . HWND)

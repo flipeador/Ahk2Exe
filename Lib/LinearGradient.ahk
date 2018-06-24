@@ -42,12 +42,6 @@ LinearGradient(Pic, Colors, Positions := "", Direction := 0, GammaCorrection := 
     If (Direction != 0 && Direction != 1 && Direction != 2 && Direction != 3)
         Throw Exception("Function LinearGradient invalid parameter #4", -1, SubStr(Direction, 1, 50))
 
-    Local hGdiplus := 0, SI := "", pToken := 0
-    If (!DllCall("Kernel32.dll\GetModuleHandleW", "Str", "Gdiplus.dll", "Ptr"))
-        hGdiplus := DllCall("Kernel32.dll\LoadLibraryW", "Str", "Gdiplus.dll", "Ptr")
-    VarSetCapacity(SI, 16, 0), Numput(1, SI, "UInt")
-    DllCall("Gdiplus.dll\GdiplusStartup", "PtrP", pToken, "UPtr", &SI, "Ptr", 0)
-
     Local pos := Pic.Pos, pBitmap := 0, pGraphics := 0
     DllCall("Gdiplus.dll\GdipCreateBitmapFromScan0", "Int", pos.w, "Int", pos.h, "Int", 0, "Int", 0x26200A, "Ptr", 0, "PtrP", pBitmap)
     DllCall("Gdiplus.dll\GdipGetImageGraphicsContext", "Ptr", pBitmap, "PtrP", pGraphics)
@@ -78,10 +72,6 @@ LinearGradient(Pic, Colors, Positions := "", Direction := 0, GammaCorrection := 
     DllCall("Gdiplus.dll\GdipDisposeImage", "Ptr", pBitmap)
     DllCall("Gdiplus.dll\GdipDeleteBrush", "Ptr", pBrush)
     DllCall("Gdiplus.dll\GdipDeleteGraphics", "Ptr", pGraphics)
-
-    DllCall("Gdiplus.dll\GdiplusShutdown", "Ptr", pToken)
-    If (hGdiplus)
-        DllCall("Kernel32.dll\FreeLibrary", "Ptr", hGdiplus)
 
     ; STM_SETIMAGE message
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb760782(v=vs.85).aspx

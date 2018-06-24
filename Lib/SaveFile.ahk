@@ -59,8 +59,8 @@ SaveFile(Owner, FileName := "", Filter := "", CustomPlaces := "", Options := 0x6
                 DllCall(NumGet(NumGet(IFileSaveDialog)+15*A_PtrSize), "UPtr", IFileSaveDialog, "UPtr", &File)
             }
             
-            While (StrLen(Directory) > 3 && !DirExist(Directory))    ; si el directorio no existe buscamos directorios superiores
-                Directory := SubStr(Directory, 1, InStr(RTrim(Directory, "\"), "\",, -1) - 1)
+            While (InStr(Directory, "\") && !DirExist(Directory))    ; si el directorio no existe buscamos directorios superiores
+                Directory := SubStr(Directory, 1, InStr(Directory, "\",, -1) - 1)
             If (DirExist(Directory))
             {
                 DllCall("Shell32.dll\SHParseDisplayName", "UPtr", &Directory, "Ptr", 0, "UPtrP", PIDL, "UInt", 0, "UInt", 0)

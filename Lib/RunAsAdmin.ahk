@@ -7,20 +7,15 @@
 */
 RunAsAdmin()
 {
+    If (ObjLength(A_Args) && A_Args[1] == A_ThisFunc && ObjRemoveAt(A_Args, 1))
+        Return A_IsAdmin ? 2 : FALSE
+
     If (A_IsAdmin)
-    {
-        Local Ret := 1
-        If (ObjLength(A_Args) && A_Args[1] == A_ThisFunc)
-            ObjDelete(A_Args, 1), Ret := 2
-        Return Ret
-    }
+        Return TRUE
 
-    If (ObjLength(A_Args) && A_Args[1] == A_ThisFunc)
-        Return FALSE
-
-    Local Params := A_Space
+    Local Params := ""
     Loop (ObjLength(A_Args))
-        Params .= "`"" . A_Args[A_Index] . "`"" . A_Space
+        Params .= " `"" . A_Args[A_Index] . "`""
 
     If (A_IsCompiled)
         Run("*RunAs `"" . A_ScriptFullPath . "`" " . A_ThisFunc . Params)
