@@ -1,17 +1,19 @@
 ﻿GetFullPathName(Path, WorkingDir := "")
 {
-    Local RestoreIWD := ""
+    Local RestoreWD := ""
     If (DirExist(WorkingDir))
     {
-        RestoreIWD := A_WorkingDir
+        RestoreWD := A_WorkingDir
         A_WorkingDir := WorkingDir
     }
 
-    VarSetCapacity(Buffer, 5000, 0)
-    DllCall("Kernel32.dll\GetFullPathNameW", "UPtr", &Path, "UInt", 2498, "Str", Buffer, "UPtr", 0, "UInt")
+    ; https://msdn.microsoft.com/en-us/library/windows/desktop/aa364963(v=vs.85).aspx
+    Local Buffer := ""
+    VarSetCapacity(Buffer, 32767 * 2, 0)
+    DllCall("Kernel32.dll\GetFullPathNameW", "UPtr", &Path, "UInt", 32767, "Str", Buffer, "UPtr", 0, "UInt")
 
-    If (RestoreIWD != "")
-        A_WorkingDir := RestoreIWD
+    If (RestoreWD != "")
+        A_WorkingDir := RestoreWD
 
     Return Buffer
 }
