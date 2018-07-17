@@ -1,7 +1,7 @@
 ﻿/*
-expr := InputBox("Enter an expression to evaluate as a new script.",,, "Ord('*')")
-result := ExecScript("FileAppend " .  expr . ", '*'")
-MsgBox "Result: " . result
+    expr := InputBox("Enter an expression to evaluate as a new script.",,, "Ord('*')")
+    result := ExecScript("FileAppend " .  expr . ", '*'")
+    MsgBox "Result: " . result
 */
 ExecScript(Script, WorkingDir := "", Wait := TRUE)
 {
@@ -12,6 +12,7 @@ ExecScript(Script, WorkingDir := "", Wait := TRUE)
     If (!ahk)    ; puede requerir permisos Administrativos
         Throw Exception("ExecScript", -1, "Process couldn't be created")
 
+    ahk.StdIn.Encoding := ""
     ahk.StdIn.Write( "#NoTrayIcon"
                    . "`nListLines 0"
                    . "`n#KeyHistory 0"
@@ -30,38 +31,53 @@ ExecScript(Script, WorkingDir := "", Wait := TRUE)
 
 
 
-VarSetLength(ByRef Var, Bytes := "", FillByte := 0)
+SetFileExt(File, Ext := "")
 {
-    If (Bytes == "")
-        Return VarSetCapacity(Var)
-   
-    VarSetCapacity(Var, 0)
-    VarSetCapacity(Var, Bytes, FillByte)
-    Return Bytes
+    if ((File:=Trim(File)) == "")
+        return ""
+    local c_ext := ""
+    SplitPath(File,,, c_ext)
+    return c_ext == "" && SubStr(File, -1) != "." ? File . (Ext == "" ? "" : "." . Ext) : RegExReplace(File, "\..*$", Ext == "" ? "" : "." . Ext)
 }
 
 
 
 
 
-Contains2(Var, Data)
+_CONTAINS(Var, Data, CaseSensitive := FALSE, Delimiter := "|", OmitCars := "")
 {
-    Local Key := ""
-    If (!IsObject(Var))
+    Local Key := "", Value := ""
+    If (IsObject(Data))
     {
-        If (IsObject(Data))
-        {
-            For Key, Data in Data
-                If (InStr(Var, Data))
-                    Return Key
-        }
-        Else
-            Loop Parse, Data
-                If (InStr(Var, A_LoopField))
-                    Return A_Index
-        Return FALSE
+        For Key, Value in Data
+            If (InStr(Var, Value, CaseSensitive))
+                Return TRUE
     }
-    Throw Exception("Error in function Contains2", -1)
+    Else
+        Loop Parse, Data, Delimiter, OmitCars
+            If (InStr(Var, A_LoopField, CaseSensitive))
+                Return TRUE
+    Return FALSE
+}
+
+
+
+
+
+_IN(Var, Data, CaseSensitive := FALSE, Delimiter := "|", OmitCars := "")
+{
+    Local Key := "", Value := ""
+    If (IsObject(Data))
+    {
+        For Key, Value in Data
+            If ( (CaseSensitive && Value == Var) || (!CaseSensitive && Value = Var) )
+                Return TRUE
+    }
+    Else
+        Loop Parse, Data, Delimiter, OmitCars
+            If ( (CaseSensitive && A_LoopField == Var) || (!CaseSensitive && A_LoopField = Var) )
+                Return TRUE
+    Return FALSE
 }
 
 
@@ -118,21 +134,12 @@ StrPutVar(String, ByRef Buffer, ByRef Size := "", Encoding := "UTF-8")
 
 
 
-
+/*
 DPI(n, dpi := 1, m := 1)
 {
     return m > 0 ? n * ((dpi ? g_dpiy : g_dpix) / 96) * m : n / ((dpi ? g_dpiy : g_dpix) / 96) * (m ? m : 1)
 }
-
-
-
-
-
-OSVersion(MajorVersion, MinorVersion := 0, BuildVersion := 0)
-{
-    Return g_osv[1] > MajorVersion || (g_osv[1] == MajorVersion && g_osv[2] >= MinorVersion && g_osv[3] >= BuildVersion)
-} ; https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/wdm/ns-wdm-_osversioninfoexw
-
+*/
 
 
 
