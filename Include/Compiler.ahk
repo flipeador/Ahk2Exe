@@ -22,7 +22,7 @@
         Return Util_Error("El archivo BIN no se ha podido abrir para lectura.", g_data.BinFile, CMDLN(ERROR_BIN_FILE_CANNOT_OPEN))
     }
 
-    Local ExeFile := CMDLN ? g_data.ExeFile : GetFullPathName(Gui.Control["edest"].Text, DirGetParent(Data.Script))
+    Local ExeFile := CMDLN ? g_data.ExeFile : GetFullPathName(g_data.Gui.EDDst.Text, DirGetParent(Data.Script))
     If (ExeFile == "")    ; si no se a especificado un archivo destino, utiliza la misma carpeta y nombre que el archivo fuente
     {
         Local SrcDir := "", SrcName := ""
@@ -101,13 +101,16 @@
         ,        IconID :=  1, CursorID :=  1
     If (hIconFile)
     {
-        ; eliminamos todos los grupos de iconos
-        For g_k, g_v in EnumResourceNames(hExe, RT_GROUP_ICON)    ; g_v = [obj] Resource
+        If (TRUE)
         {
-            ; eliminamos todos los iconos en el grupo actual
-            For g_k, g_v in EnumResourceIcons(hExe, g_v.Name)    ; g_v = IconResName
-                UpdateResource(hUpdate, RT_ICON, g_v)
-            UpdateResource(hUpdate, g_v.Type, g_v.Name)
+            ; eliminamos todos los grupos de iconos
+            For g_k, g_v in EnumResourceNames(hExe, RT_GROUP_ICON)    ; g_v = [obj] Resource
+            {
+                ; eliminamos todos los iconos en el grupo actual
+                For g_k, g_v in EnumResourceIcons(hExe, g_v.Name)    ; g_v = IconResName
+                    UpdateResource(hUpdate, RT_ICON, g_v)
+                UpdateResource(hUpdate, g_v.Type, g_v.Name)
+            }
         }
         ; procesamos y añadimos el icono
         ProcessIcon(hIconFile, IconID, GROUP_ICON, ICONS)
@@ -190,7 +193,7 @@
 
     ; establecemos la versión binaria del archivo
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms646997(v=vs.85).aspx
-    NumPut(MAKELONG(Data.Directives.FileVersion[2], Data.Directives.FileVersion[1]), VerRes.GetValue(8), "UInt")    ; VS_FIXEDFILEINFO.dwFileVersionMS
+    NumPut(MAKELONG(Data.Directives.FileVersion[2], Data.Directives.FileVersion[1]), VerRes.GetValue(8), "UInt")     ; VS_FIXEDFILEINFO.dwFileVersionMS
     NumPut(MAKELONG(Data.Directives.FileVersion[4], Data.Directives.FileVersion[3]), VerRes.GetValue(12), "UInt")    ; VS_FIXEDFILEINFO.dwFileVersionLS
 
     ; establecemos la versión binaria del producto
@@ -214,7 +217,8 @@
 
 
     ; cerramos el archivo destino
-    FreeLibrary(hExe), EndUpdateResource(hUpdate)
+    FreeLibrary(hExe)
+    EndUpdateResource(hUpdate)
 
 
     ; establecemos el subsistema requerido para ejecutar el archivo destino
@@ -230,16 +234,26 @@
 
 
     ; añadimos streams
-    For g_k, g_v in Data.Directives.Streams    ; g_k = Index | g_v = {Name,Value,IsText}
+    For g_k, g_v in Data.Directives.Streams    ; g_k = Index | g_v = {Name,Value,Mode,Encoding}
     {
-        If (g_v.IsText)
-            FileOpen(ExeFile . ":" . g_v.Name, "w", "UTF-8-RAW").Write(g_v.Value)    ; UTF-8 without BOM
+        If (g_v.Mode == 0)    ; plain text
+            FileOpen(ExeFile . ":" . g_v.Name, "w", g_v.Encoding).Write(g_v.Value)
           , Util_AddLog("INFO", "Se ha añadido el stream `"" . g_v.Name . "`"", ExeFile)
-        Else
+        Else If (g_v.Mode == 1)    ; plain text file
         {
-            If (foo := FileOpen(g_v.Value, "r"))  ; raw
+            If (foo := FileOpen(g_v.Value, "r", g_v.Encoding))
             {
-                VarSetLength(Buffer, Size := foo.Length)
+                foo := FileOpen(ExeFile . ":" . g_v.Name, "w", g_v.Encoding).Write(foo.Read())
+                Util_AddLog("INFO", "Se ha añadido el stream `"" . g_v.Name . "`"", ExeFile)
+            }
+            Else
+                Util_AddLog("ADVERTENCIA", "No se ha podido abrir el archivo para añadir al stream `"" . g_v.Name . "`"", g_v.Value)
+        }
+        Else If (g_v.Mode == 2)    ; binary file
+        {
+            If (foo := FileOpen(g_v.Value, "r"))
+            {
+                VarSetCapacity(Buffer, Size := foo.Length)
                 foo.Seek(0), foo.RawRead(&Buffer, Size)
                 foo := FileOpen(ExeFile . ":" . g_v.Name, "w")
                 foo.Seek(0), foo.RawWrite(&Buffer, Size), foo.Close()
@@ -254,7 +268,7 @@
     ; ======================================================================================================================================================
     ; Iniciar compresión
     ; ======================================================================================================================================================
-    Local CompressionMode := CMDLN ? g_data.Compression : CB_GetSelection(Gui.Control["ddlcomp"])
+    Local CompressionMode := CMDLN ? g_data.Compression : g_data.Gui.CBCmp.Selected
 
     If (CompressionMode != NO_COMPRESSION)
     {
@@ -319,7 +333,7 @@
         {
             try    ; try Subprocess
             {
-                ExecScript("Run " . Data.Directives.PostExec.Target . "," . Data.Directives.PostExec.WorkingDir . "," . Data.Directives.PostExec.Options, Data.Directives.PostExec.WorkingDir, 0)    ; intentamos en un nuevo proceso
+                ExecScript("Run '" . Data.Directives.PostExec.Target . "','" . Data.Directives.PostExec.WorkingDir . "','" . Data.Directives.PostExec.Options . "'", Data.Directives.PostExec.WorkingDir, 0)    ; intentamos en un nuevo proceso
                 Util_AddLog("INFO", "El comando de post-ejecución se ha ejecutado en un nuevo proceso", A_ScriptFullPath)
             }
             catch    ; error
@@ -358,7 +372,7 @@ ResFileOpen(Data, FileName, ByRef Buffer := "", ByRef Size := 0)
         f.Seek(0)
         If (IsByRef(Buffer))
         {
-            VarSetLength(Buffer, Size := f.Length)
+            VarSetCapacity(Buffer, Size := f.Length)
             Return f.RawRead(&Buffer, Size)
         }
         Return f
