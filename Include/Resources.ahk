@@ -30,7 +30,7 @@ EnumResourceNames(hExe, ResType, Flags := 0, LangID := 0x0409)
     {
         Local  hModule := NumGet(Address)
             , lpszType := NumGet(Address + A_PtrSize)
-            , lpszName := NumGet(Address + A_PtrSize*2)
+            , lpszName := NumGet(Address + 2*A_PtrSize)
 
         ObjPush(Data, {  hModule: hModule
                       ,     Type: IS_INTRESOURCE(lpszType) ? lpszType : StrGet(lpszType, "UTF-16")
