@@ -1,4 +1,4 @@
-# <p align="center">Ahk2Exe 1.1.0.5 | Alpha v2.0-a097-60f26de</p>
+# <p align="center">Ahk2Exe 1.1.1.6 | Alpha v2.0-a097-60f26de</p>
 ###### Compilador no oficial para AutoHotkey v2 en español.
 
 Puedes reportar errores, proponer nueva funcionalidad o hacer cualquier otro tipo de comentarios acerca del compilador en el sitio en el foro de AutoHotkey: [autohotkey.com/boards/viewtopic.php?f=44&t=48953](https://autohotkey.com/boards/viewtopic.php?f=44&t=48953).
@@ -21,8 +21,8 @@ Puedes reportar errores, proponer nueva funcionalidad o hacer cualquier otro tip
 ##### Compatibilidad / Requisitos
 
   - Microsoft **Windows Vista** en adeltante.
-  - El compilador es únicamente para **AutoHotkey versión 2**.
-  - La interfaz gráfica de usuario (GUI) no ha sido probada en pantallas con un DPI ([PPP](https://es.wikipedia.org/wiki/P%C3%ADxeles_por_pulgada)) alto (mayor a 96). Si **la interfaz no se visualiza correctamente** haga clic en el botón `High-DPI Settings`.
+  - El compilador es únicamente para **AutoHotkey_L versión 2**.
+  - La interfaz gráfica de usuario (GUI) no ha sido probada en pantallas con un DPI ([PPP](https://es.wikipedia.org/wiki/P%C3%ADxeles_por_pulgada)) alto (mayor a 96).
 
 
 
@@ -41,6 +41,12 @@ Puedes reportar errores, proponer nueva funcionalidad o hacer cualquier otro tip
 - Por lo general, **la compilación no mejora el rendimiento de un script**.
 - En el caso de una falla, `Ahk2Exe` tiene **códigos de salida** que indican el tipo de error que ocurrió.
 - La **codificación por defecto** utilizada es `UTF-8 con BOM` (unicode), esto quiere decir que, si va a compilar un script sin `BOM`, el script compilado lo incluirá automáticamente, para asegurarse de que todos los caracteres (ej. `á`) se visualizen correctamente.
+- Para **habilitar la detección de errores de sintaxis** (analizar el código fuente), debe tener `AutoHotkey.exe` en uno de los directorios listados a continuación, ordenados en orden descendente de prioridad. Además del orden de directorios, también se le da prioridad a la arquitectura de `AutoHotkey.exe` dependiendo de la arquitectura del sistema (ej. si el sistema es de 64-Bit, se busca primero `AutoHotkeyU64.exe`).
+    - [directorio_superior_compilador]\AutoHotkey.exe
+    - [directorio_compilador]\AutoHotkey.exe
+    - [archivos_de_programa]\AutoHotkey\AutoHotkey.exe
+    - [HKLM\SOFTWARE\AutoHotkey->InstallDir]
+    - [HKCU\SOFTWARE\AutoHotkey->InstallDir]
 
 
 
@@ -100,7 +106,7 @@ El orden de los parámetros especificados importa, por ejemplo, si especifica pr
 | [&ast;]**iconfile.ico** | Icono principal del archivo compilado. Si no se especifica se mantiene el icono por defecto de AutoHotkey. Si se especificó la directiva `@Ahk2Exe-SetMainIcon` se utilizará el icono allí especificado. Puede añadir el caracter `*` como prefijo para ignorar la directiva `@Ahk2Exe-SetMainIcon` y forzar el uso de este icono. Tenga en cuenta que establecer un icono elimina todos los iconos por defecto de AHK, incluyendo iconos de _pausa_ (pause) y _suspensión_ (suspend). | infile.ahk o compilador |
 | [&ast;]**binfile.bin** | Archivo BIN AutoHotkey. Si no se especifica utiliza el último archivo BIN utilizado. En caso de no haber una configuración válida guardada se establece dependiendo de la arquitectura del compilador `Unicode %8*A_PtrSize%-bit`. Por ejemplo: `Unicode 64-bit` (la extensión es opcional). Si se especificó la directiva `@Ahk2Exe-Bin` se utilizará el archivo BIN allí especificado. Puede añadir el caracter `*` como prefijo para ignorar la directiva `@Ahk2Exe-Bin` y forzar el archivo BIN aquí especificado. | Compilador |
 | **/upx** o **/mpress** | Especifica el método de compresión del archivo EXE resultante. Los archivos `upx.exe` y `mpress.exe` deben estar en el directorio junto al compilador. | Compilador |
-| **/nocheck** | Omite la comprobación de sintaxis por medio de `AutoHotkey.exe`. Si especifica este parámetro, no se autoincluirá ninguna función automáticamente. | - |
+| **/nocheck** | Omite la comprobación de sintaxis por medio de `AutoHotkey.exe`. Si especifica este parámetro, no se incluirá ninguna función automáticamente. | - |
 | **/quiet** o **/q** | Especifica que deben suprimirse todos los mensajes, diálogos y ventanas durante la compilación. Esta opción es útil si se aprovecha el código de salida, que le permite identificar el error ocurrido, si lo hubo. | - |
 
 
@@ -219,7 +225,7 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
 - ##### Directivas que controlan los metadatos ejecutables
 
-  - **`;@Ahk2Exe-SetProp`**`Valor`
+  - **`;@Ahk2Exe-SetProp`**`Value`
 
     Cambia una propiedad en la información de versión del ejecutable compilado. En la tabla siguiente se describen las propiedades disponibles y su descripción. Puede utilizar las propiedades descritas entre parentesis para evitar utilizar, por ejemplo, la propiedad `Name`, que cambia tanto el nombre del producto como el nombre interno. Si desea un mayor control sobre la información de la versión, considere utilizar las directivas `@Ahk2Exe-VerInfo`, `@Ahk2Exe-FileVersion` y `@Ahk2Exe-ProductVersion`.
 
@@ -278,6 +284,15 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
     Por ejemplo, `;@Ahk2Exe-PostExec "notepad.exe"` y `;@Ahk2Exe-PostExec Run "notepad.exe",,*` son idénticos, ambos ejecutan el Bloc de notas, pero el último requiere de `AutoHotkey.exe` ya que utiliza un nuevo proceso.
 
+    También puede especificar varios comandos utilizando un comentario en bloque como se demuestra a continuación. Tenga en cuenta que esto anula cualquier otro `PostExec` anterior.
+
+    ```autohotkey
+    /*@Ahk2Exe-PostExec D:    ; "D:" es el directorio de trabajo a utilizar para el nuevo proceso
+    MsgBox "Este mensaje aparecerá despues de una compilación exitosa"
+    MsgBox "El directorio de trabajo es " . A_WorkingDir
+    */
+    ```
+
   - **`;@Ahk2Exe-ConsoleApp`**
 
     Cambia el subsistema ejecutable al modo consola. Cuando se ejecute el archivo compilado EXE, se abrirá una ventana de consola. Esto modifica el valor de `IMAGE_OPTIONAL_HEADER.Subsystem` a `IMAGE_SUBSYSTEM_WINDOWS_CUI`.
@@ -292,7 +307,7 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
     `FileName` Es el nombre del archivo para agregar como recurso en el ejecutable. Si el archivo no existe se mostrará un error. En caso de que el archivo no pueda ser abierto para lectura se omitirá y se añadirá al registro.
 
-    `ResourceName` (opcional) Es el nombre que tendrá el recurso (puede ser una cadena o un número entero). Si se omite, el valor predeterminado es el nombre (sin ruta) del archivo, en mayúsculas (incluye la extensión). Puede especicar un número hexadecimal, en cuyo caso debe tener el prefijo `0x`.
+    `ResourceName` (opcional) Es el nombre que tendrá el recurso (puede ser una cadena o un número entero). Si se omite, el valor predeterminado es el nombre (sin ruta) del archivo, en mayúsculas (incluye la extensión). Puede especificar un número hexadecimal, en cuyo caso debe tener el prefijo `0x`.
 
     `LangID` (opcional) Es el [código de idioma](https://msdn.microsoft.com/en-us/library/windows/desktop/dd318693%28v=vs.85%29.aspx) para este recurso. Si no se especifica, utiliza el código de idioma especificado en la directiva `UseResourceLang`.
 
@@ -332,15 +347,17 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
     Especifica el archivo BIN a utilizar durante la compilación. Esta directiva será ignorada si se especificó un asterisco `*` al inicio del nombre del archivo BIN en la línea de parámetros.
 
-  - **`;@Ahk2Exe-AddStream`**`Name, Value [, IsText]`
+  - **`;@Ahk2Exe-AddStream`**`Name, Value [, Mode] [, Encoding]`
 
     Añade un [stream](https://msdn.microsoft.com/en-us/library/windows/desktop/aa364404) al archivo destino. Puede entender un stream como archivos que están contenidos en un archivo principal. Se utilizan generalmente para almacenar ciertos datos/atributos en un archivo. Se puede acceder a un stream utilizando, por ejemplo: `C:\nombre_archivo:nombre_stream`. Para eliminar un stream puede utilizar la función de AHK incorporada `FileDelete`.
 
     `Name` es el nombre del stream, se aplican las mismas reglas que con el nombre de un archivo, por lo que no puede contener los siguientes caracteres: `<>:"/\|?*`. 
 
-    `Value` representa los datos a añadir. Este valor depende del valor especificado en `IsText`. Si va a añadir texto, este parámetro puede ser una cadena vacía.
+    `Value` representa los datos del stream. Este valor depende del valor especificado en el parámetro `Mode`. Por defecto este valor representa texto plano. El texto es añadido utilizando la codificación UTF-8 sin BOM.
 
-    `IsText` determina si el valor en `Value` debe interpretarse como texto, en cuyo caso debe especificar **1**. Si este parámetro no se especifica, `Value` se interpretará como un archivo. Si el archivo no se puede abrir para lectura se omite y se añade una advertencia al registro. El texto se añade utilizando la codificación **UTF-8** sin **BOM**. Si se va a añadir un archivo, éste se interpretará en forma binaria (se incluye entero, sin modificaciones).
+    `Mode` determina el comportamiento del parámetro `Value`. Si no se especifica, `Value` representa texto plano. Si especifica **1**, `Value` es la ruta a un archivo del que leer texto plano. Si especifica **2**, es igual a **1** pero el archivo se interpreta como binario (se incluye el archivo completo). El archivo se abre como solo lectura.
+
+    `Encoding` La codificación a usar para los modos **0** (defecto) y **1**. Por defecto utiliza la codificación **UTF-8-RAW**. Pueden ser algunas de las siguientes: UTF-8, UTF-8-RAW, UTF-16 o UTF-16-RAW.
 
     Tenga en cuenta que los streams solo son soportados en sistemas de archivos [NTFS](https://es.wikipedia.org/wiki/NTFS) y [ReFS](https://en.wikipedia.org/wiki/ReFS)[+](https://docs.microsoft.com/en-us/windows-server/storage/refs/refs-overview), este último tiene un tamaño límite de 128K. Si copia el archivo a otro sistema de archivos todos los streams son eliminados (esto también ocurre si sube el archivo a ciertos sitios de almacenamiento en la nube). Puede administrar los streams en un archivo utilizando [ADS Manager](https://dmitrybrant.com/adsmanager).
 
