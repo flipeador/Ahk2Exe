@@ -54,7 +54,6 @@
         ,    InComment := FALSE    ; determina si se está en un comentario en bloque
         ,  ContSection := FALSE    ; determina si se está en una continuación de una sección
         ,  IgnoreBegin := FALSE    ; determina si el código siguiente debe ser ignorado
-        ,         Keep := FALSE    ; determina si el comentario en bloque debe añadirse en el script compilado (no como comentario)
         ,          _If := FALSE    ; http://www.cplusplus.com/doc/tutorial/preprocessor/
 
     VarSetCapacity(NewCode, FileGetSize(Script))    ; establecemos la capacidad de la variable que amlacenará el nuevo código, para mejorar el rendimiento
@@ -101,9 +100,18 @@
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         If (InComment)    ; ¿comentario en bloque multilínea?
         {
-            InComment := !(LineTxt ~= "\*/$")    ; fix 20180614 | thanks «coffee»
-            If (!InComment || !Keep)
+            If (LineTxt ~= "\*/$")    ; ¿termina el comentario en bloque? - fix 20180614 | thanks «coffee»
+            {
+                InComment := FALSE
                 Continue
+            }
+
+            If (InComment != 1)    ; KEEP = 1
+            {
+                If (InComment == 2)    ; POSTEXEC = 2
+                    Directives.PostExec.Target .= "`r`n" . LineTxt
+                Continue
+            }
         }
 
         If (IgnoreBegin)    ; ignorar líneas especificadas entre @Ahk2Exe-IgnoreBegin[32/64] y @Ahk2Exe-IgnoreEnd[32/64]
@@ -157,8 +165,14 @@
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         If (LineTxt ~= "^/\*")
         {
-            InComment := !(LineTxt ~= "\*/\s*$")    ; ¿el comentario en bloque termina en la misma línea o no? (/* comentario */)
-            Keep := LineTxt ~= "i)^/\*@Ahk2Exe-Keep"
+            If (LineTxt ~= "\*/\s*$")    ; el comentario en bloque termina en la misma línea  /* ... */
+                Continue
+            LineTxt := RegExReplace(LineTxt, "\s+;.*")    ; quita comentarios en línea
+
+            ; NORMAL = -1 | NO = 0 | KEEP = 1 | POSTEXEC = 2
+            InComment := LineTxt ~= "i)^/\*@Ahk2Exe-Keep" ? 1 : LineTxt ~= "i)^/\*@Ahk2Exe-PostExec" ? 2 : -1
+            If (InComment == 2)    ; POSTEXEC
+                ObjRawSet(Directives, "PostExec", {Target: "", WorkingDir: RegExReplace(LineTxt, "i)^/\*@Ahk2Exe-PostExec\s*"), Options: "*"})
             Continue
         }
 
@@ -299,14 +313,14 @@
             Else If (foo = "RequireAdmin")    ; RequireAdmin
                 ObjRawSet(Directives, "RequireAdmin", TRUE)
 
-            Else If (foo = "AddStream")    ; AddStream Name [, Value] [, IsText?]
+            Else If (foo = "AddStream")    ; AddStream Name [, Value] [, Mode] [, Encoding]
             {
-                bar := ParseParams(bar,, 3)
-                If (Contains2(bar[1], "<>:`"/\|?*`t") || (bar[3] != 1 && bar[3] != ""))
+                bar := ParseParams(bar,, 4, [":","",0,"UTF-8-RAW"])
+                If (_CONTAINS(bar[1], "<,>,:,`",/,\,|,?,*,`t",,",") || !_IN(bar[3], "0|1|2") || !_IN(bar[4], "UTF-8|UTF-8-RAW|UTF-16|UTF-16-RAW"))
                     Util_AddLog("ERROR", "La sintaxis en la directiva @Ahk2Exe-AddStream no es correcta", Script, A_Index)
                   , Util_Error("La sintaxis en la directiva @Ahk2Exe-AddStream no es correcta.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
                 Else
-                    ObjPush(Directives.Streams, {Name: bar[1], Value: bar[2], IsText: bar[3] == 1})
+                    ObjPush(Directives.Streams, {Name: bar[1], Value: bar[2], Mode: Integer(bar[3]), Encoding: bar[4]})
             }
 
 
@@ -586,6 +600,7 @@
                         OutputDebug("Syntax check unsuccessful. Can't execute new AutoHotkey.exe Subprocess.")
                         Break
                     }
+                    ahk.prc.StdIn.Encoding := ""
                     ahk.prc.StdIn.Write(NewCode)
                     ahk.prc.StdIn.Close()
 
@@ -633,9 +648,11 @@
 
 ProcessLine(Code) ; \.*?+[{|()^$
 {
+    Static   delim := ["\s|\(|~|\-|\+|/|&|,|\*|!|<|>|\||=|\?|:|\[|\{|\^", "\s|\)|~|\-|\+|/|&|,|\*|!|<|>|\||=|\?|:|\]|\{|\^"]
+         , EscSequ := ";:nrbtsvaf'{}^!+#```""
+
     Code := StrSplit(Code)
     Local   Escape := 0
-        ,  EscSequ := ";:nrbtsvaf'{}^!+#```""
         ,     Last := ""
         ,        i := 1    ; Index
 
@@ -683,11 +700,11 @@ ProcessLine(Code) ; \.*?+[{|()^$
             }
         }
         
-        If (Code[i-1] == "" || Code[i-1] ~= "\s|\(|~|\-|\+|/|&|,|\*|!|<|>|\||=|\?|:|\[|\{|\^")
+        If (Code[i-1] == "" || Code[i-1] ~= delim[1])
         {
-            If (ArrSubStr(i,12) = "A_IsCompiled")
+            If (ArrSubStr(i,12) = "A_IsCompiled" && (Code[i+12] == "" || Code[i+12] ~= delim[2]))
                 ObjRemoveAt(Code, i+1, 11), Code[i] := 1
-            Else If (ArrSubStr(i,9) = "A_PtrSize")
+            Else If (ArrSubStr(i,9) = "A_PtrSize" && (Code[i+9] == "" || Code[i+9] ~= delim[2]))
                 ObjRemoveAt(Code, i+1, 8), Code[i] := g_data.Compile64 ? 8 : 4
         }
 
@@ -750,23 +767,21 @@ class TempWorkingDir
 
 QuickParse(Script)    ; analiza rápidamente el Script a compilar para recuperar ciertos datos
 {
-    If (!IS_FILE(Script) || !FileOpen(Script, "r"))
-        Return FALSE
-
-    Local      WD := new TempWorkingDir( DirGetParent(Script) )
-        ,    Data :=  { Script: Script, MainIcon: "", BinFile: "" }
-        , LineTxt := ""
-
-    Loop Read, Script
+    local f := FileOpen(Script, "r")
+    if (!f)
+        return FALSE
+    local WD      := new TempWorkingDir( DirGetParent(Script) )
+    local Data    := { Script: Script, MainIcon: "", BinFile: "" }
+    local LineTxt := ""
+    While (!f.AtEOF)
     {
-        LineTxt := Trim(A_LoopReadLine)
-        If (LineTxt ~= "i)^;@Ahk2Exe-SetMainIcon")
-            ObjRawSet(Data, "MainIcon", GetFullPathName(LTrim(SubStr(LineTxt, 22))))
-        Else If (LineTxt ~= "i)^;@Ahk2Exe-Bin")
-            ObjRawSet(Data, "BinFile", PATH(LTrim(SubStr(LineTxt, 14), A_ScriptDir)).FNNE)
+        LineTxt := RegExReplace(Trim(f.ReadLine()), "\s+;.*")
+        if (LineTxt ~= "i)^;@Ahk2Exe-SetMainIcon")
+            Data.MainIcon := GetFullPathName(LTrim(SubStr(LineTxt, 22)))
+        else if (LineTxt ~= "i)^;@Ahk2Exe-Bin")
+            Data.BinFile := PATH(LTrim(SubStr(LineTxt, 14), A_ScriptDir)).FNNE
     }
-
-    Return Data
+    return Data
 }
 
 
@@ -913,6 +928,7 @@ ParseResourceStr(String, Script, Line)    ;@Ahk2Exe-AddResource [*Type] FileName
 
 ;MsgBox ParseParams("a,b,c")[2]    ; b
 ;MsgBox ParseParams(".1 2 3.","\s")[3]    ; 3.
+;MsgBox (t:=ParseParams("A",, 4, [0,"B","C","D"]))[1] " " t[2] " " t[3] " " t[4]    ; A B C D
 ParseParams(String, Delimiter := ",", Max := 0, Default := "", Trim := TRUE)
 {
     Local Data := [], Len := StrLen(String)
@@ -927,19 +943,19 @@ ParseParams(String, Delimiter := ",", Max := 0, Default := "", Trim := TRUE)
             Data[Pos] := SubStr(String, A_Index)
             Break
         }
-        Else If (A_LoopField ~= Delimiter)
+        Else If (A_LoopField ~= Delimiter)    ; delimitador
             ++Pos
-        Else If (A_LoopField == "``")
+        Else If (A_LoopField == "``")    ; caracter de escape
             Skip := 1, Data[Pos] .= SubStr(String, A_Index+1, 1)
         Else
             Data[Pos] .= A_LoopField
     }
 
-    Loop (Trim ? ObjLength(Data) : 0)
+    Loop (Trim ? ObjLength(Data) : 0)    ; quita espacios al inicio y final de cada parámetro
         Data[A_Index] := Trim( Data[A_Index] )
 
-    Loop ( Max - ObjLength(Data) )
-        ObjPush(Data, Default)
+    Loop ( Max - (Trim := ObjLength(Data)) )    ; agrega los parámetros faltantes
+        ObjPush(Data, IsObject(Default) ? Default[Trim+A_Index] : Default)
 
     Return Data
 }
