@@ -1,17 +1,18 @@
 ﻿;@Ahk2Exe-SetName             Ahk2Exe
 ;@Ahk2Exe-SetOrigFilename     Ahk2Exe.exe
 ;@Ahk2Exe-SetDescription      Compilador de scripts para AutoHotkey v2 en español
-;@Ahk2Exe-SetFileVersion      1.1.0.5    ; major.minor.maintenance.build
+;@Ahk2Exe-SetFileVersion      1.1.1.6    ; major.minor.maintenance.build
 ;@Ahk2Exe-SetCompanyName      AutoHotkey
 ;@Ahk2Exe-SetCopyright        Copyright (c) 2004-2018
 ;@Ahk2Exe-SetComments         [2018-06-23] https://github.com/flipeador/Ahk2Exe
 
-;@Ahk2Exe-SetMainIcon Ahk2Exe.ico
+;@Ahk2Exe-SetMainIcon Ahk2Exe.ico    ; icono principal del ejecutable compilado
 
 ;@Ahk2Exe-AddResource logo.bmp         ; imagen logo de AHK
 ;@Ahk2Exe-AddResource waterctrl.dll    ; para el efecto de agua en la imagen logo
 
 ;;@Ahk2Exe-PostExec MsgBox "Done!",,*
+;;@Ahk2Exe-RequireAdmin
 
 
 
@@ -21,16 +22,15 @@
 ; CONFIGURACIÓN DE INICIO
 ; =====================================================================================================================================================
 #Warn
-;@Ahk2Exe-Keep #NoTrayIcon    ; ocultamos el icono en el área de notificación en el script compilado
 #SingleInstance Off
-;@Ahk2Exe-Keep #KeyHistory 0
+;@Ahk2Exe-Keep #NoTrayIcon      ; ocultamos el icono en el área de notificación en el script compilado
+;@Ahk2Exe-Keep #KeyHistory 0    ; desactivamos el historial de teclas en el script compilado
 
 ;@Ahk2Exe-Keep ListLines FALSE
 DetectHiddenWIndows TRUE
 ;@Ahk2Exe-IgnoreBegin64 1    ; SetRegView no es necesario en compilaciones x64
 SetRegView 64
-FileEncoding "UTF-8"    ; unicode (el script compilado siempre incluirá BOM)
-;;@Ahk2Exe-Keep OnError "_OnError"
+FileEncoding "UTF-8"         ; unicode (el script compilado siempre incluirá BOM)
 
 
 
@@ -43,7 +43,6 @@ FileEncoding "UTF-8"    ; unicode (el script compilado siempre incluirá BOM)
 #Include <Gdiplus\Gdiplus>
 #Include <LinearGradient>       ; crea imagen para fondos con degradado
 #Include <ImageButton>          ; asigna imagenes a botones
-#Include <ComboBox>             ; funciones para controles combobox
 #Include <RunAsAdmin>           ; función para ejecutar el script como administraor
 #Include <TaskDialog>           ; diálogo de tareas (un MsgBox más completo)
 #Include <DirGetParent>         ; función para recuperar el directorio superior
@@ -55,6 +54,10 @@ FileEncoding "UTF-8"    ; unicode (el script compilado siempre incluirá BOM)
 #Include <GetBinaryType>        ; para recuperar el tipo de archivo binario
 #Include <Language>             ; algunas funciones de idiomas
 #Include <Subprocess>           ; para crear sub-procesos : thanks «coffee» -> https://autohotkey.com/boards/viewtopic.php?f=44&t=48953#p223878
+#Include <Tab>                  ; clase para controles Tab
+#Include <ComboBoxEx>           ; clase para controles ComboBoxEx
+#Include <DownloadText>         ; función para recuperar el texto desde URL
+#Include <GetFileVersionInfo>   ; función para recuperar la información de la versión de un archivo
 
 ; Include\
 #Include Include
@@ -72,26 +75,15 @@ FileEncoding "UTF-8"    ; unicode (el script compilado siempre incluirá BOM)
 ; =====================================================================================================================================================
 ; INICIO
 ; =====================================================================================================================================================
-; comprobamos sistema operativo (necesario WIN_V+)
-global g_osv := StrSplit(A_OSVersion, ".")
-;global   WIN_V := [6,0]
-;     ,   WIN_7 := [6,1]
-;     ,   WIN_8 := [6,2]
-;     , WIN_8_1 := [6,3]
-;     ,  WIN_10 := [10,0]
-
-If ( !OSVersion(6) )    ; WIN_V+
-    Util_Error("Sistema operativo no soportado.", A_OSVersion, 196)
-
 A_ScriptName := "Ahk2Exe Compilador"
-global Title := "Ahk2Exe para AutoHotkey v" . A_AhkVersion . " | Script a EXE Conversor (" . (A_PtrSize==4?"32-Bit)":"64-Bit)")
+global   Title := "Ahk2Exe para AutoHotkey v" . A_AhkVersion . " | Script a EXE Conversor (" . (A_PtrSize==4?"32-Bit)":"64-Bit)")
 
 ; variables super-globales
-global     g_data := { define: {} }
+global     g_data := { Gui: {}, define: {} }
       ,       g_k := 0, g_v := 0    ; for g_k, g_v in Obj
       , g_ahkpath := Util_GetAhkPath()
-global     Cfg := Util_LoadCfg()
-global    Gdip := new Gdiplus
+global Cfg := Util_LoadCfg()
+global Gdip := new Gdiplus()
 global ERROR := FALSE
 global BE_QUIET := FALSE
 
@@ -207,177 +199,188 @@ global     VK_F1 := 0x70    ; F1 key                       || https://msdn.micro
      , VK_DELETE := 0x2E    ; DEL key
      ,   VK_BACK := 0x08    ; BACKSPACE key
 
-global COLOR_3DFACE := DllCall("User32.dll\GetSysColor", "Int", 15, "UInt")    ; color por defecto de las ventanas GUI (BGR)
-       COLOR_3DFACE := (COLOR_3DFACE & 255) << 16 | (COLOR_3DFACE & 65280) | (COLOR_3DFACE >> 16)    ; RGB
-
-global MONITOR_DEFAULTTONEAREST := 0x00000002
-
 
 ; comprobamos permisos
-If (!FileOpen("~tmp", "w"))
+If (!A_IsAdmin && !FileOpen("~tmp", "w"))
     If (!RunAsAdmin())
         Util_Error("Error de permisos.`nIntente ejecutar el compilador como Administrador.",, TRUE)
-FileDelete(A_ScriptDir . "\~tmp")
+FileDelete("~tmp")
 
+; barra de menu
+g_data.Gui.MenuBar := MenuBarCreate()
+g_data.Gui.MenuBar_File := MenuCreate()
+g_data.Gui.MenuBar_File.Add("Compilar", "Gui_CompileButton")
+g_data.Gui.MenuBar_File.SetIcon("Compilar", "shell32.dll", -167)
+g_data.Gui.MenuBar_File.Add()
+g_data.Gui.MenuBar_File.Add("Reiniciar", "Reload")
+g_data.Gui.MenuBar_File.SetIcon("Reiniciar", "shell32.dll", -47)
+g_data.Gui.MenuBar_File.Add("Salir", "ExitApp")
+g_data.Gui.MenuBar_File.SetIcon("Salir", "shell32.dll", -240)
+g_data.Gui.MenuBar.Add("Archivo", g_data.Gui.MenuBar_File)
+g_data.Gui.MenuBar.SetIcon("Archivo", A_WinDir . "\explorer.exe")
+g_data.Gui.MenuBar_Edit := MenuCreate()
+g_data.Gui.MenuBar_Edit.Add("Limpiar la lista de archivos fuente", () => g_data.Gui.CBSrc.DeleteAll(""))
+g_data.Gui.MenuBar_Edit.SetIcon("Limpiar la lista de archivos fuente", "shell32.dll", -261)
+g_data.Gui.MenuBar_Edit.Add("Limpiar la lista de iconos", () => g_data.Gui.CBIco.DeleteAll("") . IL_Destroy(g_data.Gui.CBIco.SetImageList(IL_Create())))
+g_data.Gui.MenuBar_Edit.SetIcon("Limpiar la lista de iconos", "shell32.dll", -261)
+g_data.Gui.MenuBar.Add("Edición", g_data.Gui.MenuBar_Edit)
+g_data.Gui.MenuBar.SetIcon("Edición", "shell32.dll", -182)
+g_data.Gui.MenuBar_Help := MenuCreate()
+g_data.Gui.MenuBar_Help.Add("Ir al sitio oficial de AutoHotkey", () => Run("https://autohotkey.com"))
+g_data.Gui.MenuBar_Help.SetIcon("Ir al sitio oficial de AutoHotkey", "shell32.dll", -15)
+g_data.Gui.MenuBar_Help.Add("Ir al sitio oficial del compilador en AutoHotkey", () => Run("https://autohotkey.com/boards/viewtopic.php?f=44&p=227964"))
+g_data.Gui.MenuBar_Help.SetIcon("Ir al sitio oficial del compilador en AutoHotkey", "shell32.dll", -15)
+g_data.Gui.MenuBar_Help.Add("Ir al sitio oficial del compilador en GitHub", () => Run("https://github.com/flipeador/Ahk2Exe"))
+g_data.Gui.MenuBar_Help.SetIcon("Ir al sitio oficial del compilador en GitHub", "shell32.dll", -15)
+g_data.Gui.MenuBar_Help.Add()
+g_data.Gui.MenuBar_Help.Add("Comprobar actualizaciones de AutoHotkey", () => TaskDialog(INFO_ICON, [Title,"Actualizaciones.."], "Versión actual: " . GetFileVersionInfo(g_ahkpath).ProductVersion . "`nÚltima versión: " . DownloadText("https://autohotkey.com/download/2.0/version.txt")))
+g_data.Gui.MenuBar_Help.SetIcon("Comprobar actualizaciones de AutoHotkey", "shell32.dll", -244)
+g_data.Gui.MenuBar_Help.Add("Comprobar actualizaciones de Ahk2Exe", () => TaskDialog(INFO_ICON, [Title,"Actualizaciones.."], "Versión actual: " . (A_IsCompiled?GetFileVersionInfo(A_ScriptFullPath).FileVersion:FileRead("version.txt")) . "`nÚltima versión: " . DownloadText("https://raw.githubusercontent.com/flipeador/Ahk2Exe/master/version.txt")))
+g_data.Gui.MenuBar_Help.SetIcon("Comprobar actualizaciones de Ahk2Exe", "shell32.dll", -244)
+g_data.Gui.MenuBar_Help.Add()
+g_data.Gui.MenuBar_Help.Add("Ver la ayuda de AutoHotkey", () => Run(DirGetParent(g_ahkpath) . "\AutoHotkey.chm",,"max"))
+g_data.Gui.MenuBar_Help.SetIcon("Ver la ayuda de AutoHotkey", A_WinDir . "\hh.exe")
+g_data.Gui.MenuBar_Help.Add("Acerca de..", Func("WM_KEYDOWN").Bind(0x70,0))
+g_data.Gui.MenuBar_Help.SetIcon("Acerca de..", "HICON:" . LoadPredefinedIcon(32514))
+g_data.Gui.MenuBar.Add("Ayuda", g_data.Gui.MenuBar_Help)
+g_data.Gui.MenuBar.SetIcon("Ayuda", "HICON:" . LoadPredefinedIcon(32514))
 
 ; creamos la interfaz de usuario (GUI)
-Gui := GuiCreate("-DPIScale -Resize -MaximizeBox +MinSize690x481 +E0x00000400", Title)
+Gui := GuiCreate("-DPIScale -Resize -MaximizeBox +E0x400", Title)
     ERROR_ICON[1] := WARNING_ICON[1] := INFO_ICON[1] := SHIELD_ICON[1] := Gui.Hwnd
     GCT := new GuiControlTips(Gui)
     GCT.SetTitle("Ahk2Exe", 1)
     GCT.SetFont("Italic", "Segoe UI")
+    Gui.MenuBar := g_data.Gui.MenuBar
 Gui.SetFont("s9", "Segoe UI")
 
-hMonitor := DllCall("User32.dll\MonitorFromWindow", "Ptr", Gui.Hwnd, "UInt", 0x00000002)    ; MONITOR_DEFAULTTONEAREST = 0x00000002
-If ( OSVersion(6, 1) )    ; WIN_8_1+
-    DllCall("Shcore.dll\GetDpiForMonitor", "Ptr", hMonitor, "Int", 0, "UIntP", g_dpix, "UIntP", g_dpiy)    ; MDT_EFFECTIVE_DPI = 0
-Else
-{
-    MONITORINFOEX := ""
-    NumPut(VarSetCapacity(MONITORINFOEX, 104, 0), MONITORINFOEX, 0, "UInt")
-    DllCall("User32.dll\GetMonitorInfoW", "Ptr", hMonitor, "UPtr", &MONITORINFOEX)
-    hDC := DllCall("Gdi32.dll\CreateDC", "Str", StrGet(&MONITORINFOEX+40), "Ptr", 0, "Ptr", 0, "Ptr", 0, "Ptr")
-    g_dpix := DllCall("Gdi32.dll\GetDeviceCaps", "Ptr", hDC, "Int", 88)    ; LOGPIXELSX = 88
-    g_dpiy := DllCall("Gdi32.dll\GetDeviceCaps", "Ptr", hDC, "Int", 90)    ; LOGPIXELSY = 90
-    DllCall("Gdi32.dll\DeleteDC", "Ptr", hDC)
-}
+g_data.Gui.SB := Gui.AddStatusBar("+0x100")
+    GCT.Attach(g_data.Gui.SB, "Muestra información del estado actual")
+    g_data.Gui.sbpos := g_data.Gui.SB.Pos
 
-;@Ahk2Exe-IgnoreBegin32 1    // Ignora la línea "If (A_PtrSize..." en la compilación de 32-bit
-;@Ahk2Exe-IgnoreBegin64 3    // Ignora las líneas "If...", "Gui.AddText..." y "Else" en la compilación de 64-bit
+;@Ahk2Exe-IgnoreBegin32 1    ; Ignora la línea "If (A_PtrSize..." en la compilación de 32-bit
+;@Ahk2Exe-IgnoreBegin64 3    ; Ignora las líneas "If...", "Gui.AddText..." y "Else" en la compilación de 64-bit
 If (A_PtrSize == 4)    ; solo la versión de 32-Bit soporta waterctrl
-    Gui.AddText("x0 y0 w690 h110 vlogo"), Util_LoadWaterCtrl(), Util_EnableWater(Gui.Control["logo"].Hwnd, Util_LoadLogo())
-;@Ahk2Exe-IgnoreBegin32 2    // Ignora las líneas "Else" y "Gui.AddPic..." en la compilación de 32-bit
+    g_data.Gui.TXLgo := Gui.AddText("x0 y0 w800 h110"), Util_LoadWaterCtrl(), Util_EnableWater(g_data.Gui.TXLgo.Hwnd, Util_LoadLogo(), 800, 110)
+;@Ahk2Exe-IgnoreBegin32 2    ; Ignora las líneas "Else" y "Gui.AddPic..." en la compilación de 32-bit
 Else
-    Gui.AddPic("x0 y0 w690 h110 vlogo", "HBITMAP:" . Util_LoadLogo())
-Gui.AddButton("x318 y4 w368 h100 vbinfo Left", "  ©2004-2009 Chris Mallet`n  ©2008-2011 Steve Gray (Lexikos)`n  ©2011-2018 fincs`n  ©2018-2018 Flipeador`n`n  Nota: La compilación no garantiza la protección del código fuente.")
-    DllCall("User32.dll\SetParent", "Ptr", Gui.Control["binfo"].Hwnd, "Ptr", Gui.Control["logo"].Hwnd)
+    g_data.Gui.TXLgo := Gui.AddPic("x0 y0 w800 h110", "HBITMAP:" . Util_LoadLogo())
+Gui.AddButton("x395 y4 w400 h100 vbinfo Left", "  ©2004-2009 Chris Mallet`n  ©2008-2011 Steve Gray (Lexikos)`n  ©2011-2018 fincs`n  ©2018-2018 Flipeador`n`n  Nota: La compilación no garantiza la protección del código fuente.")
+    DllCall("User32.dll\SetParent", "Ptr", Gui.Control["binfo"].Hwnd, "Ptr", g_data.Gui.TXLgo.Hwnd)
     ImageButton.Create(Gui.Control["binfo"].Hwnd, [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEE786, 0xFEF5BF, 0x2D4868, 5, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1])
 
-Gui.AddButton("x585 y111 w100 h20 vbdpi", "High-DPI Settings")
-    Gui.Control["bdpi"].SetFont("s" . DPI(8,,0) . " w" . DPI(400,0,1.1), "Tahoma")
-    Gui.Control["bdpi"].OnEvent("Click", "HighDPIBtn")
-    ImageButton.Create(Gui.Control["bdpi"].Hwnd, ButtonStyle2*)
-    GCT.Attach(Gui.Control["bdpi"], "Ajusta la interfaz para adaptarse a pantallas de alto DPI (PPP)")
+g_data.Gui.Tab := new Tab(Gui, "x0 y" . g_data.Gui.TXLgo.Pos.H . " w802", "General", "Registros")
+g_data.Gui.Tab.SetImageList(IL_Create())
+IL_Add(g_data.Gui.Tab.GetImageList(), A_IsCompiled ? A_ScriptFullPath : "Ahk2Exe.ico")
+IL_Add(g_data.Gui.Tab.GetImageList(), A_WinDir . "\regedit.exe")
+Loop g_data.Gui.Tab.GetCount()
+    g_data.Gui.Tab.SetItemImage(A_Index-1, A_Index-1)
+g_data.Gui.TabDA := g_data.Gui.Tab.GetDisplayArea()
 
-Gui.AddTab3("x0 y110 w692 h304 vtab", "General|Registros|AutoHotkey")
-    Gui.Control["tab"].OnEvent("Change", "Gui_Tab")
+g_data.Gui.Tab.UseTab(0)
+g_data.Gui.CBSrc := new ComboBoxEx(Gui, "x" . (g_data.Gui.TabDA.GX+180) . " y" . (g_data.Gui.TabDA.GY+24) . " w" . (800-g_data.Gui.TabDA.GX-250) . " r10 +0x100", StrSplit(RTrim(Cfg.LastSrcList,"`r`n"), "`r`n")*)
+    g_data.Gui.CBSrc.SetImageList(IL_Create())
+    IL_Add(g_data.Gui.CBSrc.GetImageList(), A_IsCompiled ? A_ScriptFullPath : "Ahk2Exe.ico")
+    g_data.Gui.CBSrc.Selected := g_data.Gui.CBSrc.FindString(Cfg.LastSrcFile)
+    g_data.Gui.CBSrc.OnCommand(1, "Util_DDLSrc_CBN_SELCHANGE")     ; CBN_SELCHANGE
+    g_data.Gui.CBSrc.OnCommand(5, "Util_DDLSrc_CBN_EDITCHANGE")    ; CBN_EDITCHANGE
+    GCT.Attach(g_data.Gui.CBSrc.GetComboControl(), "Buscar y seleccionar el archivo fuente en la lista")
+    GCT.Attach(g_data.Gui.CBSrc.GetEditControl(), "El archivo fuente script a compilar`nPresione Supr para eliminar el elemento de la lista")
+g_data.Gui.TXSrc := Gui.AddText("x" . (g_data.Gui.TabDA.GX+15) . " y" . g_data.Gui.CBSrc.Pos.Y . " w160 h" . g_data.Gui.CBSrc.Pos.H . " +0x200", "Fuente (archivo script)")
+g_data.Gui.BTSrc := Gui.AddButton("x" . (g_data.Gui.TabDA.GX+g_data.Gui.TabDA.W-15-40) . " y" . g_data.Gui.CBSrc.Pos.Y . " w40 h" . g_data.Gui.CBSrc.Pos.H, "•••")
+    g_data.Gui.BTSrc.OnEvent("Click", "Gui_SrcButton")
+    ImageButton.Create(g_data.Gui.BTSrc.Hwnd, ButtonStyle2*)
+    GCT.Attach(g_data.Gui.BTSrc, "Buscar y seleccionar un archivo fuente")
+g_data.Gui.TXDst := Gui.AddText("x" . g_data.Gui.TXSrc.Pos.X . " y" . (g_data.Gui.CBSrc.Pos.Y+g_data.Gui.CBSrc.Pos.H+5) . " w160 h" . g_data.Gui.CBSrc.Pos.H . " +0x200", "Destino (archivo exe)")
+g_data.Gui.EDDst := Gui.AddEdit("x" . (g_data.Gui.TabDA.GX+180) . " y" . g_data.Gui.TXDst.Pos.Y . " w" . g_data.Gui.CBSrc.Pos.W . " h" . g_data.Gui.CBSrc.Pos.H)
+    g_data.Gui.EDDst.OnEvent("Change", () => SetTimer("Util_UpdateSrc", g_data.Gui.EDDst.Text == "" ? -1000 : "Off"))
+    GCT.Attach(g_data.Gui.EDDst, "El archivo destino compilado EXE`nSe tene en cuenta el directorio del archivo fuente")
+g_data.Gui.BTDst := Gui.AddButton("x" . g_data.Gui.BTSrc.Pos.X . " y" . g_data.Gui.TXDst.Pos.Y . " w40 h" . g_data.Gui.CBSrc.Pos.H, "•••")
+    g_data.Gui.BTDst.OnEvent("Click", "Gui_DestButton")
+    ImageButton.Create(g_data.Gui.BTDst.Hwnd, ButtonStyle2*)
+    GCT.Attach(g_data.Gui.BTDst, "Seleccionar el archivo destino")
+g_data.Gui.GB1 := Gui.AddGroupBox("x" . g_data.Gui.TabDA.GX . " y" . g_data.Gui.TabDA.GY . " w" . g_data.Gui.TabDA.W . " h" . (2*24+2*g_data.Gui.CBSrc.Pos.H+5), "Parámetros requeridos")
 
-Gui.Control["tab"].UseTab(1)
-Gui.AddGroupBox("x20 y140 w650 h90", "Parámetros requeridos")
-Gui.AddText("x30 y165 w120 h20 +0x200", "Fuente (archivo script)")
-Gui.AddComboBox("x180 y165 w435 h22 vddlsrc R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastSrcList, "`r`n", "|"), "|"))
-    CB_SetItemHeight(Gui.Control["ddlsrc"], 16,  0)
-    CB_SetItemHeight(Gui.Control["ddlsrc"], 16, -1)
-    Gui.Control["ddlsrc"].OnEvent("Change", "Util_DDLSrc")
-    CB_SetSelection(Gui.Control["ddlsrc"], CB_FindString(Gui.Control["ddlsrc"], Cfg.LastSrcFile))
-    GCT.Attach(Gui.Control["ddlsrc"], "Buscar y seleccionar el archivo fuente en la lista")
-    GCT.Attach(CB_GetInfo(Gui.Control["ddlsrc"]).Edit, "El archivo fuente script a compilar`nPresione Supr para eliminar el elemento de la lista")
-Gui.AddButton("x620 y165 w40 h22 vbsrc", "•••")
-    Gui.Control["bsrc"].OnEvent("Click", "Gui_SrcButton")
-    ImageButton.Create(Gui.Control["bsrc"].Hwnd, ButtonStyle2*)
-    GCT.Attach(Gui.Control["bsrc"], "Buscar y seleccionar un archivo fuente")
-Gui.AddText("x30 y192 w120 h20 +0x200", "Destino (archivo exe)")
-Gui.AddEdit("x180 y192 w435 h20 vedest")
-    Gui.Control["edest"].OnEvent("Change", () => SetTimer("Util_UpdateSrc", Gui.Control["edest"].Text == "" ? -1000 : "Off"))
-    GCT.Attach(Gui.Control["edest"], "El archivo destino compilado EXE`nSe tene en cuenta el directorio del archivo fuente")
-Gui.AddButton("x620 y192 w40 h20 vbdest", "•••")
-    Gui.Control["bdest"].OnEvent("Click", "Gui_DestButton")
-    ImageButton.Create(Gui.Control["bdest"].Hwnd, ButtonStyle2*)
-    GCT.Attach(Gui.Control["bdest"], "Seleccionar el archivo destino")
-Gui.AddGroupBox("x20 y239 w650 h90", "Parámetros opcionales")
-Gui.AddText("x30 y262 w120 h20 +0x200", "Icono (archivo ico)")
-Gui.AddComboBox("x180 y262 w435 h22 vddlico R6 Choose1 +0x400 +0x100", RTrim(StrReplace(Cfg.LastIconList, "`r`n", "|"), "|"))
-    CB_SetItemHeight(Gui.Control["ddlico"], 16,  0)
-    CB_SetItemHeight(Gui.Control["ddlico"], 16, -1)
-    CB_SetSelection(Gui.Control["ddlico"], CB_FindString(Gui.Control["ddlico"], Cfg.LastIconFile))
-    GCT.Attach(Gui.Control["ddlico"], "Buscar y seleccionar un icono en la lista")
-    GCT.Attach(CB_GetInfo(Gui.Control["ddlico"]).Edit, "El icono principal del archivo compilado`nPresione Supr para eliminar el elemento de la lista")
-Gui.AddButton("x620 y262 w40 h22 vbico", "•••")
-    Gui.Control["bico"].OnEvent("Click", "Gui_IcoButton")
-    ImageButton.Create(Gui.Control["bico"].Hwnd, ButtonStyle2*)
-    GCT.Attach(Gui.Control["bico"], "Buscar y seleccionar un archivo icono")
-Gui.AddText("x32 y290 w120 h22 +0x200", "Archivo base (bin)")
-Gui.AddDDL("x180 y290 w405 h22 vddlbin R6 +0x400")
-    CB_SetItemHeight(Gui.Control["ddlbin"], 16,  0)
-    CB_SetItemHeight(Gui.Control["ddlbin"], 16, -1)
+g_data.Gui.CBIco := new ComboBoxEx(Gui, "x" . g_data.Gui.CBSrc.Pos.X . " y" . (g_data.Gui.GB1.Pos.Y+g_data.Gui.GB1.Pos.H+15+24) . " w" . g_data.Gui.CBSrc.Pos.W . " r10 +0x100")
+    g_data.Gui.CBIco.SetImageList(IL_Create())
+    Loop Parse, Cfg.LastIconList, "`r`n"
+        if (g_data.foo := IL_Add(g_data.Gui.CBIco.GetImageList(), A_LoopField))
+            g_data.Gui.CBIco.Add(, A_LoopField, g_data.foo-1, g_data.foo-1, g_data.foo-1,, g_data.foo-1)
+    g_data.Gui.CBIco.Selected := g_data.Gui.CBIco.FindString(Cfg.LastIconFile)
+    GCT.Attach(g_data.Gui.CBIco.GetComboControl(), "Buscar y seleccionar un icono en la lista")
+    GCT.Attach(g_data.Gui.CBIco.GetEditControl(), "El icono principal del archivo compilado`nPresione Supr para eliminar el elemento de la lista")
+g_data.Gui.TXIco := Gui.AddText("x" . g_data.Gui.TXSrc.Pos.X . " y" . g_data.Gui.CBIco.Pos.Y . " w160 h" . g_data.Gui.CBIco.Pos.H . " +0x200", "Icono (archivo ico)")
+g_data.Gui.BTIco := Gui.AddButton("x" . g_data.Gui.BTSrc.Pos.X . " y" . g_data.Gui.CBIco.Pos.Y . " w40 h" . g_data.Gui.CBIco.Pos.H, "•••")
+    g_data.Gui.BTIco.OnEvent("Click", "Gui_IcoButton")
+    ImageButton.Create(g_data.Gui.BTIco.Hwnd, ButtonStyle2*)
+    GCT.Attach(g_data.Gui.BTIco, "Buscar y seleccionar un archivo icono")
+g_data.Gui.TXBin := Gui.AddText("x" . g_data.Gui.TXSrc.Pos.X . " y" . (g_data.Gui.CBIco.Pos.Y+g_data.Gui.CBIco.Pos.H+5) . " w160 h" . g_data.Gui.CBIco.Pos.H . " +0x200", "Archivo base (bin)")
+g_data.Gui.CBBin := new ComboBoxEx(Gui, "x" . g_data.Gui.CBIco.Pos.X . " y" . g_data.Gui.TXBin.Pos.Y . " w" . (g_data.Gui.CBIco.Pos.W-50) . " +0x3 r10")
+    GCT.Attach(g_data.Gui.CBBin.GetComboControl(), "El archivo base BIN AutoHotkey")
     Util_LoadBinFiles(Cfg.LastBinFile)
-    GCT.Attach(Gui.Control["ddlbin"], "El archivo base BIN AutoHotkey")
-Gui.AddButton("x592 y290 w68 h22 vbrefbin", "Refrezcar")
-    Gui.Control["brefbin"].OnEvent("Click", () => Util_LoadBinFiles(Cfg.LastBinFile))
-    ImageButton.Create(Gui.Control["brefbin"].Hwnd, ButtonStyle2*)
-    GCT.Attach(Gui.Control["brefbin"], "Volver a leer los archivos BIN")
-Gui.AddGroupBox("x20 y338 w650 h61", "Compresión del archivo exe resultante")
-Gui.AddText("x30 y362 w125 h22 +0x200", "Método de compresión")
-Gui.AddDDL("x180 y362 w405 h22 vddlcomp R4 +0x400")
-    CB_SetItemHeight(Gui.Control["ddlcomp"], 16,  0)
-    CB_SetItemHeight(Gui.Control["ddlcomp"], 16, -1)
-    Util_LoadCompressionFiles(Cfg.Compression)
-    GCT.Attach(Gui.Control["ddlcomp"], "El método de compresión del archivo EXE")
-Gui.AddButton("x592 y362 w68 h22 vbdownload", "Descargar")
-    Gui.Control["bdownload"].OnEvent("Click", () => InStr(CB_GetText(Gui.Control["ddlcomp"]), "upx") ? Run("https://upx.github.io/") : InStr(CB_GetText(Gui.Control["ddlcomp"]), "mpress") ? Run("http://www.matcode.com/mpress.htm") : 0)
-    ImageButton.Create(Gui.Control["bdownload"].Hwnd, ButtonStyle2*)
-    GCT.Attach(Gui.Control["bdownload"], "Ir a la página oficial para descargar la herramienta seleccionada")
+g_data.Gui.BTRfz := Gui.AddButton("x" . (g_data.Gui.BTIco.Pos.X-50) . " y" . g_data.Gui.TXBin.Pos.Y . " w90 h" . g_data.Gui.TXBin.Pos.H, "Refrezcar")
+    g_data.Gui.BTRfz.OnEvent("Click", () => Util_LoadBinFiles(Cfg.LastBinFile))
+    ImageButton.Create(g_data.Gui.BTRfz.Hwnd, ButtonStyle2*)
+    GCT.Attach(g_data.Gui.BTRfz, "Volver a leer los archivos BIN")
+g_data.Gui.GB2 := Gui.AddGroupBox("x" . g_data.Gui.TabDA.GX . " y" . (g_data.Gui.CBIco.Pos.Y-24) . " w" . g_data.Gui.TabDA.W . " h" . (2*24+2*g_data.Gui.CBIco.Pos.H+5), "Parámetros opcionales")
 
-Gui.Control["tab"].UseTab(2)
-Gui.AddListView("x2 y138 w686 h272 vlvlog -E0x200", "ID|Mensaje|Archivo|Línea|Tiempo")
-    DllCall("UxTheme.dll\SetWindowTheme", "Ptr", Gui.Control["lvlog"].Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
-    Gui.Control["lvlog"].SetImageList(g_data.log_il:=IL_Create(1))
+g_data.Gui.CBCmp := new ComboBoxEx(Gui, "x" . g_data.Gui.CBBin.Pos.X . " y" . (g_data.Gui.GB2.Pos.Y+g_data.Gui.GB2.Pos.H+15+24) . " w" . g_data.Gui.CBBin.Pos.W . " r10 +0x3")
+    GCT.Attach(g_data.Gui.CBCmp.GetComboControl(), "El método de compresión del archivo EXE")
+    Util_LoadCompressionFiles(Cfg.Compression)
+g_data.Gui.TXCmp := Gui.AddText("x" . g_data.Gui.TXSrc.Pos.X . " y" . g_data.Gui.CBCmp.Pos.Y . " w160 h" . g_data.Gui.CBCmp.Pos.H . " +0x200", "Método de compresión")
+g_data.Gui.BNDwd := Gui.AddButton("x" . g_data.Gui.BTRfz.Pos.X . " y" . g_data.Gui.CBCmp.Pos.Y . " w90 h" . g_data.Gui.CBCmp.Pos.H, "Descargar")
+    g_data.Gui.BNDwd.OnEvent("Click", () => RegExMatch(g_data.Gui.CBCmp.Text,"\bupx\b") ? Run("https://upx.github.io/") : RegExMatch(g_data.Gui.CBCmp.Text,"\bmpress\b") ? Run("http://www.matcode.com/mpress.htm") : 0)
+    ImageButton.Create(g_data.Gui.BNDwd.Hwnd, ButtonStyle2*)
+    GCT.Attach(g_data.Gui.BNDwd, "Ir a la página oficial para descargar la herramienta seleccionada")
+g_data.Gui.GB3 := Gui.AddGroupBox("x" . g_data.Gui.TabDA.GX . " y" . (g_data.Gui.CBCmp.Pos.Y-24) . " w" . g_data.Gui.TabDA.W . " h" . (2*24+g_data.Gui.CBCmp.Pos.H), "Compresión del archivo exe resultante")
+
+g_data.Gui.TXAhk := Gui.AddText("x" . g_data.Gui.TabDA.GX . " y" . (g_data.Gui.GB3.Pos.Y+g_data.Gui.GB3.Pos.H+24) . " w" . g_data.Gui.TabDA.W . " h" . g_data.Gui.CBCmp.Pos.H . " c0000FF", g_ahkpath)
+    GCT.Attach(g_data.Gui.TXAhk, "Ruta de AutoHotkey detectada`nEste es el ejecutable que se utilizará para realizar comprobaciones")
+
+g_data.Gui.Tab.Move("h" . (g_data.Gui.TXAhk.Pos.Y+g_data.Gui.TXAhk.Pos.H-g_data.Gui.TXLgo.Pos.H))
+    g_data.Gui.TabDA := g_data.Gui.Tab.GetDisplayArea()
+
+g_data.Gui.Tab.UseTab(1)
+g_data.Gui.LVReg := Gui.AddListView("x" . g_data.Gui.TabDA.GX . " y" . g_data.Gui.TabDA.GY . " w" . g_data.Gui.TabDA.W . " h" . g_data.Gui.TabDA.H . " -E0x200", "ID|Mensaje|Archivo|Línea|Tiempo")
+    DllCall("UxTheme.dll\SetWindowTheme", "Ptr", g_data.Gui.LVReg.Hwnd, "Str", "Explorer", "UPtr", 0, "UInt")
+    g_data.Gui.LVReg.SetImageList(g_data.log_il:=IL_Create(1))
     IL_Add(g_data.log_il, "HICON:" . LoadPredefinedIcon(32516))    ; IDI_INFORMATION
     IL_Add(g_data.log_il, "HICON:" . LoadPredefinedIcon(32515))    ; IDI_WARNING
     IL_Add(g_data.log_il, "HICON:" . LoadPredefinedIcon(32513))    ; IDI_ERROR
     IL_Add(g_data.log_il, "HICON:" . LoadPredefinedIcon(32518))    ; IDI_SHIELD
     IL_Add(g_data.log_il, "shell32.dll", -51380)    ; INCLUDE
 
-Gui.Control["tab"].UseTab(3)
-Gui.AddPic("x0 y134 w690 h278 vahk")
-    LinearGradient(Gui.Control["ahk"], [0xFF0000,0xFFFF00,0x00FF00,0x00FFFF,0x0000FF])
-Gui.AddText("x0 y134 w690 h278 vahk2 Center BackgroundTrans +0x200", "AutoHotkey")
-    Try Gui.Control["ahk2"].SetFont("Bold s75", "Segoe Print")
-    Catch
-        Gui.Control["ahk2"].SetFont("Bold s75", "Arial")
+g_data.Gui.Tab.UseTab()
+g_data.Gui.TXSPT := Gui.AddText("x0 y" . (g_data.Gui.Tab.Pos.X+g_data.Gui.Tab.Pos.H+g_data.Gui.TXLgo.Pos.H-2) . " w800 h2 vbsp BackgroundFED22C")    ; separador
+g_data.Gui.PCBTM := Gui.AddPic("x0 y" . (g_data.Gui.TXSPT.Pos.Y+2) . " w800 h" . (25+2*15) . " +E0x08000000")    ; fondo de pié de página
+    LinearGradient(g_data.Gui.PCBTM, [0xFEF5BF, 0xFEE786],, 1)  ; 1=VERTICAL
+g_data.Gui.BTExt := Gui.AddButton("x650 y" . (g_data.Gui.PCBTM.Pos.Y+15) . " w140 h25", "Cerrar")
+    g_data.Gui.BTExt.OnEvent("Click", "ExitApp")
+    ImageButton.Create(g_data.Gui.BTExt.Hwnd, ButtonStyle*)
+    GCT.Attach(g_data.Gui.BTExt, "Cerrar el compilador y guardar la sesión")
+g_data.Gui.BTCmp := Gui.AddButton("x500 y" . g_data.Gui.BTExt.Pos.Y . " w140 h25 Default", ">Compilar<")
+    g_data.Gui.BTCmp.OnEvent("Click", "Gui_CompileButton")
+    g_data.Gui.BTCmp.SetFont("Bold")
+    ImageButton.Create(g_data.Gui.BTCmp.Hwnd, ButtonStyle*)
+    GCT.Attach(g_data.Gui.BTCmp, "Compilar el archivo fuente seleccionado")
+g_data.Gui.BTGit := Gui.AddButton("x10 y" . g_data.Gui.BTExt.Pos.Y . " w140 h25", "Ver en GitHub")
+    g_data.Gui.BTGit.OnEvent("Click", () => Run("https://github.com/flipeador/Ahk2Exe"))
+    ImageButton.Create(g_data.Gui.BTGit.Hwnd, ButtonStyle*)
+    GCT.Attach(g_data.Gui.BTGit, "Ir a la página oficial en GitHub")
+g_data.Gui.BTAbt := Gui.AddButton("x160 y" . g_data.Gui.BTExt.Pos.Y . " w140 h25", "Acerca de (F1)")
+    g_data.Gui.BTAbt.OnEvent("Click", Func("WM_KEYDOWN").Bind(0x70,0))
+    ImageButton.Create(g_data.Gui.BTAbt.Hwnd, ButtonStyle*)
+    GCT.Attach(g_data.Gui.BTAbt, "Ver acerca de..")
 
-Gui.Control["tab"].UseTab()
-Gui.AddText("x0 y413 w690 h2 vbsp BackgroundFED22C")    ; separador
-Gui.AddPic("x0 y415 w690 h76 vbbg +E0x08000000")    ; fondo de pié de página
-    LinearGradient(Gui.Control["bbg"], [0xFEF5BF, 0xFEE786],, 1)  ; 1=VERTICAL
-Gui.AddButton("x590 y426 w90 h22 vbclose", "Cerrar")
-    Gui.Control["bclose"].OnEvent("Click", "ExitApp")
-    ImageButton.Create(Gui.Control["bclose"].Hwnd, ButtonStyle*)
-    GCT.Attach(Gui.Control["bclose"], "Cerrar el compilador y guardar la sesión")
-Gui.AddButton("x492 y426 w90 h22 Default vbcompile", ">Compilar<")
-    Gui.Control["bcompile"].OnEvent("Click", "Gui_CompileButton")
-    Gui.Control["bcompile"].SetFont("Bold")
-    ImageButton.Create(Gui.Control["bcompile"].Hwnd, ButtonStyle*)
-    GCT.Attach(Gui.Control["bcompile"], "Compilar el archivo fuente seleccionado")
-Gui.AddButton("x10 y426 w90 h22 vbgit", "Ver en GitHub")
-    Gui.Control["bgit"].OnEvent("Click", () => Run("https://github.com/flipeador/Ahk2Exe"))
-    ImageButton.Create(Gui.Control["bgit"].Hwnd, ButtonStyle*)
-    GCT.Attach(Gui.Control["bgit"], "Ir a la página oficial en GitHub")
-Gui.AddButton("x110 y426 w90 h22 vbabout", "Acerca de (F1)")
-    Gui.Control["babout"].OnEvent("Click", Func("WM_KEYDOWN").Bind(0x70, 0))
-    ImageButton.Create(Gui.Control["babout"].Hwnd, ButtonStyle*)
-    GCT.Attach(Gui.Control["babout"], "Ver acerca de..")
-Gui.AddLink("x210 y429 w200 h22 BackgroundFFFFFF vlnk", "<a href=`"https://autohotkey.com/`">https://autohotkey.com/</a>")
-    WinSetTransColor("FFFFFF", "ahk_id" . Gui.Control["lnk"].Hwnd)
-    GCT.Attach(Gui.Control["lnk"], "Ir a la página oficial de AutoHotkey")
-Gui.AddStatusBar("vsb +0x100")
-    GCT.Attach(Gui.Control["sb"], "Muestra información del estado actual")
-    WinSetTransColor(Format("{:06X}", COLOR_3DFACE), "ahk_id" . Gui.Control["sb"].Hwnd)
-    Util_Status("Inicializando ..")
-
-Gui.Show("w690 h481")
+Gui.Show("w800 h" . (g_data.Gui.PCBTM.Pos.Y+g_data.Gui.PCBTM.Pos.H+g_data.Gui.SB.Pos.H))
     Gui.OnEvent("Close", "ExitApp")
     Gui.OnEvent("Size", "Gui_Size")
     Gui.OnEvent("Escape", () => MsgBox("¿Esta seguro de que desea cerrar la aplicación?",, 0x2024) == "Yes" ? ExitApp() : 0)
     Gui.OnEvent("DropFiles", "Gui_DropFiles")
 
-
-; registramos mensajes del sistema
-OnMessage(0x100, "WM_KEYDOWN")    ; cuando se presiona una tecla que no sea del sistema (alt).
-OnMessage(0x200, "WM_MOUSEMOVE")  ; cuando se mueve el cursor en la ventana
-OnExit("_OnExit")    ; al terminar
-
 Util_UpdateSrc()
+OnExit("_OnExit")    ; al terminar
+OnMessage(0x100, "WM_KEYDOWN")    ; cuando se presiona una tecla que no sea del sistema (alt).
 Return
 
 
@@ -389,104 +392,85 @@ Return
 ; =====================================================================================================================================================
 Gui_Size(Gui, MinMax, W, H)
 {
-    If (MinMax == WIN_MINIMIZED)
-        Return
-    ; no implementado aún
+    If (MinMax != WIN_MINIMIZED)
+        SetTimer("ReSize", -500)    
+    
+    ReSize()
+    {
+        ;ToolTip A_ThisFunc
+    }
 }
 
 Gui_DropFiles(Gui, Ctrl, FileArray, X, Y)
 {
     Local LastSrc := "", LastIco := "", foo := new GuiDisable("Leyendo archivos..")
-    Loop (ObjLength(FileArray))
+    for g_v, g_k in FileArray    ; g_v = index  |  g_k = filename
     {
-        If (DirExist(FileArray[A_Index]))
-            Loop Files, FileArray[A_Index] . "\*.*", "F"
-                Load(A_LoopFileFullPath)
-        Else
-            Load(FileArray[A_Index])
+        if (PATH(g_k).Ext = "ahk")
+        {
+            if (g_data.Gui.CBSrc.FindString(g_k) == -1)
+                g_data.Gui.CBSrc.Add(, LastSrc := g_k)
+        }
+        else if (PATH(g_k).Ext = "ico")
+        {
+            if (g_data.Gui.CBIco.FindString(g_k) == -1)
+                if (g_data.foo := IL_Add(g_data.Gui.CBIco.GetImageList(), g_k))
+                    g_data.Gui.CBIco.Add(, LastIco := g_k, g_data.foo-1, g_data.foo-1, g_data.foo-1,, g_data.foo-1)
+        }
     }
-    CB_SetSelection(Gui.Control["ddlsrc"], LastSrc, 0)
-    CB_SetSelection(Gui.Control["ddlico"], LastIco, 0)
-    Gui.Control["edest"].Text := ""
-    Util_UpdateSrc()
-
-    Load(File)
-    {
-        If (SubStr(File, -4) = ".ahk")
-            LastSrc := File, CB_Insert(Gui.Control["ddlsrc"], File,, 0)
-        If (SubStr(FileArray[A_Index], -4) = ".ico")
-            LastIco := File, CB_Insert(Gui.Control["ddlico"], File,, 0)
-    }
+    if (LastSrc != "")
+        g_data.Gui.CBSrc.Selected := g_data.Gui.CBSrc.FindString(LastSrc)
+      , g_data.Gui.EDDst.Text := "", Util_UpdateSrc()
+    if (LastIco != "")
+        g_data.Gui.CBIco.Selected := g_data.Gui.CBSrc.FindString(LastIco)
 }
 
-Gui_Tab(Tab)
+Util_DDLSrc_CBN_SELCHANGE()
 {
-}
-
-Util_DDLSrc()
-{
-    Gui.Control["edest"].Text := ""
+    g_data.Gui.EDDst.Text := ""
     Util_UpdateSrc()
 }
 
-; I know, this is horrible - for the moment it stays like this
-HighDPIBtn(Btn)    ; sin terminar (este método no es muy eficiente. lo correcto sería ajustar las dimensiones y coordenadas de los controles)
+Util_DDLSrc_CBN_EDITCHANGE()
 {
-    Btn.Visible := FALSE
-    For g_k, g_v in Gui
-    {
-        try g_v.SetFont(g_v.Name == "ahk2" ? "s" . DPI(75,,0) . " Bold" : "s" . DPI(9) . " w" . DPI(400,0,1.1), "Segoe UI")
-        If (g_v.Type == "Button")   
-            If InStr("bclosebcompilebgitbabout", g_v.Name)
-                ImageButton.Create(g_k, ButtonStyle*)
-            Else If (g_v.Name == "binfo")
-                    ImageButton.Create(g_k, [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEE786, 0xFEF5BF, 0x2D4868, 5, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1])
-            Else
-                ImageButton.Create(g_k, ButtonStyle2*)
-    }
-    WinRedraw("ahk_id" . Gui.Hwnd)
+    SetTimer("Util_DDLSrc_CBN_SELCHANGE", -500)
 }
 
 Gui_SrcButton()
 {
-    Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo fuente AHK..")
-    Local File := CB_GetSelection(Gui.Control["ddlsrc"]) == -1 ? Cfg.LastSrcFile : CB_GetText(Gui.Control["ddlsrc"])
-        , File := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar archivo fuente"], File, {"Todos los archivos": "*.*", Scripts: "#*.ahk"},, 0x1200)
-    If (File)
+    local foo  := new GuiDisable("Diálogo para seleccionar archivo fuente..")
+    local file := g_data.Gui.CBSrc.Text == "" ? Cfg.LastSrcFile : g_data.Gui.CBSrc.Text
+    If ( file := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar archivo fuente"], file, {"Todos los archivos":"*.*", Scripts:"#*.ahk"},, 0x1200) )
     {
-        Loop (ObjLength(File))
-            CB_Insert(Gui.Control["ddlsrc"], File[A_Index],, 0)
-        CB_SetSelection(Gui.Control["ddlsrc"], File[1], 0)
-        Util_UpdateSrc()
+        for g_k, g_v in file    ; g_k = index  |  g_v = filename
+            if (g_data.Gui.CBSrc.FindString(g_v) == -1)    ; no añadir duplicados
+                g_data.Gui.CBSrc.Add(-1, g_v)
+        g_data.Gui.CBSrc.Selected := g_data.Gui.CBSrc.FindString(file[1])    ; establecer la selección en el primer elemento
+        Util_UpdateSrc()    ; actualizar los datos para el archivo fuente seleccioado
     }
 }
 
 Gui_IcoButton()
 {
-    Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo icono..")
-    Local File := CB_GetSelection(Gui.Control["ddlico"]) == -1 ? Cfg.LastIconFile : CB_GetText(Gui.Control["ddlico"])
-        , File := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar icono"], File, {Iconos: "#*.ico"},, 0x1200)
-    If (File)
+    local foo  := new GuiDisable("Diálogo para seleccionar archivo icono..")
+    local file := g_data.Gui.CBIco.Text == "" ? Cfg.LastIconFile : g_data.Gui.CBIco.Text
+    If ( file := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar icono"], file, {Iconos:"#*.ico"},, 0x1200) )
     {
-        Loop (ObjLength(File))
-            If (SubStr(File[A_Index], -4) = ".ico")
-                CB_Insert(Gui.Control["ddlico"], File[A_Index],, 0)
-        CB_SetSelection(Gui.Control["ddlico"], File[1], 0)
+        for g_k, g_v in file    ; g_k = index  |  g_v = filename
+            if (g_data.Gui.CBIco.FindString(g_v) == -1)    ; no añadir duplicados
+                if (g_data.foo := IL_Add(g_data.Gui.CBIco.GetImageList(), g_v))
+                    g_data.Gui.CBIco.Add(-1, g_v, g_data.foo-1, g_data.foo-1, g_data.foo-1,, g_data.foo-1)
+        g_data.Gui.CBIco.Selected := g_data.Gui.CBIco.FindString(file[1])    ; establecer la selección en el primer elemento
     }
 }
 
 Gui_DestButton()
 {
-    Local foo := new GuiDisable("Mostrando diálogo para seleccionar archivo de destino..")
-    Local File := Gui.Control["edest"].Text == "" ? (CB_GetSelection(Gui.Control["ddlsrc"]) == -1 ? DirGetParent(Cfg.LastExeFile) . "\" : CB_GetText(Gui.Control["ddlsrc"])) : GetFullPathName(Gui.Control["edest"].Text, DirGetParent(CB_GetText(Gui.Control["ddlsrc"])))
-        , File := SaveFile([Gui.Hwnd,"Ahk2Exe - Guardar como"], SubStr(File, -4) = ".ahk" ? SubStr(File, 1, -4) . ".exe" : File, {Ejecutables: "#*.exe"})
-    If (File)
-    {
-        If (PATH(File).Ext = "exe")
-            Gui.Control["edest"].Text := File
-        Else
-            Util_Error("El archivo destino debe ser un archivo ejecutable EXE.", File)
-    }
+    local foo  := new GuiDisable("Diálogo para seleccionar archivo destino..")
+    local file := g_data.Gui.EDDst.Text == "" ? ( g_data.Gui.CBSrc.Text == "" ? DirGetParent(Cfg.LastExeFile) . "\" : g_data.Gui.CBSrc.Text )
+                                              : ( GetFullPathName(g_data.Gui.EDDst.Text, DirGetParent(g_data.Gui.CBSrc.Text))               )
+    if ( file := SaveFile([Gui.Hwnd,"Ahk2Exe - Seleccionar archivo destino"], SetFileExt(File,"exe"), {Ejecutables:"#*.exe"}) )
+        g_data.Gui.EDDst.Text := file
 }
 
 Gui_CompileButton()
@@ -499,17 +483,17 @@ Gui_CompileButton()
 
     ObjRawSet(g_data, "IgnoreSetMainIcon", TRUE)
     ObjRawSet(g_data, "IgnoreBinFile", TRUE)
-    ObjRawSet(g_data, "IcoFile", CB_GetText(Gui.Control["ddlico"]))
+    ObjRawSet(g_data, "IcoFile", g_data.Gui.CBIco.Text)
 
     Local BinaryType := 0
-    ObjRawSet(g_data, "BinFile", Util_CheckBinFile(CB_GetText(Gui.Control["ddlbin"]), BinaryType))
+    ObjRawSet(g_data, "BinFile", Util_CheckBinFile(g_data.Gui.CBBin.Text, BinaryType))
     ObjRawSet(g_data, "Compile64", BinaryType == SCS_64BIT_BINARY)
     If (!g_data.BinFile)
         Return Util_Error("El archivo BIN no existe.", g_data.BinFile)
     ObjRawSet(g_data, "BinVersion", FileGetVersion(g_data.BinFile))
     ObjRawSet(g_data, "SyntaxCheck", TRUE)
 
-    Local Script := CB_GetText(Gui.Control["ddlsrc"])
+    Local Script := g_data.Gui.CBSrc.Text
         ,   Data := PreprocessScript(Script)
 
     If (Data)
@@ -538,9 +522,9 @@ Gui_CompileButton()
 ; =====================================================================================================================================================
 WM_KEYDOWN(VKCode, lParam)
 {
-    Local FocusedCtrl := Gui.FocusedCtrl
+    local FocusedCtrl := ControlGetHwnd(ControlGetFocus("ahk_id" . Gui.Hwnd), "ahk_id" . Gui.Hwnd)
 
-    If (VKCode == VK_F1)
+    if (VKCode == VK_F1)
     {
         Util_Status("Mostrando Acerca de.. (F1)")
         TaskDialog(INFO_ICON, [Gui.Title,"Acerca de.."], ["Ahk2Exe - Script to EXE Converter`n-----------------------------------`n`n"
@@ -555,12 +539,12 @@ WM_KEYDOWN(VKCode, lParam)
         Util_Status()
     }
 
-    Else If (VKCode == VK_DELETE)
+    else if (VKCode == VK_DELETE)
     {
-        If (FocusedCtrl.Name == "ddlsrc")
-            CB_Delete(Gui.Control["ddlsrc"], CB_GetText(Gui.Control["ddlsrc"]), 1), CB_SetText(Gui.Control["ddlsrc"], "")
-        Else If (FocusedCtrl.Name == "ddlico")
-            CB_Delete(Gui.Control["ddlico"], CB_GetText(Gui.Control["ddlico"]), 1), CB_SetText(Gui.Control["ddlico"], "")
+        if (FocusedCtrl == g_data.Gui.CBSrc.GetEditControl() || FocusedCtrl == g_data.Gui.CBSrc.Hwnd)
+            g_data.Gui.CBSrc.Delete(g_data.Gui.CBSrc.Selected, "")
+        else if (FocusedCtrl == g_data.Gui.CBIco.GetEditControl() || FocusedCtrl == g_data.Gui.CBIco.Hwnd)
+            g_data.Gui.CBIco.Delete(g_data.Gui.CBIco.Selected, "")
     }
 } ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms646280(v=vs.85).aspx
 
@@ -568,23 +552,13 @@ WM_KEYDOWN(VKCode, lParam)
 
 
 
-WM_MOUSEMOVE(VKCode, Coords)
-{
-} ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms645616(v=vs.85).aspx
-
-
-
-
-
 _OnExit(ExitReason, ExitCode)
 {
-    Util_Status("Adios ...  =D")
     If (wctrltimer)
         SetTimer(wctrltimer, "Delete")
-    DllCall("User32.dll\AnimateWindow", "Ptr", Gui.HWnd, "UInt", 350, "UInt", 0x00080000|0x00010000)
+    DllCall("User32.dll\AnimateWindow", "Ptr", Gui.HWnd, "UInt", 350, "UInt", 0x80000|0x10000)
 
     Util_SaveCfg()
-
     Return 0    ; EXIT
 }
 
@@ -620,53 +594,60 @@ Util_LoadCfg()
 
 Util_SaveCfg()
 {
-    ; guarda una lista de máximos MAX_SRCITEMLIST elementos con los archivos fuente AHK en el control
-    Cfg.LastSrcList := ""
-    Loop (CB_GetCount(Gui.Control["ddlsrc"]))
-        If (A_Index <= MAX_SRCITEMLIST)
-            Cfg.LastSrcList .= CB_GetText(Gui.Control["ddlsrc"], A_Index-1) . "`r`n"
-    RegWrite(Cfg.LastSrcList, "REG_EXPAND_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastSrcList")
+    ; guarda una lista de máximos MAX_SRCITEMLIST archivos fuente en el control
+    local LastSrcList := ""
+    Loop g_data.Gui.CBSrc.GetCount()
+        LastSrcList .= g_data.Gui.CBSrc.GetText(A_Index-1) . "`r`n"
+    Until (A_Index == MAX_SRCITEMLIST)
+    if (LastSrcList != Cfg.LastSrcList)
+        RegWrite(LastSrcList, "REG_EXPAND_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastSrcList")
 
-    ; guarda una lista de máximos MAX_ICOITEMLIST elementos con los archivos iconos en el control
-    Cfg.LastIconList := ""
-    Loop (CB_GetCount(Gui.Control["ddlico"]))
-        If (A_Index <= MAX_ICOITEMLIST)
-            Cfg.LastIconList .= CB_GetText(Gui.Control["ddlico"], A_Index-1) . "`r`n"
-    RegWrite(Cfg.LastIconList, "REG_EXPAND_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastIconList")
+    ; guarda una lista de máximos MAX_ICOITEMLIST archivos icono en el control
+    local LastIconList := ""
+    Loop g_data.Gui.CBIco.GetCount()
+            LastIconList .= g_data.Gui.CBIco.GetText(A_Index-1) . "`r`n"
+    Until (A_Index == MAX_ICOITEMLIST)
+    if (LastIconList != Cfg.LastIconList)
+        RegWrite(LastIconList, "REG_EXPAND_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastIconList")
 
-    ; guarda el último directorio utilizado con un archivo fuente AHK
-    If (CB_GetSelection(Gui.Control["ddlsrc"]) != -1)
-        RegWrite(CB_GetText(Gui.Control["ddlsrc"]), "REG_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastSrcFile")
+    ; guarda el último directorio de archivo fuente utilizado
+    If (g_data.Gui.CBSrc.Text != Cfg.LastSrcFile && g_data.Gui.CBSrc.Text != "")
+        RegWrite(g_data.Gui.CBSrc.Text, "REG_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastSrcFile")
 
-    ; guarda el último directorio utilizado con el archivo destino EXE
-    RegWrite(Gui.Control["edest"].Text, "REG_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastExeFile")
+    ; guarda el último directorio de archivo destino utilizado
+    if (g_data.Gui.EDDst.Text != Cfg.LastExeFile && g_data.Gui.EDDst.Text != "")
+        RegWrite(g_data.Gui.EDDst.Text, "REG_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastExeFile")
 
-    ; guarda el último directorio utilizado con un archivo icono
-    If (CB_GetSelection(Gui.Control["ddlico"]) != -1)
-        RegWrite(CB_GetText(Gui.Control["ddlico"]), "REG_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastIconFile")
+    ; guarda el último directorio de archivo icono utilizado
+    If (g_data.Gui.CBIco.Text != Cfg.LastIconFile && g_data.Gui.CBIco.Text != "")
+        RegWrite(g_data.Gui.CBIco.Text, "REG_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastIconFile")
     
-    ; guarda el archivo BIN utilizado
-    If (Cfg.LastBinFile != SubStr(CB_GetText(Gui.Control["ddlbin"]), InStr(CB_GetText(Gui.Control["ddlbin"]), A_Space)+1) . ".bin")
-        RegWrite(SubStr(CB_GetText(Gui.Control["ddlbin"]), InStr(CB_GetText(Gui.Control["ddlbin"]), A_Space)+1) . ".bin", "REG_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastBinFile")
+    ; guarda el último archivo BIN utilizado
+    If (Cfg.LastBinFile != g_data.Gui.CBBin.Text)
+        RegWrite(g_data.Gui.CBBin.Text, "REG_SZ", "HKCU\Software\AutoHotkey\Ahk2Exe", "LastBinFile")
 
-    ; guarda el método de compresión actual
-    If (Cfg.Compression != CB_GetSelection(Gui.Control["ddlcomp"]))
-        RegWrite(CB_GetSelection(Gui.Control["ddlcomp"]), "REG_DWORD", "HKCU\Software\AutoHotkey\Ahk2Exe", "Compression")
+    ; guarda el último método de compresión utilizado
+    If (Cfg.Compression != g_data.Gui.CBCmp.Selected)
+        RegWrite(g_data.Gui.CBCmp.Selected, "REG_DWORD", "HKCU\Software\AutoHotkey\Ahk2Exe", "Compression")
 }
 
 Util_LoadBinFiles(Default)
 {
-    CB_Delete(Gui.Control["ddlbin"])
+    IL_Destroy(g_data.Gui.CBBin.SetImageList(IL_Create()))
+    IL_Add(g_data.Gui.CBBin.GetImageList(), "shell32.dll", -266)
+
+    g_data.Gui.CBBin.DeleteAll()
     Loop Files, "*.bin", "F"
-        CB_Insert(Gui.Control["ddlbin"], "v" . FileGetVersion(A_LoopFileFullPath) . A_Space . SubStr(A_LoopFileName, 1, -4))
-    CB_SetSelection(Gui.Control["ddlbin"], CB_FindString(Gui.Control["ddlbin"], SubStr(Default, 1, -4),, 2))
+        g_data.Gui.CBBin.Add(, "v" . FileGetVersion(A_LoopFileFullPath) . A_Space . SetFileExt(A_LoopFileName))
+    local item := g_data.Gui.CBBin.FindString(Default,, 2)
+    g_data.Gui.CBBin.Selected := item == -1 ? 0 : item
 }
 
 Util_CheckBinFile(Name, ByRef BinaryType := "")
 {
     Local BinFile := RegExReplace(Name, "^v(\d\.?)+\s*")    ; remueve la versión del archivo al inicio "v2.0.0.0 XXX..." --> "XXX..."
     If (PATH(BinFile).Ext == "")
-        BinFile .= ".bin"
+        BinFile := SetFileExt(BinFile, "bin")
 
     BinaryType := GetBinaryType(BinFile := GetFullPathName(BinFile, A_ScriptDir))
     Return BinaryType == SCS_32BIT_BINARY || BinaryType == SCS_64BIT_BINARY ? BinFile : FALSE
@@ -674,56 +655,62 @@ Util_CheckBinFile(Name, ByRef BinaryType := "")
 
 Util_LoadCompressionFiles(Default)
 {
-    CB_Delete(Gui.Control["ddlcomp"])
-    CB_Insert(Gui.Control["ddlcomp"], "Sin compresión")
-    CB_Insert(Gui.Control["ddlcomp"], "UPX " . Util_CheckCompressionFile("upx.exe") . "- Ultimate Packer for eXecutables")
-    CB_Insert(Gui.Control["ddlcomp"], "MPRESS " . Util_CheckCompressionFile("mpress.exe") . "- High-performance executable packer")
-    CB_SetSelection(Gui.Control["ddlcomp"], Default)
+    IL_Destroy(g_data.Gui.CBCmp.SetImageList(IL_Create()))
+    IL_Add(g_data.Gui.CBCmp.GetImageList(), "shell32.dll", -154)
+
+    g_data.Gui.CBCmp.DeleteAll()
+    g_data.Gui.CBCmp.Add(0, "Sin compresión")
+    g_data.Gui.CBCmp.Add(1, "UPX " . Util_CheckCompressionFile("upx") . "- Ultimate Packer for eXecutables")
+    g_data.Gui.CBCmp.Add(2, "MPRESS " . Util_CheckCompressionFile("mpress") . "- High-performance executable packer")
+    g_data.Gui.CBCmp.Selected := Default >= 0 || Default < g_data.Gui.CBCmp.GetCount() ? Default : 0
 }
 
 Util_CheckCompressionFile(Name)
 {
-    Name := InStr(Name, "upx") ? "upx.exe" : InStr(Name, "mpress ") ? "mpress.exe" : Name
-    Return IS_FILE(Name) ? "v" . FileGetVersion(Name) . A_Space : ""
+    Name := RegExMatch(Name, "\bupx\b") ? "upx.exe" : RegExMatch(Name, "\bmpress\b") ? "mpress.exe" : Name
+    Return IS_FILE(Name) ? "v" . GetFileVersionInfo(Name).ProductVersion . A_Space : ""
 }
 
 Util_UpdateSrc()
 {
-    SetTimer("Update", -250)
-    Update()
+    Util_Status("Leyendo archivo fuente ..")
+    local data := QuickParse(g_data.Gui.CBSrc.Text)
+    If (data)
     {
-        Util_Status("Leyendo archivo fuente ..")
-        Local Data := QuickParse(CB_GetText(Gui.Control["ddlsrc"]))
-        CB_SetText(Gui.Control["ddlico"], "")
-        If (Data)
+        If (data.MainIcon != "")
         {
-            If (Data.MainIcon != "")
-                CB_Insert(Gui.Control["ddlico"], Data.MainIcon,, 0), CB_SetSelection(Gui.Control["ddlico"], Data.MainIcon, 0)
-            If (Data.BinFile != "")
-                CB_SetSelection(Gui.Control["ddlbin"], Data.BinFile, 2)
-            If (Trim(Gui.Control["edest"].Text) == "")
-                Gui.Control["edest"].Text := PATH(Data.Script).FNNE . ".exe"
+            if (g_data.Gui.CBIco.FindString(data.MainIcon) == -1)
+            {
+                if (g_data.foo := IL_Add(g_data.Gui.CBIco.GetImageList(), data.MainIcon))
+                    g_data.Gui.CBIco.Selected := g_data.Gui.CBIco.Add(, data.MainIcon, g_data.foo-1, g_data.foo-1, g_data.foo-1,, g_data.foo-1)
+            }
+            else
+                g_data.Gui.CBIco.Selected := g_data.Gui.CBIco.FindString(data.MainIcon)
         }
-        Util_Status()
+        If (data.BinFile != "")
+            g_data.Gui.CBBin.Selected := g_data.Gui.CBBin.FindString(data.BinFile,, 2)
+        If (Trim(g_data.Gui.EDDst.Text) == "")
+            g_data.Gui.EDDst.Text := PATH(data.Script).FNNE . ".exe"
     }
+    Util_Status()
 }
 
 Util_AddLog(What, Message, Script := "-", Line := "-")
 {
     static Icon := {INFO: 1, ADVERTENCIA: 2, ERROR: 3, "*INFO": 4, INCLUDE: 5}
     if (!CMDLN)
-        Gui.Control["lvlog"].Add("Icon" . Icon[What], What, Message, Script, Line, FormatTime(, "dd/MM/yyyy hh:mm:ss"))
+        g_data.Gui.LVReg.Add("Icon" . Icon[What], What, Message, Script, Line, FormatTime(, "dd/MM/yyyy hh:mm:ss"))
 }
 
 Util_ClearLog()
 {
-    Gui.Control["lvlog"].Delete()
+    g_data.Gui.LVReg.Delete()
 }
 
 Util_AutoHdrLog()
 {
     Loop 4
-        Gui.Control["lvlog"].ModifyCol(A_Index, "AutoHdr")
+        g_data.Gui.LVReg.ModifyCol(A_Index, "AutoHdr")
 }
 
 Util_LoadLogo()
@@ -764,14 +751,14 @@ Util_LoadWaterCtrl()
     Return FreeLibrary(hExe) * 0 + (waterctrldll.hModule := LoadLibrary(waterctrldll.path))
 }
 
-Util_EnableWater(Hwnd, hBitmap)
+Util_EnableWater(Hwnd, hBitmap, Width, Height)
 {
     For g_k, g_v in ["enablewater","disablewater","waterblob","flattenwater","setwaterparent"]
-        waterctrldll[g_v] := GetProcAddress(waterctrldll.hModule, g_k)
+        waterctrldll[g_v] := GetProcAddress(waterctrldll.hModule, g_v)
     DllCall(waterctrldll.enablewater, "Ptr", Gui.Hwnd, "Int", 0, "Int", 0, "Ptr", hBitmap, "Int", 3, "Int", 20)
     DllCall(waterctrldll.setwaterparent, "Ptr", Hwnd)
     If (WATER_BLOB_INTERVAL)
-        SetTimer(wctrltimer := () => DllCall(waterctrldll.waterblob, "Int", Random(0, 690), "Int", Random(0, 110), "Int", Random(3, 12), "Int", Random(20, 75)), WATER_BLOB_INTERVAL)
+        SetTimer(wctrltimer := () => DllCall(waterctrldll.waterblob, "Int", Random(0, Width), "Int", Random(0, Height), "Int", Random(3, 12), "Int", Random(20, 75)), WATER_BLOB_INTERVAL)
 } ; https://autohotkey.com/boards/viewtopic.php?t=3302
 ;@Ahk2Exe-IgnoreEnd64
 
@@ -807,7 +794,7 @@ Util_GetAhkPath()
 Util_Status(Info := "Listo. [posiciona el cursor sobre un control para ver información]")
 {
     If (!CMDLN)
-        Gui.Control["sb"].SetText(Info)
+        g_data.Gui.SB.SetText(Info)
 }
 
 
@@ -821,7 +808,7 @@ Class Status
 {
     __New(str)
     {
-        Try Gui.Control["sb"].SetText(str)
+        Try g_data.Gui.SB.SetText(str)
     }
 
     __Delete()
