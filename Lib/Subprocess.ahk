@@ -152,9 +152,9 @@
         ReadAll()
         {
             Local Str := "", Buffer := "", Bytes := 0
-            VarSetCapacity(Buffer, 4096)
+            VarSetCapacity(Buffer, 4096 + 2)
             While (Bytes := this.Stream.RawRead(&Buffer, 4096))
-                Str .= StrGet(&Buffer, Bytes, this.Encoding)
+                NumPut(0, &Buffer+Bytes, "UShort"), Str .= StrGet(&Buffer, -Bytes, this.Encoding)
             Return Str
         }
 
