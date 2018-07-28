@@ -5,13 +5,13 @@
 */
 VerLanguageName(LangID, Flag := 0)
 {
-    If (!(LangID is "Integer"))
-        Throw Exception("Function VerLanguageName invalid parameter #1.", -1, LangID)
+    if (!(LangID is "Integer"))
+        return ""
 
-    Local Lang := ""
+    local Lang := ""
     VarSetCapacity(Lang, 200)
     DllCall("Version.dll\VerLanguageNameW", "UInt", LangID, "Str", Lang, "UInt", 100, "UInt")
-    Return Lang
+    return Lang
 } ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms647463(v=vs.85).aspx
 
 
@@ -24,10 +24,11 @@ VerLanguageName(LangID, Flag := 0)
 */
 LCIDToLocaleName(LangID, Flags := 0)    ; LOCALE_ALLOW_NEUTRAL_NAMES = 0x08000000
 {
-    If (!(LangID is "Integer"))
-        Throw Exception("Function LCIDToLocaleName invalid parameter #1.", -1, LangID)
+    if (!(LangID is "integer"))
+        return FALSE
 
+    local Name := ""
     VarSetCapacity(Name, 200)
     DllCall("Kernel32.dll\LCIDToLocaleName", "UInt", LangID, "Str", Name, "Int", 100, "UInt", Flags)
-    Return Name == "" ? FALSE : Name
+    return Name == "" ? FALSE : Name
 } ; https://msdn.microsoft.com/en-us/library/windows/desktop/dd318698(v=vs.85).aspx
