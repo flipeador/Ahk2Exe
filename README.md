@@ -3,6 +3,8 @@
 
 Puedes reportar errores, proponer nueva funcionalidad o hacer cualquier otro tipo de comentarios acerca del compilador en el sitio en el foro de AutoHotkey: [autohotkey.com/boards/viewtopic.php?f=44&t=48953](https://autohotkey.com/boards/viewtopic.php?f=44&t=48953).
 
+Para descargar únicamente el compilador (archivo binario exe) diríjase a la [página de Releases](https://github.com/flipeador/Ahk2Exe/releases). Allí encontrará la última versión de Ahk2Exe.
+
 <p align="center">
   <img src="https://github.com/flipeador/Ahk2Exe/raw/master/preview.jpg" alt="Ahk2Exe For AHKv2"/>
 </p>
@@ -101,7 +103,7 @@ El orden de los parámetros especificados importa, por ejemplo, si especifica pr
 - ##### Descripción
 | Parámetro  | Descripción | Directorio de trabajo |
 | ---------- | ----------- | --------------------- |
-| **infile.ahk** | Archivo fuente AHK (script) que se va a compilar (obligatorio). | Compilador |
+| **infile.ahk** | Archivo fuente AHK (script) que se va a compilar. Este es el único parámetro obligatorio. | Compilador |
 | [&ast;]**outfile.exe** | Archivo destino EXE compilado. Si no se especifica, se establece en `infile.exe`. Si se especifica un directorio se establece en `\infile.exe`. Si no se especifica la extensión se añade automáticamente `.exe`; puede especificar cualquier extensión. Si el archivo ya existe, lo intenta sobreescribir. Si el directorio no existe la compilación falla. Para forzar la creación del directorio destino en caso de que no exista especifique como prefijo `*`. | infile.ahk o compilador |
 | [&ast;]**iconfile.ico** | Icono principal del archivo compilado. Si no se especifica se mantiene el icono por defecto de AutoHotkey. Si se especificó la directiva `@Ahk2Exe-SetMainIcon` se utilizará el icono allí especificado. Puede añadir el caracter `*` como prefijo para ignorar la directiva `@Ahk2Exe-SetMainIcon` y forzar el uso de este icono. Tenga en cuenta que establecer un icono elimina todos los iconos por defecto de AHK, incluyendo iconos de _pausa_ (pause) y _suspensión_ (suspend). | infile.ahk o compilador |
 | [&ast;]**binfile.bin** | Archivo BIN AutoHotkey. Si no se especifica utiliza el último archivo BIN utilizado. En caso de no haber una configuración válida guardada se establece dependiendo de la arquitectura del compilador `Unicode %8*A_PtrSize%-bit`. Por ejemplo: `Unicode 64-bit` (la extensión es opcional). Si se especificó la directiva `@Ahk2Exe-Bin` se utilizará el archivo BIN allí especificado. Puede añadir el caracter `*` como prefijo para ignorar la directiva `@Ahk2Exe-Bin` y forzar el archivo BIN aquí especificado. | Compilador |
@@ -167,7 +169,7 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
   - **`;@Ahk2Exe-Keep`**`[Code]`
 
-    Lo contrario también es posible, es decir, marcar una sección de código para que solo se ejecute en el script compilado. Esta directiva también acepta las variantes `@Ahk2Exe-Keep32` y `@Ahk2Exe-Keep64`.
+    Lo contrario también es posible, es decir, **marcar una sección de código para que solo se ejecute en el script compilado**. Esta directiva también acepta las variantes `@Ahk2Exe-Keep32` y `@Ahk2Exe-Keep64`.
 
     ```autohotkey
     /*@Ahk2Exe-Keep
@@ -181,21 +183,23 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
   - **`;@Ahk2Exe-Define`**`Identifier [Replacement]`
 
-    Define un identificador (variable) en el valor especificado. Este identificador podrá ser utilizado con otras directivas del compilador que soporten esta característica.
+    **Define un identificador** (variable) en el valor especificado. Este identificador podrá ser utilizado con otras directivas del compilador que soporten esta característica. Algunas directivas definen automáticamente ciertos identificadores.
 
-    `Identifier` Es un nombre cualquiera sin espacio que será utilizado como identificador. El nombre no puede ser una cadena vacía. Si bien el identificador puede contener cualquier texto, tenga en cuenta que éste es tratado como `RegEx` en la directiva `If` al evaluar expresiones.
+    `Identifier` Es un **nombre** cualquiera sin espacio que será utilizado como **identificador**. El nombre no puede ser una cadena vacía. Si bien el identificador puede contener cualquier texto, tenga en cuenta que éste es tratado como `RegEx` en la directiva `If` al evaluar expresiones.
 
-    `Replacement` Es el valor de `Identifier`. Puede ser cualquier cadena, incluyendo espacios. Si no se especifica, se establece en una cadena vacía.
+    `Replacement` Es el **valor** de `Identifier`. Puede ser cualquier cadena, incluyendo espacios. Si no se especifica, se establece en una cadena vacía.
+
+    Cuando se va a compilar con la versión de **64-Bit** se define automáticamente el identificador `_COMPILE64` en `1`.
 
   - **`;@Ahk2Exe-UnDef`**`Identifier`
 
-    Elimina un identificador definido anteriormente mediante la directiva `@Ahk2Exe-Define`. Si el identificador especificado no se encuentra definido, se mostrará un error y la compilación será cancelada; Para evitar esto compruebe antes mediante la directiva `;@Ahk2Exe-IfDef` si el identificador ya se encuentra definido o no.
+    **Elimina un identificador** definido anteriormente mediante la directiva `@Ahk2Exe-Define`. Si el identificador especificado no se encuentra definido, se mostrará un **error** y la compilación será cancelada; Para evitar esto compruebe antes mediante la directiva `;@Ahk2Exe-IfDef` si el identificador ya se encuentra definido o no.
 
   - **`;@Ahk2Exe-If/EndIf/IfDef/IfNDef`**`Condition`
 
-    Estas directivas están basadas en [Preprocessor directives (C++)](http://www.cplusplus.com/doc/tutorial/preprocessor/), permiten incluir o descartar parte del código de un programa si se cumple una determinada condición.
+    Estas directivas están basadas en [Preprocessor directives (C++)](http://www.cplusplus.com/doc/tutorial/preprocessor/), permiten **incluir o descartar parte del código** de un programa si se cumple una determinada condición.
 
-    La directiva `;@Ahk2Exe-If` soporta expresiones mediante el uso de la función [Eval](https://github.com/flipeador/AutoHotkey/blob/master/Lib/math/Eval.ahk). Puede consultar el enlace a esa función para ver las limitantes y las características soportadas.
+    La directiva `;@Ahk2Exe-If` **soporta expresiones** mediante el uso de la función [Eval](https://github.com/flipeador/AutoHotkey/blob/master/Lib/math/Eval.ahk). Puede consultar el enlace a esa función para ver las limitantes y las características soportadas.
 
     Los identificadores en `Condition` son reemplazados por sus correspondientes valores asignados mediante `If`. Tenga en cuenta que a la hora de reemplazar los identificadores por sus correspondientes valores se utiliza `RegEx` de la siguiente manera: `RegExReplace(Condition, "\bIdentifier\b", Replacement)`.
 
@@ -221,6 +225,12 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
 	**Nota: Actualmente estas directivas tienen ciertas limitantes, no soporta ifs anidados y el comportamiento puede no ser el deseado.**
 
+  - **`;@Ahk2Exe-Include`**`Filename`
+
+    **Incluye el** contenido del **archivo especificado** en esta posición exacta del script. Este comando es similar a la directiva de AutoHotkey `#Include`, permite incluir archivos únicamente durante la compilación.
+
+    `Filename` especifica el **nombre del archivo** a incluir. Si especifica una ruta relativa, utiliza el directorio del script en donde se utilice esta directiva. Expresiones y variables no son soportadas.
+
 <br><br>
 
 - ##### Directivas que controlan los metadatos ejecutables
@@ -237,7 +247,7 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
     | --------- | ----------- |
     | Name | Cambia el nombre del producto (`ProductName`) y el nombre interno (`InternalName`). |
     | Description | Cambia la descripción del archivo (`FileDescription`). |
-    | Version | Cambia la versión del archivo (`FileVersion`) y la versión del producto (`ProductVersion`). Si esta propiedad no se modifica, se usa de forma predeterminada la versión de AutoHotkey utilizada para compilar el script. Esto tambien establece la versión binaria (`VS_FIXEDFILEINFO`) en el archivo; Si algún valor no es un número se establece en cero, por ejemplo: `1.A.5 -> 1.0.5.0`. Para especificar una versión binaria diferente a este valor, utilize las directivas `@Ahk2Exe-FileVersion` y `@Ahk2Exe-ProductVersion`. |
+    | Version | Cambia la versión del archivo (`FileVersion`) y la versión del producto (`ProductVersion`). Si esta propiedad no se modifica, se usa de forma predeterminada la versión de AutoHotkey utilizada para compilar el script. Esto tambien establece la versión binaria en la estructura VS_FIXEDFILEINFO, en este caso si algún valor no es un número entero sin signo se establece en cero, por ejemplo: `1.A.5 -> 1.0.5.0`. Para especificar una versión binaria diferente a este valor, utilize las directivas `@Ahk2Exe-FileVersion` y `@Ahk2Exe-ProductVersion`. |
     | Copyright  | Cambia la información legal de copyright (derechos de autor). |
     | OrigFilename | Cambia la información del nombre de archivo original (`OriginalFileName`). |
     | CompanyName | Cambia el nombre de la compañía. |
@@ -254,15 +264,32 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
 
     Establece el número de versión binaria del producto con el que se distribuyó este archivo, esto es, `VS_FIXEDFILEINFO.dwProductVersionMS` y `VS_FIXEDFILEINFO.dwProductVersionLS`. Este valor se establece automáticamente cuando se establece la propiedad `ProductVersion` en la directiva `@Ahk2Exe-SetProp`.
 
-  - **`;@Ahk2Exe-VerInfo`**`Prop [, Value] [, Delete?]`
+  - **`;@Ahk2Exe-VerInfo`**`PropName [, Value] [, LangID] [, Delete?]`
 
-    Esta directiva es una alternativa a `@Ahk2Exe-SetProp`. Hace modificaciones en la información de la versión, permite añadir, modificar y eliminar propiedades. Esta directiva le será útil si desea eliminar las propiedades por defecto que se añaden a la información de la versión (`Comments`, `FileVersion` y `ProductVersion`), además de añadir propiedades cuyo nombre contenga espacios. Puede especificar una coma `,` literal utilizando el caracter de escape de AHK.
+    Esta directiva es una alternativa a `@Ahk2Exe-SetProp`. Hace modificaciones en la información de la versión, permite añadir, modificar y eliminar propiedades. Esta directiva le será útil si desea eliminar las propiedades por defecto que se añaden a la información de la versión (`Comments`, `FileVersion` y `ProductVersion`), además de añadir propiedades cuyo nombre contenga espacios. También puede especificar el identificador de idioma de la propiedad.
 
-    `Prop` El nombre de la propiedad. A diferencia de `@Ahk2Exe-SetProp` aquí se admiten espacios. Este parámetro únicamente puede ser omitido (cadena vacía) si `Delete` se estableció en el número `2`.
+    `PropName` El **nombre de la propiedad**. A diferencia de `@Ahk2Exe-SetProp` aquí se admiten espacios. Este parámetro únicamente puede ser omitido (cadena vacía) si `Delete` se estableció en el número `2`. No puede haber dos o más propiedades con el mismo nombre en el mismo idioma.
 
-    `Value` El valor de la propiedad. Si no se especifica, se establece en una cadena vacía.
+    `Value` El **valor de la propiedad**. Si no se especifica, se establece en una cadena vacía.
 
-    `Delete` Especifica si desea eliminar una propiedad o si se desea eliminar todas las propiedades. Para eliminar la propiedad especificada debe establecerse en el número `1` (en este caso el segundo parámetro se ignora). Para eliminar todas las propiedades debe especificar el número `2` (en este caso los dos primeros parámetros se ignoran). Si se va a añadir o modificar una propiedad, debe omitir este parámetro.
+    `LangID` **Número hexadecimal de 8 dígitos**. Los cuatro dígitos más significativos representan el **identificador de idioma**. Los cuatro dígitos menos significativos representan la **página de códigos para la que se formatean los datos**. Este es el valor de `StringTable.szKey` de la estructura `StringFileInfo` a su vez estructura de `VS_VERSIONINFO`. Puede encontrar la descripción en [este enlace](https://docs.microsoft.com/es-es/windows/desktop/menurc/stringtable). El valor por defecto es **040904B0** (1033/1200).
+
+    `Delete` Especifica si desea **eliminar una propiedad** o si se desea eliminar **todas las propiedades**. Para eliminar la propiedad especificada debe establecerse en el número `1` (en este caso el segundo parámetro se ignora). Para eliminar todas las propiedades debe especificar el número `2` (en este caso los dos primeros parámetros se ignoran). Si se va a añadir o modificar una propiedad, debe omitir este parámetro (el valor por defecto es `0`).
+
+    Cuando elimina todas las propiedades en el idioma especificado, se elimina automáticamente el idioma para evitar escribir una estructura `StringTable` vacía. La sintaxis de la información de versión de un archivo es: `VS_VERSIONINFO.StringFileInfo.StringTable.String`. `VS_VERSIONINFO` es la estructura principal, contiene el tamaño total y la estructura de tamaño fijo `VS_FIXEDFILEINFO` con la información binaria del archivo (como la versión). `StringTable` contiene el idioma (puede haber varias de estas estructuras). `String` contiene una propiedad junto con sus datos/valor (una estructura por propiedad).
+
+    Vea el siguiente **ejemplo** que demuestra **todas las formas de uso** de esta directiva:
+    ```autohotkey
+	; añade una propiedad llamada 'FileDescription' en el idioma '0C0A' (Spanish_Modern_Sort).
+    ;@Ahk2Exe-VerInfo FileDescription, Descripción del archivo en español, 0C0A04B0
+    
+    ; elimina la propiedad 'Comments' que se añade por defecto en el idioma '0409' (English_United_States).
+	;@Ahk2Exe-VerInfo Comments,,, 1
+    
+    ; elimina todas las propiedades en el idioma '0419' (Russian).
+    ; esto elimina automáticamente el idioma '0419' de la lista.
+    ;@Ahk2Exe-VerInfo ,, 041904B0, 2
+	```
 
   - **`;@Ahk2Exe-SetMainIcon`**`IcoFile`
 
@@ -296,6 +323,8 @@ En ciertas directivas, se permiten comentarios únicamente mediante el uso del c
   - **`;@Ahk2Exe-ConsoleApp`**
 
     Cambia el subsistema ejecutable al modo consola. Cuando se ejecute el archivo compilado EXE, se abrirá una ventana de consola. Esto modifica el valor de `IMAGE_OPTIONAL_HEADER.Subsystem` a `IMAGE_SUBSYSTEM_WINDOWS_CUI`.
+
+    El uso de esta directiva define automáticamnte el identificador `_CONSOLEAPP` en `1` que puede utilizar con la directiva `;@Ahk2Exe-ifdef`. Esto es útil si por ejemplo, el Script, además de la línea de parámetros, tiene una interfaz gráfica, entonces puede quitar todo el código (en el archivo script compilado) correspondiente a la interfaz gráfica cuando utiliza esta directiva.
 
   - **`;@Ahk2Exe-AddResource`**`[*Type] FileName [, ResourceName] [, LangID]`
 
@@ -445,6 +474,27 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
 <br><br>
 
 
+# Como compilar Ahk2Exe
+  - Descargar el código fuente haciendo clic en `Clone or download` -> `Download ZIP`. Descomprimir.
+  - Arrastrar el archivo `Ahk2Exe.ahk` sobre el ejecutable `AutoHotkey.exe` para iniciar la interfaz gráfica del compilador.
+  - Una vez en la interfaz, buscar y seleccionar el archivo fuente `Ahk2Exe.ahk`.
+  - Especificar el nombre del archivo destino.
+  - Especificar la arquitectura: `Unicode 32-Bit` o `Unicode 64-Bit`.
+  - Clic en el botón `>Compilar<`. Para la comprobación de sintaxis puede ser necesario tener que ejecutar el compilador como Administrador.
+  - Para ejecutar como **Administrador**, antes de llevar a cabo los pasos anteriores, abrir las propiedades de `AutoHotkey.exe` y marcar la casilla **Ejecutar esta programa como administrador** en la pestaña **Compatibilidad**.
+  - El archivo resultante no tiene ninguna dependencia externa. Aunque en la versión de 32-Bit se extrae un archivo dll en la carpeta temporal del sistema para su uso. El compilador es inútil sin el/los archivo(s) `BIN`.
+  - Para quitar la interfaz gráfica y dejar el compilador únicamente funcional mediante el uso por la línea de parámetros, utilizar la directiva `;@Ahk2Exe-ConsoleApp` en el archivo `Ahk2Exe.ahk` (esta directiva ya se encuentra definida pero como un comentario, debe remover un `;`).
+
+
+
+
+
+* * *
+
+
+<br><br>
+
+
 # Agradecimientos
   - ##### [Chris Mallet](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=2) - Por el fantástico AutoHotkey.
   - ##### [lexikos](https://autohotkey.com/boards/memberlist.php?mode=viewprofile&u=77) - Por continuar dando soporte a AutoHotkey, especialmente por la versión 2.
@@ -471,3 +521,4 @@ Los códigos de salida indican el tipo de error que ocurrió durante la compilac
   - ##### [MPRESS](http://www.matcode.com/mpress.htm) - Empaquetador ejecutable de alto rendimiento.
   - ##### [SublimeText](https://www.sublimetext.com/) - Para la edición de los scripts ([IDE](https://es.wikipedia.org/wiki/Entorno_de_desarrollo_integrado)).
   - ##### [AutoGUI](https://autohotkey.com/boards/viewforum.php?f=64) - Para la creación de la interfaz gráfica de usuario ([GUI](https://es.wikipedia.org/wiki/Interfaz_gr%C3%A1fica_de_usuario)).
+  - ##### [IcoFX](https://icofx.ro/) - Para la creación del icono `Ahk2Exe.ico`.
