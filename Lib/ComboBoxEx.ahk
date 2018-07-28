@@ -3,7 +3,7 @@
     CBE := new ComboBoxEx(Gui, "x5 y5 w200 r10", "Item #0", "Item #1")
         CBE.OnCommand(1, "CBN_SELCHANGE")
         CBE.OnCommand(5, "CBN_EDITCHANGE")
-    DDL := new ComboBoxEx(Gui, "x5 y50 w200 +0x3 Choose0", "Item #0", "Item #1", "Item #2", "Item #3")
+    DDL := new ComboBoxEx(Gui, "x5 y50 w200 +0x3 r10 Choose0", "Item #0", "Item #1", "Item #2", "Item #3", "Item #4")
         DDL.OnCommand(1, "CBN_SELCHANGE")
     Gui.Show()
         Gui.OnEvent("Close", "ExitApp")
@@ -17,18 +17,36 @@
     CBE.Selected := 10
     CBE.SetImage(0, 1, 1)
     CBE.SetIndent(0, 4)
+
+    OnMessage(0x100, "WM_KEYDOWN")
     Return
 
-    F1:: CBE.Delete(CBE.Selected, CBE.Selected ? CBE.Selected - 1 : 0)
-
-    CBN_SELCHANGE(GuiControl)
+    WM_KEYDOWN(VK_CODE)             ; función llamada cuando se presiona una tecla en nuestra ventana Gui
     {
-        GuiControl := new ComboBoxEx(GuiControl)
-        ToolTip("CBN_SELCHANGE`n" . GuiControl.Text)
+        SetTimer("Timer", -50)
+        return 1
+        Timer()
+        {
+            global CBE, DDL             ; para acceder a las variables globales CBE y DDL
+            static VK_DELETE := 0x2E    ; DEL Key
+            if (VK_CODE == VK_DELETE)   ; si se presionó la tecla Suprimir
+            {
+                if (CBE.Focused == 2)        ; si el control de edición de CBE tiene el foco
+                    CBE.Delete(CBE.Selected, CBE.Selected ? CBE.Selected - 1 : 0)
+                else if (DDL.Focused)        ; si el control DDL tiene el foco
+                    DDL.Delete(DDL.Selected, DDL.Selected ? DDL.Selected - 1 : 0)
+            }
+        }
+    }
+
+    CBN_SELCHANGE(GuiControl)       ; función llamada cuando se modifica el control de edición del ComboBox
+    {
+        GuiControl := new ComboBoxEx(GuiControl)         ; recupera el objeto ComboBoxEx
+        ToolTip("CBN_SELCHANGE`n" . GuiControl.Text)     ; muestra el texto del control de edición
         SetTimer("ToolTip", -1000)
     }
 
-    CBN_EDITCHANGE(GuiControl)
+    CBN_EDITCHANGE(GuiControl)     ; función llamada cuando se selecciona un elemento
     {
         GuiControl := new ComboBoxEx(GuiControl)
         ToolTip("CBN_EDITCHANGE`n[" . GuiControl.GetTextLength() . "] " . GuiControl.Text)
@@ -69,15 +87,8 @@ Class ComboBoxEx
     */
     __New(Gui, Options := "", Items*)
     {
-        if (Type(Gui) != "Gui")
-        {
-            Gui := IsObject(Gui) ? Gui.Hwnd : Gui
-            local k := "", v := ""
-            for k, v in ComboBoxEx.CtrlList
-                if (k == Gui)
-                    return v
-            return 0
-        }
+        if (ObjHasKey(ComboBoxEx.CtrlList, IsObject(Gui) ? Gui.Hwnd : Gui))
+            return ComboBoxEx.CtrlList[IsObject(Gui) ? Gui.Hwnd : Gui]
 
         ; ComboBoxEx Control Reference
         ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775740.aspx
@@ -240,9 +251,9 @@ Class ComboBoxEx
             Item:
                 El índice basado en cero del elemento a eliminar.
             Select:
-                Cuando elimina un elemento, el texto en el control de edición se mantiene.
+                Cuando elimina un elemento, el texto en el control de edición se mantiene. Si el control tiene el estilo CBS_DROPDOWNLIST, el control queda en blanco (sin elemento seleccionado).
                 Si es un entero, especifica el índice basado en cero del elemento a seleccionar una vez eliminado el elemento especificado.
-                Si es una cadena, especifica el nuevo texto en el control de edición a establecer una vez eliminado el elemento especificado.
+                Si es una cadena, especifica el nuevo texto en el control de edición a establecer una vez eliminado el elemento especificado. No es válido si el control tiene el estilo CBS_DROPDOWNLIST.
         Return:
             Devuelve el número de elementos restantes en la lista.
     */
@@ -433,6 +444,21 @@ Class ComboBoxEx
     }
 
     /*
+        Quita una imagen en la lista de imagenes asignada al control.
+        Parámetros:
+            Index:
+                El índice basado en cero de la imagen a eliminar en la lista de imagenes actualmente asignada al control.
+        Return:
+            Si tuvo éxito devuelve un valor distinto de cero, o cero en caso contrario.
+    */
+    RemoveImage(Index)
+    {
+        ; ImageList_Remove function
+        ; https://docs.microsoft.com/es-es/windows/desktop/api/commctrl/nf-commctrl-imagelist_remove
+        return DllCall("Comctl32.dll\ImageList_Remove", "Ptr", this.GetImageList(), "Int", Index)
+    }
+
+    /*
         Recupera el identificaador de la lista de imagenes asignada al control.
     */
     GetImageList()
@@ -524,6 +550,18 @@ Class ComboBoxEx
         ; CB_SETITEMDATA message
         ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775909(v=vs.85).aspx
         return DllCall(this.psendmsg, "Ptr", this.hWnd, "UInt", 0x151, "Ptr", Item, "Ptr", Data)
+    }
+
+    /*
+        Determina si el contenido puede ser redibujado después de un cambio.
+        Return:
+            Devuelve cero si procesa este mensaje.
+    */
+    SetRedraw(State)
+    {
+        ; WM_SETREDRAW message
+        ; https://docs.microsoft.com/en-us/windows/desktop/gdi/wm-setredraw
+        return DllCall("User32.dll\SendMessageW", "Ptr", this.hWnd, "UInt", 0xB, "Ptr", State, "Ptr", 0)
     }
 
     /*
@@ -653,11 +691,15 @@ Class ComboBoxEx
 
     /*
         Determina si el control tiene el foco del teclado.
+        Devuelve 0 si el control no tiene el foco.
+        Devuelve 1 si el control ComboBox tiene el foco.
+        Devuelve 2 si el control Edit tiene el foco.
     */
     Focused[]
     {
         get {
-            return this.ctrl.Focused
+            local Hwnd := ControlGetHwnd(ControlGetFocus("ahk_id" . this.Gui.Hwnd), "ahk_id" . this.Gui.Hwnd)
+            return Hwnd == this.GetComboControl() ? 1 : Hwnd == this.GetEditControl() ? 2 : Hwnd == this.hWnd ? 3 : 0
         }
     }
 
