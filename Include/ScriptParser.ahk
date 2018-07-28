@@ -4,44 +4,38 @@
     {
         Util_AddLog("INFO", "Se ha iniciado el procesado del script", Script)
 
-        FileList := []    ; almacena una lista con todos los archivos incluidos (para evitar varias inclusiones de un mismo archivo)
-        ; almacena los archivos a añadir luego de la compilación al archivo EXE resultante y otras configuraciones
+        FileList := []         ; almacena una lista con todos los archivos incluidos (para evitar varias inclusiones de un mismo archivo)
         Directives := {         MainIcon: g_data.IcoFile
                       ,        Subsystem: IMAGE_SUBSYSTEM_WINDOWS_GUI
                       ,     ResourceLang: SUBLANG_ENGLISH_US
                       ,         PostExec: FALSE
-                      ,      VersionInfo: {      FileVersion: g_data.BinVersion    ; estos son los valores por defecto de la información de versión
-                                          ,   ProductVersion: g_data.BinVersion
-                                          , OriginalFilename: PATH(Script).FN
-                                          ,         Comments: "Compiled with https://github.com/flipeador/Ahk2Exe" }
+                      ,      VersionInfo: { "040904B0": { FileVersion     : g_data.BinVersion    ; estos son los valores por defecto de la información de versión
+                                                        , ProductVersion  : g_data.BinVersion
+                                                        , OriginalFilename: PATH(Script).FN
+                                                        , Comments        : "Compiled with https://github.com/flipeador/Ahk2Exe" } }
                       ,      FileVersion: StrSplit(g_data.BinVersion, ".")    ; versión binaria del archivo
                       ,   ProductVersion: StrSplit(g_data.BinVersion, ".")    ; versión binaria del producto
                       ,        Resources: []
                       ,     RequireAdmin: FALSE
                       ,          Streams: [] }
+
+        g_data.define := {}    ; limpia todas las definiciones actuales
+        if (g_data.Compile64)
+            g_data.define._COMPILE64 := TRUE
     }
 
-    ObjPush(FileList, Script)
+    FileList.Push(Script)
     Util_Status("Procesando.. [" . Script . "]")
     Util_AddLog("INCLUDE", "Se ha incluido un archivo", Script)
 
-
-    ; ======================================================================================================================================================
-    ; Comprobación del archivo de código fuente AHK
-    ; ======================================================================================================================================================
-    If (!IS_FILE(Script))
+    local file := FileOpen(Script, "r-wd", "UTF-8")
+    if (!file)
     {
-        Util_AddLog("ERROR", "No se ha encontrado el script", Script)
-        Return Util_Error("El archivo de código fuente AHK no existe.", Script, CMDLN(ERROR_CANNOT_OPEN_SCRIPT))
+        Util_AddLog("ERROR", "No se ha podido abrir el archivo script para lectura o el archivo no existe", Script)
+        Return Util_Error("No se ha podido abrir el archivo script para lectura o el archivo no existe.", Script, CMDLN(ERROR_CANNOT_OPEN_SCRIPT))
     }
 
-    If (!FileOpen(Script, "r"))    ; comprobamos permisos de lectura
-    {
-        Util_AddLog("ERROR", "No se ha podido abrir el Script para lectura", Script)
-        Return Util_Error("No se ha podido abrir el Script para lectura.", Script, CMDLN(ERROR_CANNOT_OPEN_SCRIPT))
-    }
-
-    Local WorkingDir := new TempWorkingDir(DirGetParent(Script))    ; establece temporalmente el directorio de trabajo actual al del script ha procesar
+    local WorkingDir := new TempWorkingDir(DirGetParent(Script))    ; establece temporalmente el directorio de trabajo actual al del script ha procesar
 
 
     ; ======================================================================================================================================================
@@ -60,101 +54,101 @@
     VarSetCapacity(LineTxt, 65534 * 2)    ; capacidad de la variable que almacenará el texto de la línea actual
 
     ; caracteres especiales regex \.*?+[{|()^$
-    Loop Read, Script    ; abrimos el archivo para lectura y leemos línea por línea
+    While ( !file.AtEOF )
     {
-        LineTxt := A_LoopReadLine
+        LineTxt := file.ReadLine()
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Detectamos secciones de continuación (cadenas)
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (ContSection)
+        if (ContSection)
         {
-            If ( !(LineTxt ~= "^\s*\)(`"|')") )    ; ¿no termina la sección?    )" | )'
+            if ( !(LineTxt ~= "^\s*\)(`"|')") )    ; ¿no termina la sección?    )" | )'
             {
-                If (!InStr(ContSection.Options, "LTrim0"))
+                if ( !InStr(ContSection.Options, "LTrim0") )
                     LineTxt := LTrim(LineTxt)
 
-                If (!InStr(ContSection.Options, "RTrim0"))
+                if ( !InStr(ContSection.Options, "RTrim0") )
                     LineTxt := RTrim(LineTxt)
 
                 NewCode .= ( InStr(ContSection.Options, "C") ? RegExReplace(LineTxt, "\s+;.*") : LineTxt ) . "`n"    ; C = Comments (si se permite comentarios los quitamos con regex)
-                Continue
+                continue
             }
-            NewCode .= ProcessLine(Trim(RegExReplace(LineTxt, "\s+;.*"))) . "`n"
+            NewCode .= ProcessLine( RegExReplace(Trim(LineTxt), "\s+;.*") ) . "`n"
             ContSection := FALSE
-            Continue
+            continue
         }
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Eliminamos comentarios en línea, espacios en blanco al inicio/final y omitimos líneas en blanco
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        LineTxt := Trim(LineTxt)
-        If (LineTxt ~= "^\s*$")    ; ignoramos líneas en blanco | ignore blank lines
-            Continue
+        LineTxt := RegExReplace(Trim(LineTxt), "\s+;.*")
+        if (LineTxt == "")
+            continue
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Detercamos comentarios
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (InComment)    ; ¿comentario en bloque multilínea?
+        if (InComment)    ; ¿comentario en bloque multilínea?
         {
-            If (LineTxt ~= "\*/$")    ; ¿termina el comentario en bloque? - fix 20180614 | thanks «coffee»
+            if (LineTxt ~= "\*/$")    ; ¿termina el comentario en bloque? - fix 20180614 | thanks «coffee»
             {
                 InComment := FALSE
-                Continue
+                continue
             }
 
-            If (InComment != 1)    ; KEEP = 1
+            if (InComment != 1)    ; KEEP = 1
             {
-                If (InComment == 2)    ; POSTEXEC = 2
+                if (InComment == 2)    ; POSTEXEC = 2
                     Directives.PostExec.Target .= "`r`n" . LineTxt
-                Continue
+                continue
             }
         }
 
-        If (IgnoreBegin)    ; ignorar líneas especificadas entre @Ahk2Exe-IgnoreBegin[32/64] y @Ahk2Exe-IgnoreEnd[32/64]
+        if (IgnoreBegin)    ; ignorar líneas especificadas entre @Ahk2Exe-IgnoreBegin[32/64] y @Ahk2Exe-IgnoreEnd[32/64]
         {
-            If (LineTxt ~= "i)^;@Ahk2Exe-IgnoreEnd" . IgnoreBegin.Bits)
+            if (LineTxt ~= "i)^;@Ahk2Exe-IgnoreEnd\b" . IgnoreBegin.Bits)
                 IgnoreBegin := FALSE
 
-            Else If (!(LineTxt ~= "^;") && IgnoreBegin.Lines != "" && !--IgnoreBegin.Lines)
+            else if (!(LineTxt ~= "^;") && IgnoreBegin.Lines != "" && !--IgnoreBegin.Lines)
                 IgnoreBegin := FALSE
 
-            Continue
+            continue
         }
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         ; Detectamos @Ahk2Exe-ifdef/ifndef/elif/else/endif
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If (_If)
+        if (_If)
         {
-            If (LineTxt ~= "i)^;@Ahk2Exe-EndIf\s*")
+            if (LineTxt ~= "i)^;@Ahk2Exe-EndIf\b")
             {
                 _If := FALSE
-                Continue
+                continue
             }
 
-            If (LineTxt ~= "i)^;@Ahk2Exe-(ifn?def|if|else|elif)")    ; nested ifs - is it really important?
+            if (LineTxt ~= "i)^;@Ahk2Exe-(ifn?def|if|else|elif)\b")    ; nested ifs - is it really important?
             {
                 Util_AddLog("ERROR", "@Ahk2Exe-If no soportado dentro de otros ifs", Script, A_Index)
                 Return Util_Error("@Ahk2Exe-If no soportado dentro de otros ifs.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_NOT_SUPPORTED))
             }
 
-            If ( _If.Type = "ifdef" && !ObjHasKey(g_data.define, _If.Def[1]) )
+            if ( _If.Type = "ifdef" && !ObjHasKey(g_data.define, _If.Def[1]) )
                 Continue
             
-            If ( _If.Type = "ifndef" && ObjHasKey(g_data.define, _If.Def[1]) )
+            if ( _If.Type = "ifndef" && ObjHasKey(g_data.define, _If.Def[1]) )
                 Continue
 
-            If (_If.Type = "if")
+            if (_If.Type = "if")
             {
                 foo := _If.Def
                 For g_k, g_v in g_data.define    ; g_k = Identifier | g_v = Replacement
                     foo := RegExReplace(foo, "\b" . g_k . "\b", g_v)
-                If ( !Eval(foo) )    ; eval expr | ExecScript("FileAppend " .  foo . ", '*'")
+                if ( !Eval(foo) )    ; eval expr | ExecScript("FileAppend " .  foo . ", '*'")
                     Continue
             } 
         }
@@ -167,10 +161,9 @@
         {
             If (LineTxt ~= "\*/\s*$")    ; el comentario en bloque termina en la misma línea  /* ... */
                 Continue
-            LineTxt := RegExReplace(LineTxt, "\s+;.*")    ; quita comentarios en línea
 
             ; NORMAL = -1 | NO = 0 | KEEP = 1 | POSTEXEC = 2
-            InComment := LineTxt ~= "i)^/\*@Ahk2Exe-Keep" ? 1 : LineTxt ~= "i)^/\*@Ahk2Exe-PostExec" ? 2 : -1
+            InComment := LineTxt ~= "i)^/\*@Ahk2Exe-Keep\b" ? 1 : LineTxt ~= "i)^/\*@Ahk2Exe-PostExec\b" ? 2 : -1
             If (InComment == 2)    ; POSTEXEC
                 ObjRawSet(Directives, "PostExec", {Target: "", WorkingDir: RegExReplace(LineTxt, "i)^/\*@Ahk2Exe-PostExec\s*"), Options: "*"})
             Continue
@@ -189,243 +182,251 @@
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
         If (LineTxt ~= "i)^;@Ahk2Exe-")
         {
-            LineTxt := SubStr(LineTxt, 11)    ; eliminamos ";@Ahk2Exe-" al principio
-            foo := (bar := InStr(LineTxt, A_Space)) ? SubStr(LineTxt, 1, bar - 1) : LineTxt    ; recuperamos el nombre del comando
-            bar := bar ? RegExReplace(LTrim(SubStr(LineTxt, bar)), "\s+;.*") : ""    ; recupera el valor
+            foo := (bar:=ParseParams(LineTxt := SubStr(LineTxt, 11), "\s", 2))[1], bar := bar[2] ~= "^;" ? "" : bar[2]
 
             ; ##############################################################################################################################################
             ; Directivas que controlan los metadatos ejecutables que se añadirán al archivo EXE resultante
             ; ##############################################################################################################################################
-            If (foo = "ConsoleApp")    ; ConsoleApp
+            if (foo = "ConsoleApp")
             {
-                If (bar != "")    ; esta directiva no admite parámetros
+                if (bar != "")    ; esta directiva no admite parámetros
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-ConsoleApp", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-ConsoleApp.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else
-                    ObjRawSet(Directives, "Subsystem", IMAGE_SUBSYSTEM_WINDOWS_CUI)
+                else
+                    Directives.Subsystem := IMAGE_SUBSYSTEM_WINDOWS_CUI
+                 ,  ObjRawSet(g_data.define, "_CONSOLEAPP", TRUE)
             }
 
-            Else If (foo = "UseResourceLang")    ; UseResourceLang LangID
+            else if (foo = "UseResourceLang")    ; UseResourceLang LangID
             {
-                If (bar == "")    ; el primer parámetro es requerido
+                if (bar == "")    ; el primer parámetro es requerido
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-UseResourceLang", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-UseResourceLang.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else If (!(bar is "Integer") || !LCIDToLocaleName(bar))    ; comprueba el código de idioma
+                else if ( !LCIDToLocaleName(bar) )    ; comprueba el código de idioma
                     Util_AddLog("ERROR", "El valor de idioma en @Ahk2Exe-UseResourceLang es inválido", Script, A_Index)
                   , Util_Error("El valor de idioma en @Ahk2Exe-UseResourceLang es inválido.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else
-                    ObjRawSet(Directives, "ResourceLang", Integer(bar))
+                else
+                    Directives.ResourceLang := Integer(bar)
             }
 
-            Else If (foo = "PostExec")    ; PostExec Command [, WorkingDir] [, Options]
+            else if (foo = "PostExec")    ; PostExec Command [, WorkingDir] [, Options]
             {
                 bar := ParseParams(bar,, 3)
-                If (bar[1] == "")
+                if (bar[1] == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-PostExec", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-PostExec.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else
-                    ObjRawSet(Directives, "PostExec", {Target: bar[1], WorkingDir: bar[2], Options: bar[3]})
+                else
+                    Directives.PostExec := { Target: bar[1], WorkingDir: bar[2], Options: bar[3] }
             }
 
-            Else If (foo = "AddResource")    ; AddResource [*Type] FileName [, ResName] [, LangID]
+            else if (foo = "AddResource")    ; AddResource [*Type] FileName [, ResName] [, LangID]
             {
-                If (bar == "")
+                if (bar == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-AddResource", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-AddResource.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else
-                    ObjPush(Directives.Resources, ParseResourceStr(bar, Script, A_Index))
+                else
+                    Directives.Resources.Push( ParseResourceStr(bar, Script, A_Index) )
             }
 
-            Else If (foo = "SetMainIcon")    ; SetMainIcon IconFile
+            else if (foo = "SetMainIcon")    ; SetMainIcon IconFile
             {
-                If (!g_data.IgnoreSetMainIcon)
+                if (!g_data.IgnoreSetMainIcon)
                 {
-                    If (bar == "")
+                    if (bar == "")
                         Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-SetMainIcon", Script, A_Index)
                       , Util_Error("Uso inválido de la directiva @Ahk2Exe-SetMainIcon.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                    Else If (!IS_FILE(bar := GetFullPathName(bar)))
+                    else if (!IS_FILE(bar := GetFullPathName(bar)))
                         Util_AddLog("ERROR", "El icono especificado en @Ahk2Exe-SetMainIcon no existe", Script, A_Index)
                       , Util_Error("El icono especificado en @Ahk2Exe-SetMainIcon no existe.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                    Else
-                        ObjRawSet(Directives, "MainIcon", bar)
+                    else
+                        Directives.MainIcon := bar
                 }
             }
 
-            Else If (foo ~= "i)^Set")    ; SetProp [Value]
+            else if (foo = "Bin")    ; Bin BinFile
             {
-                If ( StrLen(foo) < 4 )
+                if (!g_data.IgnoreBinFile)
+                {
+                    if ( g_data.BinFile := Util_CheckBinFile(bar, foo) )
+                        g_data.Compile64 := foo == SCS_64BIT_BINARY
+                    else
+                        Util_AddLog("ERROR", "El archivo BIN especificado en @Ahk2Exe-Bin no existe", Script, A_Index)
+                      , Util_Error("El archivo BIN especificado en @Ahk2Exe-Bin no existe.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_BIN_FILE_NOT_FOUND))
+                }
+            }
+
+            else if (foo ~= "i)^Set")    ; SetProp [Value]
+            {
+                if ( StrLen(foo) < 4 )
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-Set", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-Set.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-
-                Else
+                else
                 {
-                    If (foo = "SetFileVersion" || foo = "SetProductVersion" || foo = "SetVersion")
+                    if (foo = "SetFileVersion" || foo = "SetProductVersion" || foo = "SetVersion")
                     {
                         bar := [foo, bar]
-                        foo := ObjModify(StrSplit(bar[2], "."), (n) => n is "Integer" ? Integer(n) : 0, -4, 0)
-                        If (bar[1] = "SetFileVersion" || bar[1] = "SetVersion")
-                            ObjRawSet(Directives, "FileVersion", foo)
-                          , ObjRawSet(Directives.VersionInfo, "FileVersion", bar[2])
-                        If (bar[1] = "SetProductVersion" || bar[1] = "SetVersion")
-                            ObjRawSet(Directives, "ProductVersion", foo)
-                          , ObjRawSet(Directives.VersionInfo, "ProductVersion", bar[2])
+                        foo := ObjModify(StrSplit(bar[2], "."), (n) => n is "integer" && n >= 0 ? Integer(n) : 0, -4, 0)
+                        if (bar[1] = "SetFileVersion" || bar[1] = "SetVersion")
+                            Directives.FileVersion := foo
+                          , Directives.VersionInfo["040904B0"]["FileVersion"] := bar[2]
+                        if (bar[1] = "SetProductVersion" || bar[1] = "SetVersion")
+                            Directives.ProductVersion := foo
+                          , Directives.VersionInfo["040904B0"]["ProductVersion"] := bar[2]
                     }
-                    Else If (foo = "SetName")
-                    {
-                        ObjRawSet(Directives.VersionInfo, "InternalName", bar)
-                        ObjRawSet(Directives.VersionInfo, "ProductName", bar)
-                    }
-                    Else If (foo = "SetDescription")
-                        ObjRawSet(Directives.VersionInfo, "FileDescription", bar)
-                    Else If (foo = "SetCopyright")
-                        ObjRawSet(Directives.VersionInfo, "LegalCopyright", bar)
-                    Else If (foo = "SetOrigFilename")
-                        ObjRawSet(Directives.VersionInfo, "OriginalFilename", bar)
-                    Else
-                        ObjRawSet(Directives.VersionInfo, SubStr(foo, 4), bar)    ; SetXXX
+                    else if (foo = "SetName")
+                        Directives.VersionInfo["040904B0"]["InternalName"] := bar
+                      , Directives.VersionInfo["040904B0"]["ProductName"]  := bar
+                    else if (foo = "SetDescription")
+                        Directives.VersionInfo["040904B0"]["FileDescription"] := bar
+                    else if (foo = "SetCopyright")
+                        Directives.VersionInfo["040904B0"]["LegalCopyright"] := bar
+                    else if (foo = "SetOrigFilename")
+                        Directives.VersionInfo["040904B0"]["OriginalFilename"] := bar
+                    else    ; SetXXX
+                        Directives.VersionInfo["040904B0"][SubStr(foo,4)] := bar
                 }
             }
 
-            Else If (foo = "VerInfo")    ; VerInfo Prop [, Value] [, Delete?]
+            else if (foo = "VerInfo")    ; VerInfo PropName [, Value] [, LangID] [, Delete?]
             {
-                bar := ParseParams(bar,, 3)
-                If ( (bar[1] == "" && bar[3] != 2) || (bar[3] != "" && bar[3] != 1 && bar[3] != 2 ) )
-                    Util_AddLog("ERROR", "La sintaxis en la directiva @Ahk2Exe-VerInfo no es correcta", Script, A_Index)
-                  , Util_Error("La sintaxis en la directiva @Ahk2Exe-VerInfo no es correctao.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-
-                Else If (bar[3] == "")    ; añade/modifica la propiedad especificada
-                    ObjRawSet(Directives.VersionInfo, bar[1], bar[2])
-                Else If (bar[3] == 1)    ; elimina la propiedad especificada
-                    ObjDelete(Directives.VersionInfo, bar[1])
-                Else ;If (bar[3] == 2)    ; elimina todas las propiedades
-                    ObjRawSet(Directives, "VersionInfo", {})
+                bar := ParseParams(bar,, 4, ["","","040904B0",0])
+                if ( (bar[1] == "" && bar[4] != 2) || !_IN(bar[4],"0|1|2") || StrLen(bar[3]) != 8 || !("0x" SubStr(bar[3],1,4) is "integer") || !("0x" SubStr(bar[3],-4) is "integer") )
+                    Util_AddLog("ERROR", "El parámetro en la directiva @Ahk2Exe-VerInfo no es correcto", Script, A_Index)
+                  , Util_Error("El parámetro en la directiva @Ahk2Exe-VerInfo no es correcto.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
+                else if (bar[4] == 0)    ; añade/modifica la propiedad especificada
+                {
+                    if ( !Directives.VersionInfo.HasKey(bar[3]) )    ; comprueba si el idioma no existe
+                        Directives.VersionInfo[bar[3]] := {}
+                    Directives.VersionInfo[bar[3]][bar[1]] := bar[2]
+                }
+                else if (bar[4] == 1)    ; elimina la propiedad especificada
+                {
+                    if ( Directives.VersionInfo.HasKey(bar[3]) )    ; comprueba si el idioma existe (si no existe no hay nada que eliminar)
+                    {
+                        Directives.VersionInfo[bar[3]].Delete( bar[1] )   ; elimina la propiedad deseada del idioma especificado
+                        if ( !Directives.VersionInfo[bar[3]].Count() )    ; comprueba si sigue habiendo propiedades en este idioma
+                            Directives.VersionInfo.Delete( bar[3] )       ; si no hay mas propiedades elimina el idioma
+                    }
+                }
+                else if (bar[4] == 2)    ; elimina el idioma especificado
+                    Directives.VersionInfo.Delete( bar[3] )
             }
 
-            Else If (foo = "FileVersion" || bar = "ProductVersion")    ; FileVersion 0.0.0.0  |  ProductVersion 0.0.0.0
+            else if (foo = "FileVersion" || bar = "ProductVersion")    ; FileVersion 0.0.0.0  |  ProductVersion 0.0.0.0
             {
-                If ( !RegExMatch(bar, "^\d+\.\d+\.\d+\.\d+$") )    ; 0.0.0.0
+                if ( !RegExMatch(bar, "^\d+\.\d+\.\d+\.\d+$") )    ; 0.0.0.0
                     Util_AddLog("ERROR", "El valor especificado en @Ahk2Exe-" . foo . " es inválido", Script, A_Index)
                   , Util_Error("El valor especificado en @Ahk2Exe-" . foo . " es inválido.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else
+                else
                     ObjRawSet(Directives, foo, ObjModify(StrSplit(bar, "."), (n) => Integer(n)))
             }
 
-            Else If (foo = "RequireAdmin")    ; RequireAdmin
-                ObjRawSet(Directives, "RequireAdmin", TRUE)
+            else if (foo = "RequireAdmin")    ; RequireAdmin
+                Directives.RequireAdmin := TRUE
 
-            Else If (foo = "AddStream")    ; AddStream Name [, Value] [, Mode] [, Encoding]
+            else if (foo = "AddStream")    ; AddStream Name [, Value] [, Mode] [, Encoding]
             {
                 bar := ParseParams(bar,, 4, [":","",0,"UTF-8-RAW"])
-                If (_CONTAINS(bar[1], "<,>,:,`",/,\,|,?,*,`t",,",") || !_IN(bar[3], "0|1|2") || !_IN(bar[4], "UTF-8|UTF-8-RAW|UTF-16|UTF-16-RAW"))
+                if (_CONTAINS(bar[1], "<,>,:,`",/,\,|,?,*,`t",,",") || !_IN(bar[3], "0|1|2") || !_IN(bar[4], "UTF-8|UTF-8-RAW|UTF-16|UTF-16-RAW"))
                     Util_AddLog("ERROR", "La sintaxis en la directiva @Ahk2Exe-AddStream no es correcta", Script, A_Index)
                   , Util_Error("La sintaxis en la directiva @Ahk2Exe-AddStream no es correcta.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else
-                    ObjPush(Directives.Streams, {Name: bar[1], Value: bar[2], Mode: Integer(bar[3]), Encoding: bar[4]})
+                else
+                    Directives.Streams.Push( {Name: bar[1], Value: bar[2], Mode: Integer(bar[3]), Encoding: bar[4]} )
             }
 
 
             ; ##############################################################################################################################################
             ; Directivas que controlan el comportamiento del script
             ; ##############################################################################################################################################
-            Else If (foo ~= "i)^IgnoreBegin(32|64)?$")    ; IgnoreBegin[32|64] [Lines]
+            else if (foo ~= "i)^IgnoreBegin(32|64)?$")    ; IgnoreBegin[32|64] [Lines]
             {
                 bar := StrSplit(bar, A_Space)[1]    ; @Ahk2Exe-IgnoreBegin Lines Comment
-                If (bar != "" && (!(bar is "Integer") || bar < 1 || bar > 1000000))
+                if (bar != "" && (!(bar is "Integer") || bar < 1 || bar > 1000000))
                     Util_AddLog("ERROR", "El parámetro en @Ahk2Exe-IgnoreBegin no es correcto", Script, A_Index)
                   , Util_Error("El parámetro en @Ahk2Exe-IgnoreBegin no es correcto.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
 
-                Else If (foo = "IgnoreBegin")
+                else if (foo = "IgnoreBegin")
                     IgnoreBegin := {  Bits: "", Lines: bar == "" ? "" : Integer(bar) }
-                Else If (foo = "IgnoreBegin32" && !g_data.Compile64)
+                else if (foo = "IgnoreBegin32" && !g_data.Compile64)
                     IgnoreBegin := {  Bits: "32", Lines: bar == "" ? "" : Integer(bar) }
-                Else If (foo = "IgnoreBegin64" && g_data.Compile64)
+                else if (foo = "IgnoreBegin64" && g_data.Compile64)
                     IgnoreBegin := {  Bits: "64", Lines: bar == "" ? "" : Integer(bar) }
             }
 
-            Else If (foo ~= "i)^IgnoreEnd(32|64)?$")    ; IgnoreEnd[32|64]
+            else if (foo ~= "i)^IgnoreEnd(32|64)?$")    ; IgnoreEnd[32|64]
                 Continue
 
-            Else If (foo ~= "i)^Keep(32|64)?$")    ; Keep[32|64] Code
+            else if (foo ~= "i)^Keep(32|64)?$")    ; Keep[32|64] Code
             {
-                If (bar == "")
+                if (bar == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-Keep", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-Keep.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
 
-                Else If (foo = "Keep")
+                else if (foo = "Keep")
                     NewCode .= bar . "`n"
-                Else If (foo = "Keep32" && !g_data.Compile64)
+                else if (foo = "Keep32" && !g_data.Compile64)
                     NewCode .= bar . "`n"
-                Else If (foo = "Keep64" && g_data.Compile64)
+                else if (foo = "Keep64" && g_data.Compile64)
                     NewCode .= bar . "`n"
             }
 
-            Else If (foo = "Bin")    ; Bin BinFile
-            {
-                If (!g_data.IgnoreBinFile)
-                {
-                    ObjRawSet(g_data, "BinFile", Util_CheckBinFile(bar, foo))
-                    ObjRawSet(g_data, "Compile64", foo == SCS_64BIT_BINARY)
-
-                    If (!g_data.BinFile)
-                        Util_AddLog("ERROR", "El archivo BIN especificado en @Ahk2Exe-Bin no existe", Script, A_Index)
-                      , Util_Error("El archivo BIN especificado en @Ahk2Exe-Bin no existe.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_BIN_FILE_NOT_FOUND))
-                }
-            }
-
-            Else If (foo = "define")   ; Define A [B ..]
+            else if (foo = "define")   ; Define A [B ..]
             {
                 bar := ParseParams(bar, "\s", 2)    ; bar := [A,B]
-                If (bar[1] == "")
+                if (bar[1] == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-Define", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-Define.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else
+                else
                     ObjRawSet(g_data.define, bar[1], bar[2])
             }
 
-            Else If (foo = "undef")
+            else if (foo = "undef")
             {
-                If ( !ObjHasKey(g_data.define, bar) )
+                if ( !ObjHasKey(g_data.define, bar) )
                     Util_AddLog("ERROR", "@Ahk2Exe-UnDef El identificador no estaba definido", Script, A_Index)
                   , Util_Error("@Ahk2Exe-UnDef El identificador no estaba definido.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else
+                else
                     ObjDelete(g_data.define, bar)
             }
 
-            Else If (foo ~= "i)^ifn?def$")    ; if[n]def A [B ..]
+            else if (foo ~= "i)^ifn?def$")    ; if[n]def A [B ..]
             {
                 bar := ParseParams(bar, "\s", 2)    ; bar := [A,B]
-                If (bar[1] == "")
+                if (bar[1] == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-" . foo, Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-" . foo . ".`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else
+                else
                     _If := { Type: foo, Def: bar }
             }
 
-            Else If (foo = "if")
+            else if (foo = "if")
             {
-                If (bar == "")
+                if (bar == "")
                     Util_AddLog("ERROR", "Uso inválido de la directiva @Ahk2Exe-If", Script, A_Index)
                   , Util_Error("Uso inválido de la directiva @Ahk2Exe-If.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_INVALID_DIRECTIVE_SYNTAX))
-                Else
+                else
                     _If := { Type: foo, Def: bar }
             }
 
-            Else
+            else if (foo = "Include")    ; Include Filename
+                NewCode .= PreprocessScript(GetFullPathName(bar), Tree . "`n" . Script, FileList, Directives) . "`n"
+
+            else    ; comando de directiva inválido
                 Util_AddLog("ERROR", "El comando de directiva @Ahk2Exe especificado es inválido", Script, A_Index)
               , Util_Error("El comando de directiva @Ahk2Exe especificado es inválido.`nLínea #" . A_Index . ".", Script, CMDLN(ERROR_UNKNOWN_DIRECTIVE_COMMAND))
 
 
-            If (ERROR)
+            if (ERROR)
                 Return FALSE
             Continue
         }
 
 
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        ; Eliminamos comentarios en línea y optimizamos la línea
+        ; Ignoramos las líneas de texto que contengan comentarios al inicio y procesamos/optimizamos las que sean válidas
         ; ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-        If ( (LineTxt := RegExReplace(LineTxt, "\s+;.*")) == "" || SubStr(LineTxt,1,1) == ";" )
-            Continue
+        if ( LineTxt ~= "^;" )
+            continue
         LineTxt := ProcessLine(LineTxt)
 
 
@@ -569,6 +570,8 @@
         NewCode .= LineTxt . "`n"
     }
 
+    file.Close()
+
 
 
     ; ======================================================================================================================================================
@@ -579,7 +582,7 @@
     If (Tree == "")    ; ¿estamos procesando el script principal que se va a compilar?
     {
         ; Thanks «coffee» : https://autohotkey.com/boards/viewtopic.php?f=44&t=48953#p223878
-        If (g_data.SyntaxCheck)    ; comprobación de sintaxis y autoinclución de bibliotecas
+        If (g_data.SyntaxCheck)    ; comprobación de sintaxis y librerias faltantes
         {
             Util_AddLog("INFO", "La comprobación de sintaxis está habilitada", Script)
             If (g_ahkpath == "")
@@ -619,15 +622,19 @@
                                 NewCode .= PreprocessScript(SubStr(A_LoopField, 15), Tree . "`n" . Script, FileList, Directives) . "`n"
                                 If (ERROR)
                                     Return FALSE
-                                Util_AddLog("INFO", "Se ha autoincluido una biblioteca", SubStr(A_LoopField, 15))
+                                Util_AddLog("INFO", "Se ha autoincluido una libreria", SubStr(A_LoopField, 15))
                             }
                         }
                     }
                     Else If (A_Index == 1)
                     {
                         Util_AddLog("INFO", "No se han encontrado bibliotecas para autoincluir", Script)
+                        Util_AddLog("INFO", "No se han detectado errores de sintaxis", Script)
                         Break
                     }
+
+                    if (A_Index == 2)
+                        Util_AddLog("INFO", "No se han detectado errores de sintaxis", Script)
 
                     ahk := {}
                 }
@@ -765,21 +772,93 @@ class TempWorkingDir
 
 
 
-QuickParse(Script)    ; analiza rápidamente el Script a compilar para recuperar ciertos datos
+QuickParse(Script)
 {
     local f := FileOpen(Script, "r")
     if (!f)
         return FALSE
     local WD      := new TempWorkingDir( DirGetParent(Script) )
-    local Data    := { Script: Script, MainIcon: "", BinFile: "" }
-    local LineTxt := ""
+    local Data    := { Script        : Script
+                     , MainIcon      : ""
+                     , BinFile       : ""
+                     , Directives    : { Resources: [], ResourceLang: SUBLANG_ENGLISH_US }
+                     , VerInfo       : { "040904B0": { FileVersion     : g_data.BinVersion
+                                                     , ProductVersion  : g_data.BinVersion
+                                                     , OriginalFilename: PATH(Script).FN
+                                                     , Comments        : "Compiled with https://github.com/flipeador/Ahk2Exe" } }
+                     , FileVersion   : StrSplit(g_data.BinVersion, ".")
+                     , ProductVersion: StrSplit(g_data.BinVersion, ".") }
+    local LineTxt := "", cmd := "", value := "", foo := "", bar := ""
     While (!f.AtEOF)
     {
         LineTxt := RegExReplace(Trim(f.ReadLine()), "\s+;.*")
-        if (LineTxt ~= "i)^;@Ahk2Exe-SetMainIcon")
-            Data.MainIcon := GetFullPathName(LTrim(SubStr(LineTxt, 22)))
-        else if (LineTxt ~= "i)^;@Ahk2Exe-Bin")
-            Data.BinFile := PATH(LTrim(SubStr(LineTxt, 14), A_ScriptDir)).FNNE
+        if (LineTxt ~= "i)^;@Ahk2Exe-")
+        {
+            cmd := (value:=ParseParams(LineTxt := SubStr(LineTxt, 11), "\s", 2))[1]
+          , value := RegExReplace(value[2], "\s+;.*"), value := value ~= "^;" ? "" : value
+            if (cmd = "SetMainIcon")
+                Data.MainIcon := GetFullPathName(value)
+            else if (cmd = "Bin")
+                Data.BinFile := PATH(value).FNNE
+            else if (cmd = "AddResource")
+                Data.Directives.Resources.Push( ParseResourceStr(value) )
+            else if (cmd = "UseResourceLang")
+                Data.Directives.ResourceLang := !LCIDToLocaleName(value) ? "Idioma inválido" : value
+            else if (cmd = "FileVersion" || cmd = "ProductVersion")
+                Data[cmd] := RegExMatch(value, "^\d+\.\d+\.\d+\.\d+$") ? StrSplit(value,".") : Data[cmd]
+            else if (cmd = "VerInfo")
+            {
+                foo := ParseParams(value,, 4, ["","","040904B0",0])
+                if ( (foo[1] == "" && foo[4] != 2) || StrLen(foo[3]) != 8 || !("0x" SubStr(foo[3],1,4) is "integer") || !("0x" SubStr(foo[3],-4) is "integer") )
+                    continue
+                else if (foo[4] == 0)
+                {
+                    if ( !Data.VerInfo.HasKey(foo[3]) )
+                        Data.VerInfo[foo[3]] := {}
+                    Data.VerInfo[foo[3]][foo[1]] := foo[2]
+                }
+                else if (foo[4] == 1)
+                {
+                    if ( Data.VerInfo.HasKey(foo[3]) )
+                    {
+                        Data.VerInfo[foo[3]].Delete( foo[1] )
+                        if ( !Data.VerInfo[foo[3]].Count() )
+                            Data.VerInfo.Delete( foo[3] )
+                    }
+                }
+                else if (foo[4] == 2)
+                    Data.VerInfo.Delete( foo[3] )
+            }
+            else if (cmd ~= "i)^Set")
+            {
+                if ( StrLen(cmd) < 4 )
+                    continue
+                else
+                {
+                    if (cmd = "SetFileVersion" || cmd = "SetProductVersion" || cmd = "SetVersion")
+                    {
+                        bar := ObjModify(StrSplit(value, "."), (n) => n is "integer" && n >= 0 ? Integer(n) : 0, -4, 0)
+                        if (cmd = "SetFileVersion" || cmd = "SetVersion")
+                            Data.FileVersion := bar
+                          , Data.VerInfo["040904B0"]["FileVersion"] := value
+                        if (cmd = "SetProductVersion" || cmd = "SetVersion")
+                            Data.ProductVersion := bar
+                          , Data.VerInfo["040904B0"]["ProductVersion"] := value
+                    }
+                    else if (cmd = "SetName")
+                        Data.VerInfo["040904B0"]["InternalName"] := value
+                      , Data.VerInfo["040904B0"]["ProductName"]  := value
+                    else if (cmd = "SetDescription")
+                        Data.VerInfo["040904B0"]["FileDescription"] := value
+                    else if (cmd = "SetCopyright")
+                        Data.VerInfo["040904B0"]["LegalCopyright"] := value
+                    else if (cmd = "SetOrigFilename")
+                        Data.VerInfo["040904B0"]["OriginalFilename"] := value
+                    else
+                        Data.VerInfo["040904B0"][SubStr(cmd,4)] := value
+                }
+            }
+        }
     }
     return Data
 }
@@ -865,9 +944,9 @@ ParseFuncParams(Params, Script)    ; FileInstall Source, Dest | support for file
 
 
 
-ParseResourceStr(String, Script, Line)    ;@Ahk2Exe-AddResource [*Type] FileName [, ResName] [, LangID]
+ParseResourceStr(String, Script := "", Line := 0)    ;@Ahk2Exe-AddResource [*Type] FileName [, ResName] [, LangID]
 {
-    Static ResTypes := { bmp: 2, dib: 2              ; RT_BITMAP
+    static ResTypes := { bmp: 2, dib: 2              ; RT_BITMAP
                        , cur: 12                     ; RT_GROUP_CURSOR
                        , ico: 14                     ; RT_GROUP_ICON
                        , htm: 23, html: 23, mht: 23  ; RT_HTML
@@ -875,25 +954,27 @@ ParseResourceStr(String, Script, Line)    ;@Ahk2Exe-AddResource [*Type] FileName
                        ; otros
                        , png: ".PNG" }
 
-    Local Data := { ResType: "", FileName: "", ResName: "", LangID: "" }
+    local Data := { ResType: "", FileName: "", ResName: "", LangID: "" }
         ,  foo := ""
 
-    If (String ~= "^\*")
+    if (String ~= "^\*")
     {
-        If (String ~= "^\*`"")
+        if (String ~= "^\*`"")
         {
             If (!(foo := InStr(String, "`"",, 3)) || (Data.ResType := SubStr(String, 3, foo - 3)) == "")
             {
-                Util_AddLog("ERROR", "La sintaxis en @Ahk2Exe-AddResource no es correcta", Script, Line)
-                Return Util_Error("La sintaxis en @Ahk2Exe-AddResource no es correcta.`nLínea: " . Line ".", Script)
+                if (Line)
+                    Util_AddLog("ERROR", "La sintaxis en @Ahk2Exe-AddResource no es correcta", Script, Line)
+                return Line ? Util_Error("La sintaxis en @Ahk2Exe-AddResource no es correcta.`nLínea: " . Line ".", Script) : 0
             }
         }
         Else
         {
-            If (!(foo := InStr(String, A_Space,, 2)) || (Data.ResType := SubStr(String, 2, foo - 2)) == "")
+            if (!(foo := InStr(String, A_Space,, 2)) || (Data.ResType := SubStr(String, 2, foo - 2)) == "")
             {
-                Util_AddLog("ERROR", "La sintaxis en @Ahk2Exe-AddResource no es correcta", Script, Line)
-                Return Util_Error("La sintaxis en @Ahk2Exe-AddResource no es correcta.`nLínea: " . Line ".", Script)
+                if (Line)
+                    Util_AddLog("ERROR", "La sintaxis en @Ahk2Exe-AddResource no es correcta", Script, Line)
+                return Line ? Util_Error("La sintaxis en @Ahk2Exe-AddResource no es correcta.`nLínea: " . Line ".", Script) : 0
             }
         }
         String := LTrim(SubStr(String, foo + 1))
@@ -903,23 +984,23 @@ ParseResourceStr(String, Script, Line)    ;@Ahk2Exe-AddResource [*Type] FileName
     For g_k, g_v in ["FileName","ResName","LangID"]
         ObjRawSet(Data, g_v, foo[g_k])
 
-    If (!IS_FILE(Data.FileName))
+    if (Line && !IS_FILE(Data.FileName))
     {
         Util_AddLog("ERROR", "El archivo especificado en @Ahk2Exe-AddResource no existe", Script, Line)
-        Return Util_Error("El archivo especificado en @Ahk2Exe-AddResource no existe.`nLínea: " . Line ".", Script)
+        return Util_Error("El archivo especificado en @Ahk2Exe-AddResource no existe.`nLínea: " . Line ".", Script)
     }
 
-    If (Data.LangID != "" && (!(Data.LangID is "Integer") || !LCIDToLocaleName(Data.LangID)))
+    if (Line && Data.LangID != "" && !LCIDToLocaleName(Data.LangID))
     {
         Util_AddLog("ERROR", "El código de idioma especificado en @Ahk2Exe-AddResource es inválido", Script, Line)
-        Return Util_Error("El código de idioma especificado en @Ahk2Exe-AddResource es inválido.`nLínea: " . Line ".", Script)
+        return Util_Error("El código de idioma especificado en @Ahk2Exe-AddResource es inválido.`nLínea: " . Line ".", Script)
     }
 
-    Local Path := PATH(Data.FileName)
-    ObjRawSet(Data, "ResName", Data.ResName == "" ? (Path.Ext = "manifest" ? "1" : Path.FN) : Data.ResName)
-    ObjRawSet(Data, "ResType", Data.ResType == "" ? (ObjHasKey(ResTypes, Path.Ext) ? ResTypes[Path.Ext] : RT_RCDATA) : Data.ResType)
+    local Path := PATH(Data.FileName)
+    Data.ResName := Data.ResName == "" ? (Path.Ext = "manifest"     ? "1"                : Path.FN  ) : Data.ResName
+    Data.ResType := Data.ResType == "" ? (ResTypes.HasKey(Path.Ext) ? ResTypes[Path.Ext] : RT_RCDATA) : Data.ResType
     ;MsgBox "ResType: _" . Data.ResType . "_`nFileName: _" . Data.FileName . "_`nResName: _" . Data.ResName . "_`nLangID: _" . Data.LangID . "_"
-    Return Data
+    return Data
 }
 
 

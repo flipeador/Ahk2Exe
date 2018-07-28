@@ -88,7 +88,7 @@
 
 
     ; incluir el archivo fuente
-    ; se incluye como texto simple, con el nombre ">AUTOHOTKEY SCRIPT<" que AHK (archivo bin) reconocerá para proceder a ejecutar el Script
+    ; se incluye como texto, con el nombre ">AUTOHOTKEY SCRIPT<" que AHK (archivo bin) reconocerá para proceder a ejecutar el Script
     Local Size := 0, Buffer := ""
     UpdateResource(hUpdate, RT_RCDATA, hIconFile ? ">AHK WITH ICON<" : ">AUTOHOTKEY SCRIPT<",, StrPutVar(Data.Code, Buffer, Size), Size-1)    ; -1 = '\0'
 
@@ -185,11 +185,16 @@
 
     ; establecemos la información de la versión
     Local  VerRes := new VersionRes( LoadResource3(hExe, RT_VERSION, 1) )    ; LoadResource3 devuelve un puntero a la estructura VS_VERSIONINFO
-        , VerInfo := VerRes.GetChild("StringFileInfo").GetChild("040904B0")    ; VerInfo representa la estructura StringTable (que contiene las popiedades)
-    
-    VerInfo.DeleteAll()    ; eliminamos todas las propiedades (sub-estructuras String en StringTable)
-    For g_k, g_v in Data.Directives.VersionInfo    ; añadimos las nuevas propiedades
-        VerInfo.AddChild( new VersionRes(g_k, g_v) )    ; g_k = Prop | g_v = Value
+        ,   StrFI := VerRes.GetChild("StringFileInfo")                       ; recupera un puntero a la estructura StringFileInfo
+
+    local LangID := StrFI.DeleteAll(), VerInfo := ""
+    for LangID, g_v in Data.Directives.VersionInfo    ; g_v = {PropName: Value, ..}
+    {
+        if ( !(VerInfo := StrFI.GetChild(LangID)) )    ; recupera y comprueba si existe la estructura StringTable con el idioma especificado
+            VerInfo := StrFI.AddChild( new VersionRes(LangID) )    ; si no existe la crea
+        for g_k, g_v in g_v    ; g_k = PropName | g_v = Value
+            VerInfo.AddChild( new VersionRes(g_k,g_v) )    ; añade la propiedad
+    }
 
     ; establecemos la versión binaria del archivo
     ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms646997(v=vs.85).aspx
@@ -203,22 +208,22 @@
 
     ; guardamos la nueva estructura
     UpdateResource(hUpdate, RT_VERSION, 1, Data.Directives.ResourceLang, VerRes.Alloc(Size), Size)    ; escribimos el nuevo recurso de versión reemplazando el actual
-    VerInfo := "", VerRes := ""
+    LangID := "", VerInfo := "", StrFI := "", VerRes := ""
 
 
     ; verificamos si debemos hacer cambios en el archivo .manifest
     ; https://msdn.microsoft.com/en-us/library/6ad1fshk.aspx
     If (Data.Directives.RequireAdmin)
     {
-        foo := StrGet(LoadResource3(hExe, RT_MANIFEST, 1, Size), Size, "UTF-8")
-        foo := StrReplace(foo, "asInvoker", "requireAdministrator")    ; security requestedPrivileges requestedExecutionLevel level
+        foo := StrGet(LoadResource3(hExe, RT_MANIFEST, 1, Size), Size, "UTF-8")   ; recupera el contenido del archivo manifest actual
+        foo := StrReplace(foo, "asInvoker", "requireAdministrator")               ; security requestedPrivileges requestedExecutionLevel level
         UpdateResource(hUpdate, RT_MANIFEST, 1,, StrPutVar(foo, Buffer, Size), Size-1)
     }
 
 
     ; cerramos el archivo destino
     FreeLibrary(hExe)
-    EndUpdateResource(hUpdate)
+    EndUpdateResource(hUpdate)   ; cerramos el archivo y escribimos los datos
 
 
     ; establecemos el subsistema requerido para ejecutar el archivo destino
@@ -349,7 +354,7 @@
         }
     }
 
-
+    
     ; ======================================================================================================================================================
     ; ÉXITO! | TERMINAMOS
     ; ======================================================================================================================================================
