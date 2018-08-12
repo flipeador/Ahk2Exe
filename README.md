@@ -1,4 +1,4 @@
-# <p align="center">Ahk2Exe 1.11.2.7 | Alpha v2.0-a097-60f26de</p>
+# <p align="center">Ahk2Exe 1.11.3.8 | Alpha v2.0-a097-60f26de</p>
 ###### Compilador no oficial para AutoHotkey v2 en español.
 
 Puedes reportar errores, proponer nueva funcionalidad o hacer cualquier otro tipo de comentarios acerca del compilador en el sitio en el foro de AutoHotkey: [autohotkey.com/boards/viewtopic.php?f=44&t=48953](https://autohotkey.com/boards/viewtopic.php?f=44&t=48953).
