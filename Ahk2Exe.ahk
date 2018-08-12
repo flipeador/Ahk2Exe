@@ -1,10 +1,10 @@
 ﻿;@Ahk2Exe-SetName             Ahk2Exe
 ;@Ahk2Exe-SetOrigFilename     Ahk2Exe.exe
 ;@Ahk2Exe-SetDescription      AutoHotkey v2 Script Compiler
-;@Ahk2Exe-SetFileVersion      1.11.2.7    ; major.minor.maintenance.build
+;@Ahk2Exe-SetFileVersion      1.11.3.8    ; major.minor.maintenance.build
 ;@Ahk2Exe-SetCompanyName      AutoHotkey
 ;@Ahk2Exe-SetCopyright        Copyright (c) 2004-2018
-;@Ahk2Exe-SetComments         [2018-07-28] https://github.com/flipeador/Ahk2Exe
+;@Ahk2Exe-SetComments         [2018-08-12] https://github.com/flipeador/Ahk2Exe
 
 ;;@Ahk2Exe-VerInfo FileDescription, Compilador de scripts para AutoHotkey v2 en español, 0C0A04B0
 
@@ -46,7 +46,7 @@ TraySetIcon("Ahk2Exe.ico")
 ; INCLUDES
 ; =====================================================================================================================================================
 ; Lib\
-#Include <Gdiplus\Gdiplus>
+#Include <Gdiplus>
 #Include <LinearGradient>       ; crea imagen para fondos con degradado
 #Include <ImageButton>          ; asigna imagenes a botones
 #Include <RunAsAdmin>           ; función para ejecutar el script como administraor
@@ -89,7 +89,6 @@ global     g_data := { Gui: {}, define: {} }
       ,       g_k := 0, g_v := 0    ; for g_k, g_v in Obj
       , g_ahkpath := Util_GetAhkPath()
 global Cfg := Util_LoadCfg()
-global Gdip := new Gdiplus()
 global ERROR := FALSE
 global BE_QUIET := FALSE
 
@@ -184,14 +183,19 @@ If (CMDLN)
 ;@Ahk2Exe-endif
 
 ;@Ahk2Exe-ifndef _CONSOLEAPP
-; comprobamos instancia (no permitir más de una instancia de la interfaz gráfica GUI)
 If (WinExist(Title))
     WinShow(Title), WinMoveBottom(Title), WinActivate(Title), ExitApp()
 
 
+If (!A_IsAdmin && !FileOpen("~tmp", "w"))
+    If (!RunAsAdmin())
+        Util_Error("Error de permisos.`nIntente ejecutar el compilador como Administrador.",, TRUE)
+FileDelete("~tmp")
+Gdiplus.Startup()   ; inicializa Gdiplus
+
+
 ; variables super-globales necesarias cuando se muestra la interfaz GUI
 global Gui := 0        ; almacena el objeto GUI de la ventana principal
-global g_dpix := 0, g_dpiy := 0
 global wctrltimer := 0, waterctrldll := {path: A_ScriptDir . "\waterctrl.dll"}
 global ButtonStyle := [[3, 0xFEF5BF, 0xFEE88A, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [3, 0xFEDF63, 0xFED025, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [5, 0xFEDF63, 0xFED025, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [0, 0xFEF5BF, "Black", 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1], [3, 0xFEF5BF, 0xFEE88A, 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 2], [0, 0xFEF5BF, "Black", 0x3E566F, 5, 0xFEF5BF, 0xFED22C, 1]]
 global ButtonStyle2 := [[0, 0xE1E1E1, "Black", 0x151515, 5, 0xFFFFFF, 0xADADAD, 1], [0, 0xE5F1FB, "Black", 0x151515, 5, 0xFFFFFF, 0x007CE1, 1], [0, 0xCCE4F7, "Black", 0x151515, 5, 0xFFFFFF, 0x005499, 1], [0, 0xE1E1E1, "Black", 0x808080, 5, 0xFFFFFF, 0xADADAD, 1], [0, 0xE1E1E1, "Black", 0x151515, 5, 0xFFFFFF, 0x007CE1, 2], [0, 0xE5F1FB, "Black", 0x151515, 1, 0xFFFFFF, 0x007CE1, 1]]
@@ -207,15 +211,10 @@ global WIN_MINIMIZED := -1
      , WIN_MAXIMIZED :=  1
 
 global     VK_F1 := 0x70    ; F1 key                       || https://msdn.microsoft.com/en-us/library/windows/desktop/dd375731(v=vs.85).aspx
+     ,     VK_F5 := 0x74    ; F5 key
      , VK_DELETE := 0x2E    ; DEL key
      ,   VK_BACK := 0x08    ; BACKSPACE key
 
-
-; comprobamos permisos
-If (!A_IsAdmin && !FileOpen("~tmp", "w"))
-    If (!RunAsAdmin())
-        Util_Error("Error de permisos.`nIntente ejecutar el compilador como Administrador.",, TRUE)
-FileDelete("~tmp")
 
 ; barra de menu
 g_data.Gui.MenuBar := MenuBarCreate()
@@ -230,6 +229,9 @@ g_data.Gui.MenuBar_File.SetIcon("Salir", "shell32.dll", -240)
 g_data.Gui.MenuBar.Add("Archivo", g_data.Gui.MenuBar_File)
 g_data.Gui.MenuBar.SetIcon("Archivo", A_WinDir . "\explorer.exe")
 g_data.Gui.MenuBar_Edit := MenuCreate()
+g_data.Gui.MenuBar_Edit.Add("Refrezcar", () => Util_UpdateSrc())
+g_data.Gui.MenuBar_Edit.SetIcon("Refrezcar", "shell32.dll", -16739)
+g_data.Gui.MenuBar_Edit.Add()
 g_data.Gui.MenuBar_Edit.Add("Limpiar la lista de archivos fuente", () => g_data.Gui.CBSrc.DeleteAll(""))
 g_data.Gui.MenuBar_Edit.SetIcon("Limpiar la lista de archivos fuente", "shell32.dll", -261)
 g_data.Gui.MenuBar_Edit.Add("Limpiar la lista de iconos", () => g_data.Gui.CBIco.DeleteAll("") . IL_Destroy(g_data.Gui.CBIco.SetImageList(IL_Create())))
@@ -282,12 +284,13 @@ Gui.AddButton("x395 y4 w400 h100 vbinfo Left", "  ©2004-2009 Chris Mallet`n  ©
     DllCall("User32.dll\SetParent", "Ptr", Gui.Control["binfo"].Hwnd, "Ptr", g_data.Gui.TXLgo.Hwnd)
     ImageButton.Create(Gui.Control["binfo"].Hwnd, [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEE786, 0xFEF5BF, 0x2D4868, 5, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1], [0, 0xFEF5BF, 0xFEF5BF, 0x2D4868, 1, 0xFEF5BF, 0xFEF5BF, 1])
 
-g_data.Gui.Tab := new Tab(Gui, "x0 y" . g_data.Gui.TXLgo.Pos.H . " w802", "General", "Registros", "Recursos", "Información de la versión")
+g_data.Gui.Tab := new Tab(Gui, "x0 y" . g_data.Gui.TXLgo.Pos.H . " w802", "General", "Registros", "Recursos", "Información de la versión") ;, "Variables")
 g_data.Gui.Tab.SetImageList(IL_Create())
 IL_Add(g_data.Gui.Tab.GetImageList(), A_IsCompiled ? A_ScriptFullPath : "Ahk2Exe.ico")
 IL_Add(g_data.Gui.Tab.GetImageList(), A_WinDir . "\regedit.exe")
 IL_Add(g_data.Gui.Tab.GetImageList(), "shell32.dll", -182)
 IL_Add(g_data.Gui.Tab.GetImageList(), "shell32.dll", -174)
+IL_Add(g_data.Gui.Tab.GetImageList(), "shell32.dll", -154)
 Loop g_data.Gui.Tab.GetCount()
     g_data.Gui.Tab.SetItemImage(A_Index-1, A_Index-1)
 g_data.Gui.TabDA := g_data.Gui.Tab.GetDisplayArea()
@@ -333,6 +336,7 @@ g_data.Gui.TXBin := Gui.AddText("x" . g_data.Gui.TXSrc.Pos.X . " y" . (g_data.Gu
 g_data.Gui.CBBin := new ComboBoxEx(Gui, "x" . g_data.Gui.CBIco.Pos.X . " y" . g_data.Gui.TXBin.Pos.Y . " w" . (g_data.Gui.CBIco.Pos.W-50) . " +0x3 r10")
     GCT.Attach(g_data.Gui.CBBin.GetComboControl(), "El archivo base BIN AutoHotkey")
     Util_LoadBinFiles(Cfg.LastBinFile)
+    g_data.Gui.CBBin.OnCommand(1, "CBBin_Event")    ; CBN_SELCHANGE
 g_data.Gui.BTRfz := Gui.AddButton("x" . (g_data.Gui.BTIco.Pos.X-50) . " y" . g_data.Gui.TXBin.Pos.Y . " w90 h" . g_data.Gui.TXBin.Pos.H, "Refrezcar")
     g_data.Gui.BTRfz.OnEvent("Click", () => Util_LoadBinFiles(Cfg.LastBinFile))
     ImageButton.Create(g_data.Gui.BTRfz.Hwnd, ButtonStyle2*)
@@ -366,12 +370,20 @@ g_data.Gui.LVReg := Gui.AddListView("x" . g_data.Gui.TabDA.GX . " y" . g_data.Gu
     IL_Add(g_data.log_il, "shell32.dll", -51380)    ; INCLUDE
 
 g_data.Gui.Tab.UseTab(2)
-g_data.Gui.LVRsc := Gui.AddListView("x" . g_data.Gui.TabDA.GX . " y" . g_data.Gui.TabDA.GY . " w" . g_data.Gui.TabDA.W . " h" . g_data.Gui.TabDA.H . " -E0x200", "Tipo|Archivo|Nombre|Idioma")
+g_data.Gui.LVRsc := Gui.AddListView("x" . g_data.Gui.TabDA.GX . " y" . g_data.Gui.TabDA.GY . " w" . g_data.Gui.TabDA.W . " h" . g_data.Gui.TabDA.H . " -E0x200 -LV0x10 +0x8", "Tipo|Archivo|Nombre|Idioma")
     DllCall("UxTheme.dll\SetWindowTheme", "Ptr", g_data.Gui.LVRsc.Hwnd, "Str", "Explorer", "UPtr", 0)
 
 g_data.Gui.Tab.UseTab(3)
-g_data.Gui.TVVer := Gui.AddTreeView("x" . g_data.Gui.TabDA.GX . " y" . g_data.Gui.TabDA.GY . " w" . g_data.Gui.TabDA.W . " h" . g_data.Gui.TabDA.H . " -E0x200")
+g_data.Gui.TVVer := Gui.AddTreeView("x" . g_data.Gui.TabDA.GX . " y" . g_data.Gui.TabDA.GY . " w" . g_data.Gui.TabDA.W . " h" . g_data.Gui.TabDA.H . " -E0x200 +0x1222")
     DllCall("UxTheme.dll\SetWindowTheme", "Ptr", g_data.Gui.TVVer.Hwnd, "Str", "Explorer", "UPtr", 0)
+    g_data.Gui.TVVer.SetFont(, "Courier New")
+
+g_data.Gui.Tab.UseTab(4)
+;g_data.Gui.LVVar := Gui.AddListView("x" . g_data.Gui.TabDA.GX . " y" . g_data.Gui.TabDA.GY . " w" . g_data.Gui.TabDA.W . " h" . g_data.Gui.TabDA.H . " -E0x200 -LV0x10 +0x8", "Variable|Datos")
+;    DllCall("UxTheme.dll\SetWindowTheme", "Ptr", g_data.Gui.LVVar.Hwnd, "Str", "Explorer", "UPtr", 0)
+;g_data.Gui.LVVar.Add(, "A_IsCompiled", "1")
+;g_data.Gui.LVVar.Add(, "A_PtrSize", "")
+;g_data.Gui.LVVar.ModifyCol(1, "AutoHdr")
 
 g_data.Gui.Tab.UseTab()
 g_data.Gui.TXSPT := Gui.AddText("x0 y" . (g_data.Gui.Tab.Pos.X+g_data.Gui.Tab.Pos.H+g_data.Gui.TXLgo.Pos.H-2) . " w800 h2 vbsp BackgroundFED22C")    ; separador
@@ -402,6 +414,7 @@ Gui.Show("w800 h" . (g_data.Gui.PCBTM.Pos.Y+g_data.Gui.PCBTM.Pos.H+g_data.Gui.SB
     Gui.OnEvent("DropFiles", "Gui_DropFiles")
 
 Util_UpdateSrc()
+CBBin_Event()
 OnExit("_OnExit")    ; al terminar
 OnMessage(0x100, "WM_KEYDOWN")    ; cuando se presiona una tecla que no sea del sistema (alt).
 Return
@@ -459,11 +472,22 @@ DDLSrc_Event()
     }
 }
 
+CBBin_Event()
+{
+    return
+    local BinaryType := 0
+    g_data.BinFile   := Util_CheckBinFile(g_data.Gui.CBBin.Text, BinaryType)
+    g_data.Compile64 := BinaryType == SCS_64BIT_BINARY
+    g_data.BinVersion := g_data.BinFile ? FileGetVersion(g_data.BinFile) : "0.0.0.0"
+
+    g_data.Gui.LVVar.Modify(2, "Col2", g_data.BinFile ? 32*(1+g_data.Compile64) : "")
+}
+
 Gui_SrcButton()
 {
     local foo  := new GuiDisable("Diálogo para seleccionar archivo fuente..")
     local file := g_data.Gui.CBSrc.Text == "" ? Cfg.LastSrcFile : g_data.Gui.CBSrc.Text
-    If ( file := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar archivo fuente"], file, {"Todos los archivos":"*.*", Scripts:"#*.ahk"},, 0x1200) )
+    If ( file := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar archivo fuente"], file, {"Todos los archivos":"*.*", Scripts:"`n*.ahk"},, 0x1200) )
     {
         for g_k, g_v in file    ; g_k = index  |  g_v = filename
             if (g_data.Gui.CBSrc.FindString(g_v) == -1)    ; no añadir duplicados
@@ -477,7 +501,7 @@ Gui_IcoButton()
 {
     local foo  := new GuiDisable("Diálogo para seleccionar archivo icono..")
     local file := g_data.Gui.CBIco.Text == "" ? Cfg.LastIconFile : g_data.Gui.CBIco.Text
-    If ( file := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar icono"], file, {Iconos:"#*.ico"},, 0x1200) )
+    If ( file := ChooseFile([Gui.Hwnd,"Ahk2Exe - Seleccionar icono"], file, {Iconos:"`n*.ico"},, 0x1200) )
     {
         for g_k, g_v in file    ; g_k = index  |  g_v = filename
             if (g_data.Gui.CBIco.FindString(g_v) == -1)    ; no añadir duplicados
@@ -492,7 +516,7 @@ Gui_DestButton()
     local foo  := new GuiDisable("Diálogo para seleccionar archivo destino..")
     local file := g_data.Gui.EDDst.Text == "" ? ( g_data.Gui.CBSrc.Text == "" ? DirGetParent(Cfg.LastExeFile) . "\" : g_data.Gui.CBSrc.Text )
                                               : ( GetFullPathName(g_data.Gui.EDDst.Text, DirGetParent(g_data.Gui.CBSrc.Text))               )
-    if ( file := SaveFile([Gui.Hwnd,"Ahk2Exe - Seleccionar archivo destino"], SetFileExt(File,"exe"), {Ejecutables:"#*.exe"}) )
+    if ( file := SaveFile([Gui.Hwnd,"Ahk2Exe - Seleccionar archivo destino"], SetFileExt(File,"exe"), {Ejecutables:"`n*.exe"}) )
         g_data.Gui.EDDst.Text := file
 }
 
@@ -560,6 +584,9 @@ WM_KEYDOWN(VK_CODE)
         Util_Status()
     }
 
+    else if (VK_CODE == VK_F5)
+        Util_UpdateSrc()
+
     else if (VK_CODE == VK_DELETE)
     {
         SetTimer("Timer", -50)    ; necesario para el correcto funcionamiento al eliminar un elemento
@@ -583,9 +610,11 @@ _OnExit(ExitReason, ExitCode)
 {
     If (wctrltimer)
         SetTimer(wctrltimer, "Delete")
-    DllCall("User32.dll\AnimateWindow", "Ptr", Gui.HWnd, "UInt", 350, "UInt", 0x80000|0x10000)
+    DllCall("User32.dll\AnimateWindow", "Ptr", Gui.Hwnd, "UInt", 350, "UInt", 0x80000|0x10000)
 
     Util_SaveCfg()
+    Gdiplus.Shutdown()
+
     Return 0    ; EXIT
 }
 ;@Ahk2Exe-endif
@@ -757,13 +786,13 @@ Util_UpdateSrc()
     static rsc := {1:"RT_CURSOR",2:"RT_BITMAP",3:"RT_ICON",4:"RT_MENU",5:"RT_DIALOG",6:"RT_STRING",7:"RT_FONTDIR",8:"RT_FONT",9:"RT_ACCELERATORS",10:"RT_RCDATA",11:"RT_MESSAGETABLE"
                  , 12:"RT_GROUP_CURSOR",14:"RT_GROUP_ICON",16:"RT_VERSION",17:"RT_DLGINCLUDE",19:"RT_PLUGPLAY",20:"RT_VXD",21:"RT_ANICURSOR",22:"RT_ANIICON",23:"RT_HTML",24:"RT_MANIFEST"}
     Util_Status("Leyendo archivo fuente ..")
-  , g_data.Gui.LVRsc.Delete()
-  , g_data.Gui.TVVer.Delete()
+    g_data.Gui.LVRsc.Delete()
+    g_data.Gui.TVVer.Delete()
 
     local BinaryType := 0
     g_data.BinFile   := Util_CheckBinFile(g_data.Gui.CBBin.Text, BinaryType)
-  , g_data.Compile64 := BinaryType == SCS_64BIT_BINARY
-  , g_data.BinVersion := g_data.BinFile ? FileGetVersion(g_data.BinFile) : "0.0.0.0"
+    g_data.Compile64 := BinaryType == SCS_64BIT_BINARY
+    g_data.BinVersion := g_data.BinFile ? FileGetVersion(g_data.BinFile) : "0.0.0.0"
 
     local data := QuickParse(g_data.Gui.CBSrc.Text)
     if (data)
@@ -778,43 +807,56 @@ Util_UpdateSrc()
             else
                 g_data.Gui.CBIco.Selected := g_data.Gui.CBIco.FindString(data.MainIcon)
         }
+        
         if (data.BinFile != "")
             g_data.Gui.CBBin.Selected := g_data.Gui.CBBin.FindString(data.BinFile,, 2)
+        
         if (Trim(g_data.Gui.EDDst.Text) == "")
             g_data.Gui.EDDst.Text := PATH(data.Script).FNNE . ".exe"
+        
         for g_k, g_v in data.Directives.Resources
             if (IsObject(g_v))
                 g_data.Gui.LVRsc.Add(, rsc.HasKey(g_v.ResType)?rsc[g_v.ResType]:g_v.ResType, GetFullPathName(g_v.FileName,DirGetParent(data.Script)), g_v.ResName, (g_v.LangID:=g_v.LangID==""?data.Directives.ResourceLang:g_v.LangID) . " (" . (g_v.LangID is "integer"?Format("{:04X}",g_v.LangID) . ":" . LCIDToLocaleName(g_v.LangID):"") . ")")
+        
         local LangID := "", StringTable := 0, String := 0
             , VS_VERSIONINFO   := g_data.Gui.TVVer.Add("VS_VERSIONINFO",, "Bold")
-            , VS_FIXEDFILEINFO := g_data.Gui.TVVer.Add("VS_FIXEDFILEINFO", VS_VERSIONINFO, "Bold")
-            , StringFileInfo   := g_data.Gui.TVVer.Add("StringFileInfo", VS_VERSIONINFO, "Bold")
-            , VarFileInfo      := g_data.Gui.TVVer.Add("VarFileInfo", VS_VERSIONINFO, "Bold")
+        g_data.Gui.TVVer.Add("wType: 0 (binary data)", VS_VERSIONINFO)
+        g_data.Gui.TVVer.Add("szKey: VS_VERSION_INFO", VS_VERSIONINFO)
+        local VS_FIXEDFILEINFO := g_data.Gui.TVVer.Add("Value: VS_FIXEDFILEINFO (structure)", VS_VERSIONINFO)
+        g_data.Gui.TVVer.Add("dwFileVersionMS   : " . Format("{:08X}",MAKELONG(data.FileVersion[2], Data.FileVersion[1])) . " (" . Data.FileVersion[1] . "." . Data.FileVersion[2] . ")", VS_FIXEDFILEINFO)
+        g_data.Gui.TVVer.Add("dwFileVersionLS   : " . Format("{:08X}",MAKELONG(Data.FileVersion[4], Data.FileVersion[3])) . " (" . Data.FileVersion[3] . "." . Data.FileVersion[4] . ")", VS_FIXEDFILEINFO)
+        g_data.Gui.TVVer.Add("dwProductVersionMS: " . Format("{:08X}",MAKELONG(Data.ProductVersion[2], Data.ProductVersion[1])) . " (" . Data.ProductVersion[1] . "." . Data.ProductVersion[2] . ")", VS_FIXEDFILEINFO)
+        g_data.Gui.TVVer.Add("dwProductVersionLS: " . Format("{:08X}",MAKELONG(Data.ProductVersion[4], Data.ProductVersion[3])) . " (" . Data.ProductVersion[3] . "." . Data.ProductVersion[4] . ")", VS_FIXEDFILEINFO)
+        local StringFileInfo   := g_data.Gui.TVVer.Add("StringFileInfo", VS_VERSIONINFO, "Bold")
+        g_data.Gui.TVVer.Add("wType: 0 (binary data)", StringFileInfo)
+        g_data.Gui.TVVer.Add("szKey: StringFileInfo", StringFileInfo)
+        local VarFileInfo      := g_data.Gui.TVVer.Add("VarFileInfo", VS_VERSIONINFO, "Bold")
         g_data.Gui.TVVer.Add("szKey: VarFileInfo", VarFileInfo)
-      , g_data.Gui.TVVer.Add("szKey: Translation", g_data.Gui.TVVer.Add("Var", VarFileInfo, "Bold"))
+        local Var              := g_data.Gui.TVVer.Add("Var", VarFileInfo, "Bold")
+        g_data.Gui.TVVer.Add("szKey   : Translation", Var)
         for LangID, g_v in data.VerInfo
         {
+            LangID := LangID . " (" . Integer("0x" . SubStr(LangID,1,4)) . "/" . Integer("0x" . SubStr(LangID,-4)) . ")  |  " . LCIDToLocaleName("0x" . SubStr(LangID,1,4))
+            g_data.Gui.TVVer.Add("Value[" . A_Index . "]: " . LangID, Var)
             StringTable := g_data.Gui.TVVer.Add("StringTable", StringFileInfo, "Bold")
-          , g_data.Gui.TVVer.Add("szKey: " . LangID . " (" . Integer("0x" SubStr(LangID,1,4)) . "/" . Integer("0x" SubStr(LangID,-4)) . ") - " . LCIDToLocaleName("0x" SubStr(LangID,1,4)), StringTable)
+            g_data.Gui.TVVer.Add("wType: 0 (binary data)", StringTable)
+            g_data.Gui.TVVer.Add("szKey: " . LangID, StringTable)
             for g_k, g_v in g_v
-            {
                 String := g_data.Gui.TVVer.Add("String", StringTable, "Bold")
+              , g_data.Gui.TVVer.Add("wType: 1 (text data)", String)
               , g_data.Gui.TVVer.Add("szKey: " . g_k, String)
               , g_data.Gui.TVVer.Add("Value: " . g_v, String)
-            }
         }
-        g_data.Gui.TVVer.Add("dwFileVersionMS: " . MAKELONG(data.FileVersion[2], Data.FileVersion[1]) . " (" . Data.FileVersion[1] . "." . Data.FileVersion[2] . ")", VS_FIXEDFILEINFO)
-      , g_data.Gui.TVVer.Add("dwFileVersionLS: " . MAKELONG(Data.FileVersion[4], Data.FileVersion[3]) . " (" . Data.FileVersion[3] . "." . Data.FileVersion[4] . ")", VS_FIXEDFILEINFO)
-      , g_data.Gui.TVVer.Add("dwProductVersionMS: " . MAKELONG(Data.ProductVersion[2], Data.ProductVersion[1]) . " (" . Data.ProductVersion[1] . "." . Data.ProductVersion[2] . ")", VS_FIXEDFILEINFO)
-      , g_data.Gui.TVVer.Add("dwProductVersionLS: " . MAKELONG(Data.ProductVersion[4], Data.ProductVersion[3]) . " (" . Data.ProductVersion[3] . "." . Data.ProductVersion[4] . ")", VS_FIXEDFILEINFO)
-        local ItemID := 0
-        while ( ItemID := g_data.Gui.TVVer.GetNext(ItemID,"Full") )
-            g_data.Gui.TVVer.Modify( ItemID, "Expand" )
-        g_data.Gui.TVVer.Modify(VS_VERSIONINFO, "Vis")
     }
 
     loop g_data.Gui.LVRsc.GetCount("Col") - 1
         g_data.Gui.LVRsc.ModifyCol(A_Index, "AutoHdr")
+
+    local ItemID := 0
+    while ( ItemID := g_data.Gui.TVVer.GetNext(ItemID,"Full") )
+        g_data.Gui.TVVer.Modify( ItemID, "Expand" )
+    g_data.Gui.TVVer.Modify(VS_VERSIONINFO, "Vis")
+
     Util_Status()
 }
 
