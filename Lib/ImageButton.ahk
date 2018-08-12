@@ -197,7 +197,7 @@ Class ImageButton {
          Return This.SetError("Invalid parameter HWND!")
       ; ----------------------------------------------------------------------------------------------------------------
       ; Check Options
-      If !(IsObject(Options)) || (Options.MinIndex() <> 1) || (Options.MaxIndex() > This.MaxOptions)
+      If !(IsObject(Options)) || (Options.MinIndex() != 1) || (Options.MaxIndex() > This.MaxOptions)
          Return This.SetError("Invalid parameter Options!")
       ; ----------------------------------------------------------------------------------------------------------------
       ; Get and check control's class and styles
@@ -287,7 +287,7 @@ Class ImageButton {
          GuiColor := This.GetARGB(Option.6)
          ; BorderColor
          BorderColor := ""
-         If (Option.7 <> "") {
+         If (Option.7 != "") {
             If !(Option.7 + 0) && !This.HTML.HasKey(Option.7)
                Return This.SetError("Invalid value for BorderColor in Options[" . Index . "]!")
             BorderColor := 0xFF000000 | This.GetARGB(Option.7) ; BorderColor must be always opaque
@@ -321,7 +321,7 @@ Class ImageButton {
             Else ; the path is a rounded rectangle
                This.PathAddRoundedRect(PPATH, PathX, PathY, PathW, PathH, Rounded)
             ; If BorderColor and BorderWidth are specified, 'draw' the border (not for Mode 7)
-            If (BorderColor <> "") && (BorderWidth > 0) && (Mode <> 7) {
+            If (BorderColor != "") && (BorderWidth > 0) && (Mode != 7) {
                ; Create a SolidBrush
                local PBRUSH := 0
                DllCall("Gdiplus.dll\GdipCreateSolidFill", "UInt", BorderColor, "PtrP", PBRUSH)
@@ -411,7 +411,7 @@ Class ImageButton {
          }
          ; -------------------------------------------------------------------------------------------------------------
          ; Draw the caption
-         If (BtnCaption <> "") {
+         If (BtnCaption != "") {
             ; Create a StringFormat object
             local HFORMAT := 0
             DllCall("Gdiplus.dll\GdipStringFormatGetGenericTypographic", "PtrP", HFORMAT)
@@ -446,7 +446,7 @@ Class ImageButton {
          ; Free resources
          DllCall("Gdiplus.dll\GdipDisposeImage", "Ptr", PBITMAP)
          DllCall("Gdiplus.dll\GdipDeleteBrush", "Ptr", PBRUSH)
-         If (BtnCaption <> "")
+         If (BtnCaption != "")
             DllCall("Gdiplus.dll\GdipDeleteStringFormat", "Ptr", HFORMAT)
          DllCall("Gdiplus.dll\GdipDeleteGraphics", "Ptr", PGRAPHICS)
          ; Add the bitmap to the array
