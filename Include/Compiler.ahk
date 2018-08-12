@@ -207,7 +207,8 @@
     NumPut(MAKELONG(Data.Directives.ProductVersion[4], Data.Directives.ProductVersion[3]), VerRes.GetValue(20), "UInt")    ; VS_FIXEDFILEINFO.dwProductVersionLS
 
     ; guardamos la nueva estructura
-    UpdateResource(hUpdate, RT_VERSION, 1, Data.Directives.ResourceLang, VerRes.Alloc(Size), Size)    ; escribimos el nuevo recurso de versión reemplazando el actual
+    UpdateResource(hUpdate, RT_VERSION, 1)    ; primero eliminamos el recurso de versión actual
+    UpdateResource(hUpdate, RT_VERSION, 1, Data.Directives.ResourceLang, VerRes.Alloc(Size), Size)    ; añadimos el nuevo recurso de versión
     LangID := "", VerInfo := "", StrFI := "", VerRes := ""
 
 

@@ -113,8 +113,11 @@ Class VersionRes    ;// updated on 2018-07-28 | Flipeador
     {
         loop ( this.Children.Length() )
             if ( (CaseSensitive && this.Children[A_Index].Key == Key) || (!CaseSensitive && this.Children[A_Index].Key = Key) )
-                return this.Children.RemoveAt( A_Index )
-        return FALSE
+            {
+                local Child := this.Children[ A_Index ]
+                return this.Children.RemoveAt( A_Index ) ? Child : Child
+            }
+        return 0
     }
     
     /*
@@ -174,6 +177,15 @@ Class VersionRes    ;// updated on 2018-07-28 | Flipeador
     GetKey()
     {
         return this.Key
+    }
+
+    /*
+        Recupera el tamaño de la clave, en caracteres.
+    */
+    GetKeyLength(Bytes := FALSE, Padding := FALSE)
+    {
+        local size := ( StrLen(this.Key) + 1 ) * ( Bytes ? 2 : 1 )
+        return Padding ? ( size + 3 ) & ~3 : size
     }
 
     /*

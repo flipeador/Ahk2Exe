@@ -44,7 +44,7 @@ SetFileExt(File, Ext := "")
 
 
 
-_CONTAINS(Var, Data, CaseSensitive := FALSE, Delimiter := "|", OmitCars := "")
+_CONTAINS(Var, Data, CaseSensitive := FALSE, Delimiter := "|", OmitChars := "")
 {
     Local Key := "", Value := ""
     If (IsObject(Data))
@@ -54,7 +54,7 @@ _CONTAINS(Var, Data, CaseSensitive := FALSE, Delimiter := "|", OmitCars := "")
                 Return TRUE
     }
     Else
-        Loop Parse, Data, Delimiter, OmitCars
+        Loop Parse, Data, Delimiter, OmitChars
             If (InStr(Var, A_LoopField, CaseSensitive))
                 Return TRUE
     Return FALSE
@@ -64,7 +64,7 @@ _CONTAINS(Var, Data, CaseSensitive := FALSE, Delimiter := "|", OmitCars := "")
 
 
 
-_IN(Var, Data, CaseSensitive := FALSE, Delimiter := "|", OmitCars := "")
+_IN(Var, Data, CaseSensitive := FALSE, Delimiter := "|", OmitChars := "")
 {
     Local Key := "", Value := ""
     If (IsObject(Data))
@@ -74,7 +74,7 @@ _IN(Var, Data, CaseSensitive := FALSE, Delimiter := "|", OmitCars := "")
                 Return TRUE
     }
     Else
-        Loop Parse, Data, Delimiter, OmitCars
+        Loop Parse, Data, Delimiter, OmitChars
             If ( (CaseSensitive && A_LoopField == Var) || (!CaseSensitive && A_LoopField = Var) )
                 Return TRUE
     Return FALSE
@@ -168,7 +168,7 @@ MAKELONG(short_low, short_high := 0)
 */
 MAKELONG64(long_low, long_high := 0)
 {
-    Return (long_low & 0xFFFFFFFF) | ((long_high & 0xFFFFFFFF) << 32)  
+    Return (long_low & 0xFFFFFFFF) | ((long_high & 0xFFFFFFFF) << 32)
 }
 
 LOWORD(l)
